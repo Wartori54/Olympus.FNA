@@ -80,7 +80,9 @@ namespace Olympus {
 
         public List<Installation> Found = new();
 
-        public event Action<FinderUpdateState, List<Installation>>? Updated;
+        public List<Installation> Added = new();
+
+        public event Action<FinderUpdateState, List<Installation>, InstallManagerScene.InstallList>? Updated;
 
         public FinderManager(App app) {
             App = app;
@@ -107,16 +109,16 @@ namespace Olympus {
                     Console.WriteLine("Refreshing install list");
                     HashSet<string> added = new();
                     List<Installation> installs = new();
-                    Updated?.Invoke(FinderUpdateState.Start, installs);
+                    Updated?.Invoke(FinderUpdateState.Start, installs, InstallManagerScene.InstallList.Found);
                     await foreach (Installation install in FindAll()) {
                         if (added.Add(install.Root)) {
                             Console.WriteLine($"Found install: {install.Type} - {install.Root}");
                             installs.Add(install);
-                            Updated?.Invoke(FinderUpdateState.Add, installs);
+                            Updated?.Invoke(FinderUpdateState.Add, installs, InstallManagerScene.InstallList.Found);
                         }
                     }
                     Found = installs;
-                    Updated?.Invoke(FinderUpdateState.End, installs);
+                    Updated?.Invoke(FinderUpdateState.End, installs, InstallManagerScene.InstallList.Found);
                     return installs;
                 });
             }
@@ -182,6 +184,22 @@ namespace Olympus {
             }
         }
 
+        // Helper to prevent duplicates
+        public bool AddManualInstall(Installation install) {
+            foreach (Installation item in Added) {
+                if (item.Root == install.Root) {
+                    return false;
+                }
+            }
+            foreach (Installation item in Found) {
+                if (item.Root == install.Root) {
+                    return false;
+                }
+            }
+            Added.Add(install);
+            return true;
+        }
+
     }
 
     public enum FinderUpdateState {
@@ -193,7 +211,7 @@ namespace Olympus {
 
     public class Installation {
 
-        public string Type;
+        public string Type; // TODO: Make this an enum
         public string Name;
         public string Root;
 
@@ -215,6 +233,17 @@ namespace Olympus {
 
         public bool FixPath() {
             string root = Root;
+
+            if (File.Exists(root)) { // root probably points to Celeste.exe
+                string? newRoot = Path.GetDirectoryName(root);
+                if (newRoot != null && newRoot != "") {
+                    root = newRoot;
+                }
+            }
+
+            if (root == "") {
+                return false;
+            }
 
             // Early exit check if possible.
             string path = root;

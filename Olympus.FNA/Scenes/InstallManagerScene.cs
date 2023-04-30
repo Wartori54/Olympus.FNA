@@ -1,7 +1,9 @@
 ﻿using OlympUI;
+using MonoMod.Utils;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using NativeFileDialogSharp;
 
 namespace Olympus {
     public class InstallManagerScene : Scene {
@@ -31,6 +33,11 @@ namespace Olympus {
         };
 
         private List<Installation> InstallsFoundAdded = new();
+
+        public enum InstallList {
+            Found,
+            Added
+        }
 
         public override Element Generate()
             => new Group() {
@@ -116,6 +123,15 @@ namespace Olympus {
                                             },
                                             Children = {
                                                 new HeaderSmall("Manually added"),
+                                                new Button("Add installation", b => AddManualInstallation()) {
+                                                    Style = {
+                                                        { Group.StyleKeys.Spacing, 8 },
+                                                    },
+                                                    Layout = {
+                                                        Layouts.Column(),
+                                                        Layouts.Fill(1, 0),
+                                                    },
+                                                },
                                                 new Group() {
                                                     Clip = true,
                                                     ClipExtend = 8,
@@ -146,12 +162,21 @@ namespace Olympus {
             return root;
         }
 
-        private void UpdateInstallList() => UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Found);
+        private void UpdateInstallList() {
+            UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Found, InstallList.Found);
+            UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
+        }
 
-        private void UpdateInstallList(FinderUpdateState state, List<Installation> found) {
+        private void UpdateInstallList(FinderUpdateState state, List<Installation> found, InstallList listType) {
+            Group targetGroup = new();
+            if (listType == InstallList.Found) {
+                targetGroup = InstallsFound;
+            } else if (listType == InstallList.Added) {
+                targetGroup = InstallsManual;
+            }
             if (state == FinderUpdateState.Manual || state == FinderUpdateState.Start) {
                 InstallsFoundAdded.Clear();
-                InstallsFound.DisposeChildren();
+                targetGroup.DisposeChildren();
             }
 
             if (state == FinderUpdateState.Start) {
@@ -162,13 +187,45 @@ namespace Olympus {
                 for (int i = InstallsFoundAdded.Count; i < found.Count; i++) {
                     Installation install = found[i];
                     InstallsFoundAdded.Add(install);
-                    InstallsFound.Add(CreateEntry(install));
+                    targetGroup.Add(CreateEntry(install));
                 }
             }
 
             if (state == FinderUpdateState.End) {
                 InstallsFound.Remove(InstallsFoundLoading);
             }
+        }
+
+        private void AddManualInstallation() { // TODO: Save to disk
+
+            string filter;
+
+            if (PlatformHelper.Is(Platform.Linux)) {
+                filter = "exe,bin.x86,bin.x86_64";
+            } else if (PlatformHelper.Is(Platform.MacOS)) {
+                filter = "app,exe,bin.osx";
+            } else { // default to windows
+                filter = "exe";
+            }
+
+            DialogResult result = Dialog.FileOpen(filter);
+
+            if (!result.IsOk) {
+                if (result.IsError) {
+                    Console.WriteLine("Error while choosing file: " + result.ErrorMessage);
+                }
+                return;
+            }
+
+            Installation newInstall = new("manual", "Manual installation", result.Path);
+
+            if (!newInstall.FixPath()) { // Ignore for now
+                Console.WriteLine("Bad path: " + newInstall.Root);
+                return; // TODO: Give user a warning for invalid installation
+            }
+            
+            App.Instance.FinderManager.AddManualInstall(newInstall);
+            UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
         }
 
         private Panel CreateEntry(Installation install) {

@@ -50,6 +50,7 @@
     <PackageReference Include="Mono.Options" Version="6.12.0.148" />
     <PackageReference Include="MonoMod.RuntimeDetour" Version="22.7.31.1" />
     <PackageReference Include="MonoMod.Utils" Version="22.7.31.1" />
+    <PackageReference Include="NativeFileDialogSharp" Version="0.5.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="SharpDX" Version="4.2.0" Condition="$(TargetIsWindows)" />
     <PackageReference Include="SharpDX.DXGI" Version="4.2.0" Condition="$(TargetIsWindows)" />
