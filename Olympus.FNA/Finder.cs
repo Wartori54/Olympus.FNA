@@ -204,6 +204,12 @@ namespace Olympus {
             return true;
         }
 
+        public void RemoveInstallation(Installation install) {
+            Added.Remove(install);
+            Config.Instance.ManualInstalls = Added;
+            Config.Instance.Save();
+        }
+
     }
 
     public enum FinderUpdateState {

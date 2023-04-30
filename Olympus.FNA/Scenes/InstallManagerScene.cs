@@ -4,6 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using NativeFileDialogSharp;
+using Microsoft.Xna.Framework.Graphics;
+using Olympus.NativeImpls;
 
 namespace Olympus {
     public class InstallManagerScene : Scene {
@@ -234,22 +236,45 @@ namespace Olympus {
                 Data = {
                     { "Installation", install },
                 },
-                Clip = true,
+                Clip = false,
                 Layout = {
                     Layouts.Fill(1, 0),
-                    Layouts.Column(),
                 },
                 Style = {
                     { Group.StyleKeys.Spacing, 0 },
                 },
                 Children = {
-                    new HeaderSmall(install.Name) {
-                        Wrap = true,
+                    new Group() {
+                        Clip = true,
+                        Layout = {
+                            Layouts.Fill(1, 0),
+                            Layouts.Column(),
+                        },
+                        Style = {
+                            { Group.StyleKeys.Spacing, 0 },
+                        },
+                        Children = {
+                            new HeaderSmall(install.Name) {
+                                Wrap = true,
+                            },
+                            (labelVersion = new Label("Scanning...")),
+                            new LabelSmall(install.Root),
+                        }
                     },
-                    (labelVersion = new Label("Scanning...")),
-                    new LabelSmall(install.Root),
+                    
                 }
             };
+            if (install.Type == "manual")
+                panel.Children.Add(
+                    new RemoveButton("delete", "Delete", b => {
+                        App.FinderManager.RemoveInstallation(install);
+                        UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
+                    }) {
+                        Layout = {
+                            Layouts.Right(),
+                        }
+                    }   
+                );
 
             Task.Run(() => {
                 (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) version = install.ScanVersion(true);
@@ -259,6 +284,41 @@ namespace Olympus {
             });
 
             return panel;
+        }
+
+        public partial class RemoveButton : MetaMainScene.SidebarButton {
+
+            public static readonly new Style DefaultStyle = new() {
+                {
+                    StyleKeys.Current,
+                    new Style() {
+                        { Panel.StyleKeys.Background, () => NativeImpl.Native.Accent * 0.2f },
+                        // { Button.StyleKeys.Foreground, new Color(0xff, 0xff, 0xff, 0xff) },
+                        { Button.StyleKeys.Foreground, () => NativeImpl.Native.Accent },
+                        { Panel.StyleKeys.Shadow, 0f },
+                    }
+                },
+            };
+
+            public override Style.Key StyleState =>
+                base.StyleState;
+
+            public RemoveButton(string icon, string text, Action<Button> cb)
+                : this(OlympUI.Assets.GetTexture($"icons/{icon}"), text, cb) {
+            }
+
+            public RemoveButton(IReloadable<Texture2D, Texture2DMeta> icon, string text, Action<Button> cb)
+                : base(icon, text) {
+                Callback += cb;
+                WH = new(64, 64);
+            }
+
+            public new abstract partial class StyleKeys : MetaMainScene.SidebarButton.StyleKeys {
+                protected StyleKeys(Secret secret) : base(secret) { }
+
+                public static readonly Style.Key Current = new("Current");
+            }
+
         }
 
     }
