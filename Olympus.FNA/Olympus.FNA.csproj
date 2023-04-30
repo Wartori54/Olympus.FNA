@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks Condition="'$(TargetFrameworks)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">net6.0;net6.0-windows</TargetFrameworks>
-    <TargetFrameworks Condition="'$(TargetFrameworks)' == ''">net6.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(TargetFrameworks)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">net7.0;net7.0-windows</TargetFrameworks>
+    <TargetFrameworks Condition="'$(TargetFrameworks)' == ''">net7.0</TargetFrameworks>
     <RootNamespace>Olympus</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
@@ -46,15 +46,15 @@
 
   <ItemGroup>
     <PackageReference Include="LibTessDotNet" Version="1.1.15" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="6.0.5" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.5" />
     <PackageReference Include="Mono.Options" Version="6.12.0.148" />
-    <PackageReference Include="MonoMod.RuntimeDetour" Version="22.5.1.1" />
-    <PackageReference Include="MonoMod.Utils" Version="22.5.1.1" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="MonoMod.RuntimeDetour" Version="22.7.31.1" />
+    <PackageReference Include="MonoMod.Utils" Version="22.7.31.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="SharpDX" Version="4.2.0" Condition="$(TargetIsWindows)" />
     <PackageReference Include="SharpDX.DXGI" Version="4.2.0" Condition="$(TargetIsWindows)" />
-    <PackageReference Include="System.Management" Version="6.0.0" Condition="$(TargetIsWindows)" />
-    <PackageReference Include="YamlDotNet" Version="11.2.1" />
+    <PackageReference Include="System.Management" Version="7.0.1" Condition="$(TargetIsWindows)" />
+    <PackageReference Include="YamlDotNet" Version="13.1.0" />
   </ItemGroup>
 
   <ItemGroup>
