@@ -100,6 +100,8 @@ namespace Olympus {
         private readonly object RefreshingLock = new();
         public Task<List<Installation>> Refreshing = Task.FromResult(new List<Installation>());
         public Task<List<Installation>> Refresh() {
+            Added = Config.Instance.ManualInstalls;
+
             if (!Refreshing.IsCompleted)
                 return Refreshing;
             lock (RefreshingLock) {
@@ -197,6 +199,8 @@ namespace Olympus {
                 }
             }
             Added.Add(install);
+            Config.Instance.ManualInstalls = Added;
+            Config.Instance.Save();
             return true;
         }
 

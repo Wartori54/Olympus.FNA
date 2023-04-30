@@ -160,6 +160,11 @@ namespace Olympus {
             base.BeginRun();
         }
 
+        protected override void EndRun() {
+            Config.Save(); // Extra save for safety
+            base.EndRun();
+        }
+
 
         protected override void Initialize() {
             Config.Load();

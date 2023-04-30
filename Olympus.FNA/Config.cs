@@ -13,8 +13,12 @@ namespace Olympus {
         [NonSerialized]
         private readonly JsonHelper.ExistingCreationConverter<Config> Converter;
 
+        [NonSerialized]
+        public static Config Instance = new();
+
         public Config() {
             Converter = new(this);
+            Instance = this;
         }
 
         public string Updates = "stable";
