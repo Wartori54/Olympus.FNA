@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using NativeFileDialogSharp;
 using Microsoft.Xna.Framework.Graphics;
 using Olympus.NativeImpls;
+using Microsoft.Xna.Framework;
 
 namespace Olympus {
     public class InstallManagerScene : Scene {
@@ -254,7 +255,7 @@ namespace Olympus {
                             { Group.StyleKeys.Spacing, 0 },
                         },
                         Children = {
-                            new HeaderSmall(install.Name) {
+                            new HeaderSmall(install.Name) { // TODO: make name changeable
                                 Wrap = true,
                             },
                             (labelVersion = new Label("Scanning...")),
@@ -295,6 +296,22 @@ namespace Olympus {
                         { Panel.StyleKeys.Background, () => NativeImpl.Native.Accent * 0.2f },
                         // { Button.StyleKeys.Foreground, new Color(0xff, 0xff, 0xff, 0xff) },
                         { Button.StyleKeys.Foreground, () => NativeImpl.Native.Accent },
+                        { Panel.StyleKeys.Shadow, 0f },
+                    }
+                },
+                {
+                    StyleKeys.Hovered,
+                    new Style() {
+                        { Panel.StyleKeys.Background, new Color(0xff, 0x30, 0x30, 0xff) },
+                        { StyleKeys.Foreground, new Color(0xff, 0xff, 0xff, 0xff) },
+                        { Panel.StyleKeys.Shadow, 0f },
+                    }
+                },
+                {
+                    StyleKeys.Pressed,
+                    new Style() {
+                        { Panel.StyleKeys.Background, new Color(0xc3, 0x00, 0x00, 0xc0) },
+                        { StyleKeys.Foreground, new Color(0xff, 0xff, 0xff, 0xff) },
                         { Panel.StyleKeys.Shadow, 0f },
                     }
                 },
