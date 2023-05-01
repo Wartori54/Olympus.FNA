@@ -412,5 +412,17 @@ namespace Olympus {
             }
         }
 
+        public override bool Equals(object? obj) {
+            if (base.Equals(obj)) return true;
+            if (!(obj is Installation)) return false;
+
+            Installation other = (Installation) obj;
+            return (
+                this.Type.Equals(other.Type) &&
+                this.Name.Equals(other.Name) &&
+                this.Root.Equals(other.Root)
+            );
+        }
+
     }
 }

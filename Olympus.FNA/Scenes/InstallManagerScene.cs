@@ -19,6 +19,8 @@ namespace Olympus {
         private Group InstallsManual;
 #pragma warning restore CS8618
 
+        public static Installation? SelectedInstall;
+
         private Group InstallsFoundLoading = new Group() {
             Layout = {
                 Layouts.Left(0.5f, 0),
@@ -160,6 +162,7 @@ namespace Olympus {
             };
 
         public override Element PostGenerate(Element root) {
+            SelectedInstall ??= Config.Instance.Install;
             App.Instance.FinderManager.Updated += UpdateInstallList;
             UpdateInstallList();
             return root;
@@ -233,7 +236,11 @@ namespace Olympus {
 
         private Panel CreateEntry(Installation install) {
             Label labelVersion;
-            Panel panel = new() {
+            SelectablePanel panel = new(install, b => {
+                SelectedInstall = install;
+                Config.Instance.Install = install;
+                Config.Instance.Save();
+            }) {
                 Data = {
                     { "Installation", install },
                 },
@@ -336,6 +343,68 @@ namespace Olympus {
                 public static readonly Style.Key Current = new("Current");
             }
 
+        }
+
+        public partial class SelectablePanel : Panel {
+
+            public static readonly new Style DefaultStyle = new() {
+                {
+                    StyleKeys.Normal,
+                    new Style() {
+                        { Panel.StyleKeys.Background, new Color(0x08, 0x08, 0x08, 0xd0) },
+                        { Panel.StyleKeys.Border, new Color(0x08, 0x08, 0x08, 0xd0) },
+                    }
+                },
+
+                {
+                    StyleKeys.Hovered,
+                    new Style() {
+                        { Panel.StyleKeys.Background, new Color(0x08, 0x08, 0x22, 0xd0) },
+                        { Panel.StyleKeys.Border, new Color(0x08, 0x08, 0x08, 0xd0) },
+                    }
+                },
+
+                {
+                    StyleKeys.Selected,
+                    new Style() {
+                        { Panel.StyleKeys.Background, new Color(0x08, 0x08, 0x48, 0xd0) },
+                        { Panel.StyleKeys.Border, new Color(0x38, 0x38, 0x38, 0xd0) },
+                    }
+                },
+            };
+
+            public bool Selected = false;
+
+            private Action<SelectablePanel> callback;
+            private Installation install;
+            
+            public SelectablePanel(Installation install, Action<SelectablePanel> cb)
+            : base() {
+                this.callback = cb;
+                this.install = install;
+            }
+
+            public override void Update(float dt) {
+                Selected = install.Equals(SelectedInstall);
+
+                Style.Apply(Selected ? StyleKeys.Selected : 
+                            Hovered  ? StyleKeys.Hovered :
+                                       StyleKeys.Normal);
+
+                base.Update(dt);
+            }
+
+            private void OnClick(MouseEvent.Click e) {
+                Console.WriteLine("Pressed " + e.XY);
+                callback.Invoke(this);
+            }
+
+            public new abstract partial class StyleKeys {
+
+                public static readonly Style.Key Normal = new("Normal");
+                public static readonly Style.Key Selected = new("Selected");
+                public static readonly Style.Key Hovered = new("Hovered");
+            }
         }
 
     }
