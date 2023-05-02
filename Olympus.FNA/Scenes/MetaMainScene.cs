@@ -97,8 +97,8 @@ namespace Olympus {
                                             Layouts.Top(),
                                         },
                                         Children = {
-                                            new SidebarPlayButton("play_wheel", "Everest", _ => { }),
-                                            new SidebarPlayButton("play", "Vanilla", _ => { }),
+                                            new SidebarPlayButton("play_wheel", "Everest", _ => Launch.GameLauncher.LaunchCurrent(false)),
+                                            new SidebarPlayButton("play", "Vanilla", _ => Launch.GameLauncher.LaunchCurrent(true)),
                                             new SidebarNavButton("everest", "Home", Scener.Get<HomeScene>()),
                                             new SidebarNavButton("gamebanana", "Find Mods", Scener.Get<TestScene>()),
                                             new SidebarNavButton("loenn", "Lönn", new MetaMainScene() { Real = false }),
