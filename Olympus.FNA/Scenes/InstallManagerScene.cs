@@ -275,6 +275,7 @@ namespace Olympus {
             if (install.Type == "manual")
                 panel.Children.Add(
                     new RemoveButton("delete", "Delete", b => {
+                        panel.PreventNextClick();
                         App.FinderManager.RemoveInstallation(install);
                         UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
                     }) {
@@ -375,6 +376,8 @@ namespace Olympus {
 
             public bool Selected = false;
 
+            private bool preventNextClick = false;
+
             private Action<SelectablePanel> callback;
             private Installation install;
             
@@ -395,8 +398,15 @@ namespace Olympus {
             }
 
             private void OnClick(MouseEvent.Click e) {
-                Console.WriteLine("Pressed " + e.XY);
+                if (preventNextClick) {
+                    preventNextClick = false;
+                    return;
+                }
                 callback.Invoke(this);
+            }
+
+            public void PreventNextClick() {
+                preventNextClick = true;
             }
 
             public new abstract partial class StyleKeys {
