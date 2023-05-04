@@ -5,6 +5,7 @@ using OlympUI.Animations;
 using Olympus.ColorThief;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -333,10 +334,7 @@ namespace Olympus {
                                                 Layout = {
                                                     Layouts.Column(),
                                                 },
-                                                Children = {
-                                                    new LabelSmall("Celeste Installation: main"),
-                                                    new LabelSmall("Version: 1.4.0.0-fna + Everest 1.3102.0-azure-39c72"),
-                                                }
+                                                Children = GetCelesteVersionLabels(),
                                             },
                                             new Button("Manage Installs", _ => Scener.Push<InstallManagerScene>()) {
                                                 Style = {
@@ -540,6 +538,51 @@ namespace Olympus {
 
                 },
             };
+        
+        private static string GetInstallationName() {
+            if (Config.Instance == null || Config.Instance.Installation == null) {
+                return "Loading...";
+            }
+
+            return Config.Instance.Installation.Name;
+        }
+
+        private static string GetInstallationInfo() {
+            if (Config.Instance == null || Config.Instance.Installation == null) {
+                return "Loading...";
+            }
+            (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
+            = Config.Instance.Installation.ScanVersion(false);
+            Console.WriteLine("Modifiable: {0}", Modifiable);
+            Console.WriteLine("Full: {0}", Full);
+            Console.WriteLine("Version: {0}", Version);
+            Console.WriteLine("Framework: {0}", Framework);
+            Console.WriteLine("ModName: {0}", ModName);
+            Console.WriteLine("ModVersion: {0}", ModVersion);
+            return Full;
+        }
+        
+        private Action<Installation?>? updateEvent = null;
+
+        private ObservableCollection<Element> GetCelesteVersionLabels() {
+            LabelSmall InstallName = new("Celeste Installation: " + GetInstallationName());
+            LabelSmall InstallVersion = new("Version: " + GetInstallationInfo());
+
+            if (updateEvent == null) {
+                updateEvent = i => {};
+                Config.Instance.SubscribeInstallUpdateNotify(i => updateEvent(i)); // wrapper so we can update the lambda
+            }
+
+            updateEvent = i => {
+                InstallName.Text = "Celeste Installation: " + GetInstallationName();
+                InstallVersion.Text = "Version: " + GetInstallationInfo();
+            };
+
+            return new() {
+                InstallName,
+                InstallVersion
+            };
+        }
 
     }
 

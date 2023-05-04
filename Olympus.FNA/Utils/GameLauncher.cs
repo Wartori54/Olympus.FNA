@@ -6,8 +6,8 @@ using System.IO;
 namespace Olympus.Launch {
     public class GameLauncher {
         public static LaunchResult LaunchCurrent(bool vanilla) {
-            if (Config.Instance.Install == null) return LaunchResult.MissingInstall;
-            return Launch(Config.Instance.Install, vanilla);
+            if (Config.Instance.Installation == null) return LaunchResult.MissingInstall;
+            return Launch(Config.Instance.Installation, vanilla);
         }
 
         public static LaunchResult Launch(Installation install, bool vanilla) {

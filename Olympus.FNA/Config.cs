@@ -14,6 +14,9 @@ namespace Olympus {
         private readonly JsonHelper.ExistingCreationConverter<Config> Converter;
 
         [NonSerialized]
+        private List<Action<Installation?>> InstallUpdateEvents = new();
+
+        [NonSerialized]
         public static Config Instance = new();
 
         public Config() {
@@ -26,7 +29,18 @@ namespace Olympus {
         public Version VersionPrev = new();
         public Version Version = App.Version;
 
-        public Installation? Install;
+        private Installation? Install;
+
+        public Installation? Installation {
+            get {return Install;}
+            set {
+                Install = value;
+                foreach (Action<Installation?> subscribed in InstallUpdateEvents) {
+                    subscribed.Invoke(Install);
+                }
+            }
+        }
+        
         public List<Installation> ManualInstalls = new();
 
         public bool? CSD;
@@ -98,6 +112,10 @@ namespace Olympus {
             using JsonTextWriter jtw = new(sw);
 
             JsonHelper.Serializer.Serialize(jtw, this);
+        }
+
+        public void SubscribeInstallUpdateNotify(Action<Installation?> action) {
+            InstallUpdateEvents.Add(action);
         }
 
     }

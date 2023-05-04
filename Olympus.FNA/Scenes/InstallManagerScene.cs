@@ -162,7 +162,7 @@ namespace Olympus {
             };
 
         public override Element PostGenerate(Element root) {
-            SelectedInstall ??= Config.Instance.Install;
+            SelectedInstall ??= Config.Instance.Installation;
             App.Instance.FinderManager.Updated += UpdateInstallList;
             UpdateInstallList();
             return root;
@@ -238,7 +238,7 @@ namespace Olympus {
             Label labelVersion;
             SelectablePanel panel = new(install, b => {
                 SelectedInstall = install;
-                Config.Instance.Install = install;
+                Config.Instance.Installation = install;
                 Config.Instance.Save();
             }) {
                 Data = {
@@ -348,7 +348,7 @@ namespace Olympus {
 
         public partial class SelectablePanel : Panel {
 
-            public static readonly new Style DefaultStyle = new() {
+            public static readonly new Style DefaultStyle = new() { // TODO: selected on dark mode looks awful
                 {
                     StyleKeys.Normal,
                     new Style() {

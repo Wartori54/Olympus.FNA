@@ -424,5 +424,9 @@ namespace Olympus {
             );
         }
 
+        public override int GetHashCode() {
+            return base.GetHashCode(); // Just to avoid warnings
+        }
+
     }
 }

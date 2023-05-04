@@ -107,6 +107,10 @@ namespace Olympus {
                 }
             }
 
+            if (UIInput.Pressed(Keys.F8)) {
+                // Run debug code that prints to stdout here
+            }
+
             if (UIInput.Pressed(Keys.F10)) {
                 AlwaysRepaint = !AlwaysRepaint;
                 App.VSync = !AlwaysRepaint;
