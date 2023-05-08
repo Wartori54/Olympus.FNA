@@ -12,6 +12,13 @@ using System.Threading.Tasks;
 namespace Olympus {
     public class HomeScene : Scene {
 
+        private Action<Installation?>? refreshModList = null;
+
+        public HomeScene() : base() {
+            Config.Instance.SubscribeInstallUpdateNotify(i => (refreshModList ?? (i => {}) )(i));
+            // TODO: make refreshModList async, currently if install has a lot of mods, little lag can be noticed
+        }
+
         public override Element Generate()
             => new Group() {
                 Style = {
@@ -408,36 +415,15 @@ namespace Olympus {
                                                     });
                                                 });
 
-                                                await Task.Delay(3000);
+                                                await Task.Delay(1000);
 
-                                                await UI.Run(() => {
+                                                refreshModList = i => {
+                                                    Console.WriteLine("refreshModList");
                                                     el.DisposeChildren();
-                                                    el.Add(new Panel() {
-                                                        Layout = {
-                                                            Layouts.Fill(1, 0),
-                                                            Layouts.Column(),
-                                                        },
-                                                        Children = {
-                                                            new HeaderSmall("Everest"),
-                                                            new Label("Everest is the mod loader. It's installed like a game patch.\nYou need to have Everest installed for all other mods to be loaded.") {
-                                                                Wrap = true,
-                                                            },
-                                                            new Group() {
-                                                                Style = {
-                                                                    { Group.StyleKeys.Spacing, 0 },
-                                                                },
-                                                                Layout = {
-                                                                    Layouts.Fill(1, 0),
-                                                                    Layouts.Column()
-                                                                },
-                                                                Children = {
-                                                                    new LabelSmall("Installed Version: 1.3102.0-azure-39c72"),
-                                                                    new LabelSmall("Update Available: 1.3193.0-azure-a5c21"),
-                                                                }
-                                                            },
-                                                        }
-                                                    });
-                                                });
+                                                    el.Children = GenerateModList();
+                                                };
+                                                await UI.Run(() => refreshModList(null)); // pass null because i is ignored
+                                                // the correct install will get picked through Config.Instance.Install
                                             })
                                         }
                                     },
@@ -541,6 +527,7 @@ namespace Olympus {
         
         private static string GetInstallationName() {
             if (Config.Instance == null || Config.Instance.Installation == null) {
+                Console.WriteLine("GetInstallationName called before config was loaded!");
                 return "Loading...";
             }
 
@@ -549,16 +536,11 @@ namespace Olympus {
 
         private static string GetInstallationInfo() {
             if (Config.Instance == null || Config.Instance.Installation == null) {
+                Console.WriteLine("GetInstallationInfo called before config was loaded!");
                 return "Loading...";
             }
             (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
             = Config.Instance.Installation.ScanVersion(false);
-            Console.WriteLine("Modifiable: {0}", Modifiable);
-            Console.WriteLine("Full: {0}", Full);
-            Console.WriteLine("Version: {0}", Version);
-            Console.WriteLine("Framework: {0}", Framework);
-            Console.WriteLine("ModName: {0}", ModName);
-            Console.WriteLine("ModVersion: {0}", ModVersion);
             return Full;
         }
         
@@ -584,6 +566,79 @@ namespace Olympus {
             };
         }
 
-    }
+        // Returns an collection of panels, each containing the mods installed
+        private ObservableCollection<Element> GenerateModList() {
+            if (Config.Instance == null || Config.Instance.Installation == null) {
+                Console.WriteLine("GenerateModList called before config was loaded!");
+                return new(); // shouldn't ever happen
+            }
+            (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
+            = Config.Instance.Installation.ScanVersion(false);
+            Panel everestPanel = new Panel() {
+                Layout = {
+                    Layouts.Fill(1, 0),
+                    Layouts.Column(),
+                },
+                Children = {
+                    new HeaderSmall("Everest"),
+                    new Label("Everest is the mod loader. It's installed like a game patch.\nYou need to have Everest installed for all other mods to be loaded.") {
+                        Wrap = true,
+                    },
+                    new Group() {
+                        Style = {
+                            { Group.StyleKeys.Spacing, 0 },
+                        },
+                        Layout = {
+                            Layouts.Fill(1, 0),
+                            Layouts.Column()
+                        },
+                        Children = {
+                            new LabelSmall("Installed Version: " + ModVersion),
+                            new LabelSmall("Update Available: TODO"),
+                        }
+                    },
+                }
+            };
 
+            ObservableCollection<Element> panels = new() {
+                everestPanel,
+            };
+
+            List<ModList.ModInfo> installedMods = ModList.GatherModList(true, false, false, false);
+
+            foreach (ModList.ModInfo mod in installedMods) {
+                Panel modPanel = new Panel() {
+                    Layout = {
+                        Layouts.Fill(1, 0),
+                        Layouts.Column(),
+                    },
+                    Children = {
+                        new HeaderSmall(mod.Name),
+                        new Label("This is a mod.") {
+                            Wrap = true,
+                        },
+                        new Group() {
+                            Style = {
+                                { Group.StyleKeys.Spacing, 0 },
+                            },
+                            Layout = {
+                                Layouts.Fill(1, 0),
+                                Layouts.Column()
+                            },
+                            Children = {
+                                new LabelSmall("Installed Version: " + mod.Version),
+                                new LabelSmall("Update Available: TODO"),
+                            }
+                        },
+                    }
+                };
+
+                panels.Add(modPanel);
+            }
+
+            return panels;
+
+        }
+
+    }
 }
