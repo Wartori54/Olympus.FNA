@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace Olympus {
     public class Config {
@@ -36,7 +37,9 @@ namespace Olympus {
             set {
                 Install = value;
                 foreach (Action<Installation?> subscribed in InstallUpdateEvents) {
-                    subscribed.Invoke(Install);
+                    Task.Run(() =>
+                        subscribed.Invoke(Install)
+                    );
                 }
             }
         }
@@ -114,6 +117,8 @@ namespace Olympus {
             JsonHelper.Serializer.Serialize(jtw, this);
         }
 
+        // Subscribes an event for when the currently active install gets changed
+        // Note: this call will be asyncronous
         public void SubscribeInstallUpdateNotify(Action<Installation?> action) {
             InstallUpdateEvents.Add(action);
         }

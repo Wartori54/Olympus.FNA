@@ -15,7 +15,7 @@ namespace Olympus {
         private Action<Installation?>? refreshModList = null;
 
         public HomeScene() : base() {
-            Config.Instance.SubscribeInstallUpdateNotify(i => (refreshModList ?? (i => {}) )(i));
+            Config.Instance.SubscribeInstallUpdateNotify(i => (refreshModList ?? (i => {}))(i));
             // TODO: make refreshModList async, currently if install has a lot of mods, little lag can be noticed
         }
 
@@ -418,11 +418,13 @@ namespace Olympus {
                                                 await Task.Delay(1000);
 
                                                 refreshModList = i => {
-                                                    Console.WriteLine("refreshModList");
-                                                    el.DisposeChildren();
-                                                    el.Children = GenerateModList();
+                                                    (Version? everestVersion, List<ModList.ModInfo> installedMods) = GenerateModList();
+                                                    UI.Run(() => {
+                                                        el.DisposeChildren();
+                                                        el.Children = GenerateModListPanels(everestVersion, installedMods);
+                                                    });
                                                 };
-                                                await UI.Run(() => refreshModList(null)); // pass null because i is ignored
+                                                await Task.Run(() => refreshModList(null)); // pass null because i is ignored
                                                 // the correct install will get picked through Config.Instance.Install
                                             })
                                         }
@@ -556,8 +558,10 @@ namespace Olympus {
             }
 
             updateEvent = i => {
-                InstallName.Text = "Celeste Installation: " + GetInstallationName();
-                InstallVersion.Text = "Version: " + GetInstallationInfo();
+                UI.Run(() => {
+                    InstallName.Text = "Celeste Installation: " + GetInstallationName();
+                    InstallVersion.Text = "Version: " + GetInstallationInfo();
+                });
             };
 
             return new() {
@@ -566,14 +570,22 @@ namespace Olympus {
             };
         }
 
-        // Returns an collection of panels, each containing the mods installed
-        private ObservableCollection<Element> GenerateModList() {
+        // Returns a the mods installed, to be ran async
+        private (Version? everestVersion, List<ModList.ModInfo> installedMods) GenerateModList() {
             if (Config.Instance == null || Config.Instance.Installation == null) {
                 Console.WriteLine("GenerateModList called before config was loaded!");
                 return new(); // shouldn't ever happen
             }
             (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
             = Config.Instance.Installation.ScanVersion(false);
+
+            List<ModList.ModInfo> installedMods = ModList.GatherModList(true, false, false, false);
+
+            return (ModVersion, installedMods);
+        }
+
+        // Builds the pannel list from the installed mods, to be run on UI
+        private ObservableCollection<Element> GenerateModListPanels(Version? everestVersion, List<ModList.ModInfo> mods) {
             Panel everestPanel = new Panel() {
                 Layout = {
                     Layouts.Fill(1, 0),
@@ -593,7 +605,7 @@ namespace Olympus {
                             Layouts.Column()
                         },
                         Children = {
-                            new LabelSmall("Installed Version: " + ModVersion),
+                            new LabelSmall("Installed Version: " + everestVersion ?? ""),
                             new LabelSmall("Update Available: TODO"),
                         }
                     },
@@ -604,9 +616,7 @@ namespace Olympus {
                 everestPanel,
             };
 
-            List<ModList.ModInfo> installedMods = ModList.GatherModList(true, false, false, false);
-
-            foreach (ModList.ModInfo mod in installedMods) {
+            foreach (ModList.ModInfo mod in mods) {
                 Panel modPanel = new Panel() {
                     Layout = {
                         Layouts.Fill(1, 0),
@@ -635,9 +645,7 @@ namespace Olympus {
 
                 panels.Add(modPanel);
             }
-
             return panels;
-
         }
 
     }
