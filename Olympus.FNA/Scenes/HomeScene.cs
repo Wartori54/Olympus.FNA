@@ -415,14 +415,37 @@ namespace Olympus {
                                                     });
                                                 });
 
-                                                await Task.Delay(1000);
-
                                                 refreshModList = i => {
-                                                    (Version? everestVersion, List<ModList.ModInfo> installedMods) = GenerateModList();
-                                                    UI.Run(() => {
-                                                        el.DisposeChildren();
-                                                        el.Children = GenerateModListPanels(everestVersion, installedMods);
-                                                    });
+                                                    try {
+                                                        UI.Run(() => { // remove old and add loading screen
+                                                            el.DisposeChildren();
+                                                            el.Children = new ObservableCollection<Element>() {
+                                                                new Group() {
+                                                                    Layout = {
+                                                                        Layouts.Left(0.5f, -0.5f),
+                                                                        Layouts.Row(8),
+                                                                    },
+                                                                    Children = {
+                                                                        new Spinner() {
+                                                                            Layout = { Layouts.Top(0.5f, -0.5f) },
+                                                                        },
+                                                                        new Label("Loading") {
+                                                                            Layout = { Layouts.Top(0.5f, -0.5f) },
+                                                                        },
+                                                                    }
+                                                                }
+                                                            };
+                                                        });
+                                                        (Version? everestVersion, List<ModList.ModInfo> installedMods) = GenerateModList();
+                                                        UI.Run(() => {
+                                                            el.DisposeChildren();
+                                                            el.Children = GenerateModListPanels(everestVersion, installedMods);
+                                                        });
+                                                    } catch (Exception e) {
+                                                        Console.WriteLine("refreshModList crashed with exception {0}", e);
+                                                        Console.WriteLine("Stacktrace: {0}", e.StackTrace);
+                                                    }
+                                                    
                                                 };
                                                 await Task.Run(() => refreshModList(null)); // pass null because i is ignored
                                                 // the correct install will get picked through Config.Instance.Install
@@ -579,6 +602,7 @@ namespace Olympus {
             (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
             = Config.Instance.Installation.ScanVersion(false);
 
+            Console.WriteLine("Gathering Mod List");
             List<ModList.ModInfo> installedMods = ModList.GatherModList(true, false, false, false);
 
             return (ModVersion, installedMods);
@@ -586,6 +610,7 @@ namespace Olympus {
 
         // Builds the pannel list from the installed mods, to be run on UI
         private ObservableCollection<Element> GenerateModListPanels(Version? everestVersion, List<ModList.ModInfo> mods) {
+            Console.WriteLine("Generating mod panels");
             Panel everestPanel = new Panel() {
                 Layout = {
                     Layouts.Fill(1, 0),
@@ -624,7 +649,7 @@ namespace Olympus {
                     },
                     Children = {
                         new HeaderSmall(mod.Name),
-                        new Label("This is a mod.") {
+                        new Label(mod.Description == "" ? "Description could not be loaded or empty" : mod.Description) {
                             Wrap = true,
                         },
                         new Group() {
