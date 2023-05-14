@@ -630,7 +630,7 @@ namespace Olympus {
                             Layouts.Column()
                         },
                         Children = {
-                            new LabelSmall("Installed Version: " + everestVersion ?? ""),
+                            new LabelSmall("Installed Version: " + everestVersion ?? "Unknown"),
                             new LabelSmall("Update Available: TODO"),
                         }
                     },
@@ -662,7 +662,8 @@ namespace Olympus {
                             },
                             Children = {
                                 new LabelSmall("Installed Version: " + mod.Version),
-                                new LabelSmall("Update Available: TODO"),
+                                new LabelSmall((mod.NewVersion == null || mod.NewVersion.Equals(mod.Version)) 
+                                ? "Up to date" : "Update available: " + mod.NewVersion),
                             }
                         },
                     }

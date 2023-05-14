@@ -13,7 +13,7 @@ using YamlDotNet.Serialization;
 
 namespace Olympus {
 
-    // Copied and refactored from https://github.com/EverestAPI/Olympus/blob/main/sharp/CmdModList.cs
+    // Copied, refactored and heavily extended from https://github.com/EverestAPI/Olympus/blob/main/sharp/CmdModList.cs
     public class ModList {
 
         public static HashAlgorithm Hasher = XXHash64.Create(); //TODO: hashing
@@ -74,6 +74,8 @@ namespace Olympus {
                 ModDBInfo? tmp;
                 if (modZipDB.TryGetValue(zipMod, out tmp)) {
                     zipMod.Description = tmp.Description;
+                    if (dataBase.RawUpdateDataBase.ContainsKey(zipMod.Name))
+                        zipMod.NewVersion = dataBase.RawUpdateDataBase[zipMod.Name]._VersionString;
                 } else {
                     Console.WriteLine("ModDBInfo: Mod {0} did not appear on the mod data base", zipMod.Name);
                 }
@@ -162,6 +164,8 @@ namespace Olympus {
 
             public string Name = "";
             public string Version = "";
+            [YamlIgnore] // For updates
+            public string? NewVersion = null;
             public string Description = "";
             public string DLL = "";
             public string[] Dependencies = {};
@@ -212,7 +216,7 @@ namespace Olympus {
 
             private static DataBaseUrls? _urls = null;
 
-            public static DataBaseUrls Urls {
+            public static DataBaseUrls Urls { // TODO: Allow fallback urls
                 get {
                     if (_urls == null) {
                         // retrieve the url
