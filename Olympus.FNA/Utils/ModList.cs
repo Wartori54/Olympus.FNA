@@ -254,7 +254,17 @@ namespace Olympus {
 
             private bool invalidateModDataBase = false;
 
-            public void InvalidateModDatabase() => invalidateModDataBase = true;
+            private DateTime lastSearchDBRefresh = DateTime.MinValue;
+
+            // minimum time between redownloading the DB
+            private static readonly TimeSpan noRedownloadInterval = new TimeSpan(0, 5, 0); // 5 min
+
+            public void InvalidateModDatabase() {
+                if (DateTime.Now - lastSearchDBRefresh > noRedownloadInterval) {
+                    invalidateModDataBase = true;
+                    lastSearchDBRefresh = DateTime.Now;
+                }
+            }
             
             // Downloads and loads the yaml containing everything in gamebanana
             private void DownloadModDataBase() {
