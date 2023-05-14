@@ -208,7 +208,7 @@ namespace Olympus {
 
             public static string DBName = "mod_search_database.yaml";
 
-            public static string modCachePath = Path.Join(Config.GetDefaultDir(), "modCaches");
+            public static string modCachePath = Path.Join(Config.GetCacheDir(), "ModCaches");
 
             private static DataBaseUrls? _urls = null;
 

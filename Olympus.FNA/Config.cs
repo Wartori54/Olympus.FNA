@@ -77,6 +77,28 @@ namespace Olympus {
             return System.IO.Path.Combine(GetDefaultDir(), "config.json");
         }
 
+        public static string GetCacheDir() {
+            if (PlatformHelper.Is(Platform.MacOS)) {
+                string? home = Environment.GetEnvironmentVariable("HOME");
+                if (!string.IsNullOrEmpty(home)) {
+                    return System.IO.Path.Combine(home, "Library", "Caches", "Olympus.FNA");
+                }
+            }
+
+            if (PlatformHelper.Is(Platform.Unix)) {
+                string? config = Environment.GetEnvironmentVariable("XDG_CACHE_HOME");
+                if (!string.IsNullOrEmpty(config)) {
+                    return System.IO.Path.Combine(config, "Olympus.FNA");
+                }
+                string? home = Environment.GetEnvironmentVariable("HOME");
+                if (!string.IsNullOrEmpty(home)) {
+                    return System.IO.Path.Combine(home, ".cache", "Olympus.FNA");
+                }
+            }
+
+            return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Olympus.FNA");
+        }
+
         public void Load() {
             string path = Path ??= GetDefaultPath();
 
