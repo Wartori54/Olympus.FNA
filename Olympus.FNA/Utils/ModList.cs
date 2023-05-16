@@ -56,14 +56,14 @@ namespace Olympus {
                     if ((onlyUpdatable && updaterBlacklist.Contains(file)) || (excludeDisabled && blacklist.Contains(file)))
                         continue;
                     ModInfo info = parseZip(file, readYamls);
-                    info.IsBlacklisted = blacklist.Contains(file);
-                    info.IsUpdaterBlacklisted = updaterBlacklist.Contains(file);
+                    info.IsBlacklisted = blacklist.Contains(Path.GetFileName(file));
+                    info.IsUpdaterBlacklisted = updaterBlacklist.Contains(Path.GetFileName(file));
                     zipMods.Add(info);
                 } else if (file.EndsWith(".bin") && !onlyUpdatable) { // quick reminder that bins and dir cannot be updated
                     // bin
                     ModInfo info = parseBin(file);
-                    info.IsBlacklisted = blacklist.Contains(file);
-                    info.IsUpdaterBlacklisted = updaterBlacklist.Contains(file);
+                    info.IsBlacklisted = blacklist.Contains(Path.GetFileName(file));
+                    info.IsUpdaterBlacklisted = updaterBlacklist.Contains(Path.GetFileName(file));
                     mods.Add(info);
                 }
             }
@@ -89,8 +89,8 @@ namespace Olympus {
                     if (Path.GetFileName(dir) == "Cache") continue;
                     // dir
                     ModInfo info = parseDir(dir, readYamls);
-                    info.IsBlacklisted = blacklist.Contains(dir);
-                    info.IsUpdaterBlacklisted = updaterBlacklist.Contains(dir);
+                    info.IsBlacklisted = blacklist.Contains(Path.GetFileName(dir));
+                    info.IsUpdaterBlacklisted = updaterBlacklist.Contains(Path.GetFileName(dir));
                     mods.Add(info);
                 }
             }
@@ -153,6 +153,10 @@ namespace Olympus {
                 } catch (UnauthorizedAccessException) { }
             }
             return info;
+        }
+
+        public static void BlackListUpdate(ModInfo mod) {
+            
         }
 
         public class ModInfo {

@@ -12,11 +12,10 @@ using System.Threading.Tasks;
 namespace Olympus {
     public class HomeScene : Scene {
 
-        private Action<Installation?>? refreshModList = null;
+        private Action<Installation?>? refreshModList;
 
-        public HomeScene() : base() {
-            Config.Instance.SubscribeInstallUpdateNotify(i => (refreshModList ?? (i => {}))(i));
-            // TODO: make refreshModList async, currently if install has a lot of mods, little lag can be noticed
+        public HomeScene() {
+            Config.Instance.SubscribeInstallUpdateNotify(i => (refreshModList ?? (_ => {}))(i));
         }
 
         public override Element Generate()
@@ -415,7 +414,7 @@ namespace Olympus {
                                                     });
                                                 });
 
-                                                refreshModList = i => {
+                                                refreshModList = _ => {
                                                     try {
                                                         UI.Run(() => { // remove old and add loading screen
                                                             el.DisposeChildren();
@@ -551,16 +550,14 @@ namespace Olympus {
             };
         
         private static string GetInstallationName() {
-            if (Config.Instance == null || Config.Instance.Installation == null) {
-                Console.WriteLine("GetInstallationName called before config was loaded!");
-                return "Loading...";
-            }
+            if (Config.Instance.Installation != null) return Config.Instance.Installation.Name;
+            Console.WriteLine("GetInstallationName called before config was loaded!");
+            return "Loading...";
 
-            return Config.Instance.Installation.Name;
         }
 
         private static string GetInstallationInfo() {
-            if (Config.Instance == null || Config.Instance.Installation == null) {
+            if (Config.Instance.Installation == null) {
                 Console.WriteLine("GetInstallationInfo called before config was loaded!");
                 return "Loading...";
             }
@@ -572,8 +569,8 @@ namespace Olympus {
         private Action<Installation?>? updateEvent = null;
 
         private ObservableCollection<Element> GetCelesteVersionLabels() {
-            LabelSmall InstallName = new("Celeste Installation: " + GetInstallationName());
-            LabelSmall InstallVersion = new("Version: " + GetInstallationInfo());
+            LabelSmall installName = new("Celeste Installation: " + GetInstallationName());
+            LabelSmall installVersion = new("Version: " + GetInstallationInfo());
 
             if (updateEvent == null) {
                 updateEvent = i => {};
@@ -582,20 +579,20 @@ namespace Olympus {
 
             updateEvent = i => {
                 UI.Run(() => {
-                    InstallName.Text = "Celeste Installation: " + GetInstallationName();
-                    InstallVersion.Text = "Version: " + GetInstallationInfo();
+                    installName.Text = "Celeste Installation: " + GetInstallationName();
+                    installVersion.Text = "Version: " + GetInstallationInfo();
                 });
             };
 
             return new() {
-                InstallName,
-                InstallVersion
+                installName,
+                installVersion
             };
         }
 
         // Returns a the mods installed, to be ran async
         private (Version? everestVersion, List<ModList.ModInfo> installedMods) GenerateModList() {
-            if (Config.Instance == null || Config.Instance.Installation == null) {
+            if (Config.Instance.Installation == null) {
                 Console.WriteLine("GenerateModList called before config was loaded!");
                 return new(); // shouldn't ever happen
             }
@@ -630,7 +627,8 @@ namespace Olympus {
                             Layouts.Column()
                         },
                         Children = {
-                            new LabelSmall("Installed Version: " + everestVersion ?? "Unknown"),
+                            new LabelSmall(everestVersion == null ? "Unknown version" : 
+                                "Installed version: " + everestVersion),
                             new LabelSmall("Update Available: TODO"),
                         }
                     },
@@ -642,7 +640,7 @@ namespace Olympus {
             };
 
             foreach (ModList.ModInfo mod in mods) {
-                Panel modPanel = new Panel() {
+                ModPanel modPanel = new(mod) {
                     Layout = {
                         Layouts.Fill(1, 0),
                         Layouts.Column(),
@@ -672,6 +670,66 @@ namespace Olympus {
                 panels.Add(modPanel);
             }
             return panels;
+        }
+
+        private partial class ModPanel : Panel {
+
+            public new static readonly Style DefaultStyle = new() { // TODO: selected on dark mode looks awful
+                {
+                    StyleKeys.Normal,
+                    new Style() {
+                        { Panel.StyleKeys.Background, new Color(0x08, 0x08, 0x08, 0xd0) },
+                        { Panel.StyleKeys.Border, new Color(0x08, 0x08, 0x08, 0xd0) },
+                    }
+                },
+
+                {
+                    StyleKeys.Hovered,
+                    new Style() {
+                        { Panel.StyleKeys.Background, new Color(0x22, 0x22, 0x22, 0xd0) },
+                        { Panel.StyleKeys.Border, new Color(0x08, 0x08, 0x08, 0xd0) },
+                    }
+                },
+
+                {
+                    StyleKeys.Selected,
+                    new Style() {
+                        { Panel.StyleKeys.Background, new Color(0x48, 0x48, 0x48, 0xd0) },
+                        { Panel.StyleKeys.Border, new Color(0x38, 0x38, 0x38, 0xd0) },
+                    }
+                },
+            };
+
+            private bool Disabled;
+
+            private readonly ModList.ModInfo mod;
+            
+            public ModPanel(ModList.ModInfo mod)
+            : base() {
+                this.mod = mod;
+                this.Disabled = this.mod.IsBlacklisted;
+            }
+
+            public override void Update(float dt) {
+                Style.Apply(Disabled ? StyleKeys.Selected : 
+                            Hovered  ? StyleKeys.Hovered :
+                                       StyleKeys.Normal);
+
+                base.Update(dt);
+            }
+
+            private void OnClick(MouseEvent.Click e) {
+                Disabled = !Disabled;
+                mod.IsBlacklisted = Disabled;
+                ModList.BlackListUpdate(mod);
+            }
+
+            public  new abstract partial class StyleKeys {
+
+                public static readonly Style.Key Normal = new("Normal");
+                public static readonly Style.Key Selected = new("Selected");
+                public static readonly Style.Key Hovered = new("Hovered");
+            }
         }
 
     }
