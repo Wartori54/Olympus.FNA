@@ -6,6 +6,7 @@ using Olympus.ColorThief;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -662,6 +663,13 @@ namespace Olympus {
                                 new LabelSmall("Installed Version: " + mod.Version),
                                 new LabelSmall((mod.NewVersion == null || mod.NewVersion.Equals(mod.Version)) 
                                 ? "Up to date" : "Update available: " + mod.NewVersion),
+                                new LabelSmall("") {
+                                    Data = {
+                                        {"subscribe_click",
+                                            (bool disabled, Element label) => 
+                                            { (label as LabelSmall)!.Text = disabled ? "Disabled" : "";}}
+                                    }
+                                },
                             }
                         },
                     }
@@ -703,11 +711,33 @@ namespace Olympus {
             private bool Disabled;
 
             private readonly ModList.ModInfo mod;
-            
+
+            private List<Tuple<Element, Action<bool, Element>>> subscribedClicks = new();
+
+            private void ParseChilds(IEnumerable<Element> elements) {
+                foreach (Element el in elements) {
+                    if (!el.Data.TryGet("subscribe_click", out Action<bool, Element>? act)) {
+                        if (el.Children.Count == 0) continue;
+                        ParseChilds(el.Children);
+                        continue;
+                    }
+
+                    if (act != null) {
+                        subscribedClicks.Add(new Tuple<Element, Action<bool, Element>>(el, act));
+                        act.Invoke(this.Disabled, el); // Invoke on init as well, on purpose
+                    }
+
+                }
+            }
+
             public ModPanel(ModList.ModInfo mod)
             : base() {
                 this.mod = mod;
                 this.Disabled = this.mod.IsBlacklisted;
+                this.Children.CollectionChanged += (sender, args) => {
+                    if (args.NewItems == null) return;
+                    ParseChilds(args.NewItems.Cast<Element>());
+                };
             }
 
             public override void Update(float dt) {
@@ -722,6 +752,9 @@ namespace Olympus {
                 Disabled = !Disabled;
                 mod.IsBlacklisted = Disabled;
                 ModList.BlackListUpdate(mod);
+                foreach (Tuple<Element, Action<bool, Element>> subbed in subscribedClicks) {
+                    subbed.Item2.Invoke(this.Disabled, subbed.Item1);
+                }
             }
 
             public  new abstract partial class StyleKeys {

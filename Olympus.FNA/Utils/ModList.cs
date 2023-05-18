@@ -156,7 +156,27 @@ namespace Olympus {
         }
 
         public static void BlackListUpdate(ModInfo mod) {
-            
+            if (Config.Instance.Installation == null) {
+                Console.WriteLine("BlackListUpdate called before setting an install");
+                return;
+            }
+            string modsFolder = Path.Combine(Config.Instance.Installation.Root, "Mods");
+            string blacklistPath = Path.Combine(modsFolder, "blacklist.txt");
+            List<string> blacklistString = File.ReadAllLines(blacklistPath).ToList();
+            bool found = false;
+            for (int i = 0; i < blacklistString.Count; i++) {
+                if (!blacklistString[i].Contains(Path.GetFileName(mod.Path))) continue;
+                if (!mod.IsBlacklisted)
+                    blacklistString[i] = blacklistString[i].Insert(0, "# ");
+                else
+                    blacklistString[i] = blacklistString[i].Replace("#", "").Trim();
+                found = true;
+                break;
+            }
+
+            if (!found)
+                blacklistString.Add((mod.IsBlacklisted ? "" : "# ") + Path.GetFileName(mod.Path));
+            File.WriteAllLines(blacklistPath, blacklistString);
         }
 
         public class ModInfo {
@@ -419,7 +439,7 @@ namespace Olympus {
                 return null;
             }
 
-            private static Dictionary<char, bool> forbidenChars = new Dictionary<char, bool>() {
+            private static Dictionary<char, bool> forbiddenChars = new Dictionary<char, bool>() {
                     {'<', true},
                     {'>', true},
                     {':', true},
@@ -435,7 +455,7 @@ namespace Olympus {
             static ModDataBase() { // Populate forbidenChars
                 // add [0-32] ascii chars
                 for (int i = 0; i < 32; i++) {
-                    forbidenChars.Add((char)i, true);
+                    forbiddenChars.Add((char)i, true);
                 }
             }
 
@@ -445,7 +465,7 @@ namespace Olympus {
                 name = name.Trim();
 
                 foreach (char c in name) {
-                    if (!forbidenChars.GetValueOrDefault(c, false)) {
+                    if (!forbiddenChars.GetValueOrDefault(c, false)) {
                         res += c;
                     }
                 }
