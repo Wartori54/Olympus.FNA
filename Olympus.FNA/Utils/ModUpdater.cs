@@ -84,18 +84,6 @@ namespace Olympus.Utils {
                     return;
                 }
 
-                // if (ongoingUpdateCancelled) { //TODO: update canceling
-                //     Lo.Log(LogLev.Verbose, "OuiModUpdateList", "Update was cancelled");
-                //
-                //     // try to delete mod-update.zip if it still exists.
-                //     ModUpdaterHelper.TryDelete(zipPath);
-                //
-                //     // update was cancelled!
-                //     button.Label =
-                //         $"{ModUpdaterHelper.FormatModName(update.Name)} ({Dialog.Clean("MODUPDATECHECKER_CANCELLED")})";
-                //     return false;
-                // }
-
                 // verify its checksum
                 VerifyChecksum(mod.DbUpdateInfo, zipPath);
 
