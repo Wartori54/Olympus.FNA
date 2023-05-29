@@ -1,28 +1,24 @@
-using System.Collections;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using System.Security.Cryptography;
 using System.Linq;
-using System;
-using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
-using YYProject.XXHash;
 using YamlDotNet.Serialization;
 
-namespace Olympus {
+namespace Olympus.Utils {
 
     // Copied, refactored and heavily extended from https://github.com/EverestAPI/Olympus/blob/main/sharp/CmdModList.cs
-    public class ModList {
+    public static class ModList {
 
-        public static HashAlgorithm Hasher = XXHash64.Create(); //TODO: hashing
-
-        public static ModDataBase dataBase = new ModDataBase();
+        public static readonly ModDataBase DataBase = new ModDataBase();
 
         public static List<ModInfo> GatherModList(bool readYamls, bool computeHashes, bool onlyUpdatable, bool excludeDisabled) {
-            if (Config.Instance == null || Config.Instance.Installation == null) return new List<ModInfo>();
-            return GatherModList(Config.Instance.Installation, readYamls, computeHashes, onlyUpdatable, excludeDisabled);
+            return Config.Instance.Installation == null 
+                ? new List<ModInfo>() : GatherModList(Config.Instance.Installation, 
+                    readYamls, computeHashes, onlyUpdatable, excludeDisabled);
         }
 
         public static List<ModInfo> GatherModList(Installation install, bool readYamls, bool computeHashes, bool onlyUpdatable, bool excludeDisabled) {
@@ -52,30 +48,36 @@ namespace Olympus {
             string[] allFiles = Directory.GetFiles(modsFolder);
             foreach (string file in allFiles) { // zips and bin(s)
                 if (file.EndsWith(".zip")) {
+                    if (file.Contains("modupdate")) continue;
                     // zip
                     if ((onlyUpdatable && updaterBlacklist.Contains(file)) || (excludeDisabled && blacklist.Contains(file)))
                         continue;
-                    ModInfo info = parseZip(file, readYamls);
-                    info.IsBlacklisted = blacklist.Contains(Path.GetFileName(file));
-                    info.IsUpdaterBlacklisted = updaterBlacklist.Contains(Path.GetFileName(file));
-                    zipMods.Add(info);
+                    try {
+                        ModInfo info = ParseZip(file, readYamls);
+                        info.IsBlacklisted = blacklist.Contains(Path.GetFileName(file));
+                        info.IsUpdaterBlacklisted = updaterBlacklist.Contains(Path.GetFileName(file));
+                        zipMods.Add(info);
+                    } catch (InvalidDataException e) {
+                        Console.WriteLine($"Zip: {file} is corrupted or unreadable");
+                        Console.WriteLine(e);
+                    }
                 } else if (file.EndsWith(".bin") && !onlyUpdatable) { // quick reminder that bins and dir cannot be updated
                     // bin
-                    ModInfo info = parseBin(file);
+                    ModInfo info = ParseBin(file);
                     info.IsBlacklisted = blacklist.Contains(Path.GetFileName(file));
                     info.IsUpdaterBlacklisted = updaterBlacklist.Contains(Path.GetFileName(file));
                     mods.Add(info);
                 }
             }
 
-            Dictionary<ModInfo, ModDBInfo> modZipDB = dataBase.QueryModDBInfoForMods(zipMods, true);
+            Dictionary<ModInfo, ModDBInfo> modZipDB = DataBase.QueryModDBInfoForMods(zipMods, true);
 
             foreach (ModInfo zipMod in zipMods) {
-                ModDBInfo? tmp;
-                if (modZipDB.TryGetValue(zipMod, out tmp)) {
-                    zipMod.Description = tmp.Description;
-                    if (dataBase.RawUpdateDataBase.ContainsKey(zipMod.Name))
-                        zipMod.NewVersion = dataBase.RawUpdateDataBase[zipMod.Name]._VersionString;
+                if (modZipDB.TryGetValue(zipMod, out ModDBInfo? dbInfo)) {
+                    zipMod.DbInfo = dbInfo;
+                    zipMod.Description = dbInfo.Description;
+                    if (DataBase.RawUpdateDataBase.TryGetValue(zipMod.Name, out ModDBUpdateInfo? updateInfo))
+                        zipMod.NewVersion = updateInfo._VersionString;
                 } else {
                     Console.WriteLine("ModDBInfo: Mod {0} did not appear on the mod data base", zipMod.Name);
                 }
@@ -88,7 +90,7 @@ namespace Olympus {
                 foreach (string dir in allDirs) {
                     if (Path.GetFileName(dir) == "Cache") continue;
                     // dir
-                    ModInfo info = parseDir(dir, readYamls);
+                    ModInfo info = ParseDir(dir, readYamls);
                     info.IsBlacklisted = blacklist.Contains(Path.GetFileName(dir));
                     info.IsUpdaterBlacklisted = updaterBlacklist.Contains(Path.GetFileName(dir));
                     mods.Add(info);
@@ -99,59 +101,57 @@ namespace Olympus {
             return mods;
         }
 
-        private static ModInfo parseZip(string file, bool readYamls) {
-            ModInfo info = new ModInfo() {
+        private static ModInfo ParseZip(string file, bool readYamls) {
+            ModInfo info = new() {
                 Path = file,
                 IsFile = true,
             };
 
-            if (readYamls) {
-                using (FileStream zipStream = File.Open(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)) {
-                    zipStream.Seek(0, SeekOrigin.Begin);
+            if (!readYamls) return info;
+            using (FileStream zipStream = File.Open(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)) {
+                zipStream.Seek(0, SeekOrigin.Begin);
 
-                    using (ZipArchive zip = new ZipArchive(zipStream, ZipArchiveMode.Read))
-                    using (Stream? stream = (zip.GetEntry("everest.yaml") ?? zip.GetEntry("everest.yml"))?.Open())
-                    using (StreamReader? reader = stream == null ? null : new StreamReader(stream))
-                        info.Parse(reader);
-                }
-
-                // if (computeHashes && info.Name != null) {
-                //     using (FileStream stream = File.Open(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                //         info.Hash = BitConverter.ToString(Hasher.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
-                // }
+                using (ZipArchive zip = new ZipArchive(zipStream, ZipArchiveMode.Read))
+                using (Stream? stream = (zip.GetEntry("everest.yaml") ?? zip.GetEntry("everest.yml"))?.Open())
+                using (StreamReader? reader = stream == null ? null : new StreamReader(stream))
+                    info.Parse(reader);
             }
+
+            // if (computeHashes && info.Name != null) {
+            //     using (FileStream stream = File.Open(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            //         info.Hash = BitConverter.ToString(Hasher.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
+            // }
             return info;
         }
 
-        private static ModInfo parseBin(string file) {
+        private static ModInfo ParseBin(string file) {
             ModInfo info = new ModInfo() {
                 Path = file,
                 IsFile = true,
             };
-
+            // No info from bins
             return info;
         }
 
-        private static ModInfo parseDir(string dir, bool readYamls) {
+        private static ModInfo ParseDir(string dir, bool readYamls) {
             ModInfo info = new ModInfo() {
                 Path = dir,
                 IsFile = false,
 
             };
 
-            if (readYamls) {
-                try {
-                    string yamlPath = Path.Combine(dir, "everest.yaml");
-                    if (!File.Exists(yamlPath))
-                        yamlPath = Path.Combine(dir, "everest.yml");
+            if (!readYamls) return info;
+            try {
+                string yamlPath = Path.Combine(dir, "everest.yaml");
+                if (!File.Exists(yamlPath))
+                    yamlPath = Path.Combine(dir, "everest.yml");
 
-                    if (File.Exists(yamlPath)) {
-                        using (FileStream stream = File.Open(yamlPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                        using (StreamReader reader = new StreamReader(stream))
-                            info.Parse(reader);
-                    }
-                } catch (UnauthorizedAccessException) { }
-            }
+                if (File.Exists(yamlPath)) {
+                    using (FileStream stream = File.Open(yamlPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                    using (StreamReader reader = new StreamReader(stream))
+                        info.Parse(reader);
+                }
+            } catch (UnauthorizedAccessException) { /* skip errors */ }
             return info;
         }
 
@@ -160,6 +160,7 @@ namespace Olympus {
                 Console.WriteLine("BlackListUpdate called before setting an install");
                 return;
             }
+
             string modsFolder = Path.Combine(Config.Instance.Installation.Root, "Mods");
             string blacklistPath = Path.Combine(modsFolder, "blacklist.txt");
             List<string> blacklistString = File.ReadAllLines(blacklistPath).ToList();
@@ -194,27 +195,32 @@ namespace Olympus {
             public string DLL = "";
             public string[] Dependencies = {};
             public bool IsValid;
+            [YamlIgnore]
+            public ModDBInfo? DbInfo;
+
+            public ModDBUpdateInfo? DbUpdateInfo;
 
             public void Parse(TextReader? reader) {
                 try {
-                    if (reader != null) {
-                        List<EverestModuleMetadata> yaml = YamlHelper.Deserializer.Deserialize<List<EverestModuleMetadata>>(reader);
-                        if (yaml != null && yaml.Count > 0) {
-                            Name = yaml[0].Name;
-                            Version = yaml[0].Version;
-                            DLL = yaml[0].DLL;
-                            if (yaml[0].Dependencies.Capacity != 0)
-                                Dependencies = yaml[0].Dependencies.Select(dep => dep.Name).ToArray();
+                    if (reader == null) return;
+                    
+                    List<EverestModuleMetadata> yaml = YamlHelper.Deserializer.Deserialize<List<EverestModuleMetadata>>(reader);
+                    if (yaml != null && yaml.Count <= 0) return;
+                    
+                    Name = yaml[0].Name;
+                    Version = yaml[0].Version;
+                    DLL = yaml[0].DLL;
+                    if (yaml[0].Dependencies.Capacity != 0)
+                        Dependencies = yaml[0].Dependencies.Select(dep => dep.Name).ToArray();
 
-                            IsValid = Name != null && Version != null;
-                        }
-                    }
+                    IsValid = Name != null && Version != null;
                 } catch {
                     // ignore parse errors
                 }
             }
 
             public override int GetHashCode() {
+                // ReSharper disable twice NonReadonlyMemberInGetHashCode
                 return Name.GetHashCode() ^ Hash.GetHashCode() ^ Version.GetHashCode();
                 // hash alone would be enough, but name and version is also hashed for bug proofing
             }
@@ -232,66 +238,66 @@ namespace Olympus {
         }
 
         public class ModDataBase {
-            public static string UrlsYamlPath = "metadata/urls.yaml";
+            private const string UrlsYamlPath = "metadata/urls.yaml";
 
-            public static string DBName = "mod_search_database.yaml";
+            private const string DBName = "mod_search_database.yaml";
 
-            public static string modCachePath = Path.Join(Config.GetCacheDir(), "ModCaches");
+            private static readonly string ModCachePath = Path.Join(Config.GetCacheDir(), "ModCaches");
 
-            private static DataBaseUrls? _urls = null;
+            private static DataBaseUrls? urls;
 
             public static DataBaseUrls Urls { // TODO: Allow fallback urls
                 get {
-                    if (_urls == null) {
-                        // retrieve the url
-                        using (Stream? stream = OlympUI.Assets.OpenStream(UrlsYamlPath)) {
-                            if (stream == null) {
-                                throw new FileNotFoundException("Couldn't query DB urls, {0} file not found", UrlsYamlPath);
-                            }
-                            using (StreamReader reader = new StreamReader(stream))
-                                _urls = YamlHelper.Deserializer.Deserialize<DataBaseUrls>(reader);
+                    if (urls != null) return urls;
+                    
+                    // retrieve the url
+                    using (Stream? stream = OlympUI.Assets.OpenStream(UrlsYamlPath)) {
+                        if (stream == null) {
+                            throw new FileNotFoundException("Couldn't query DB urls, {0} file not found", UrlsYamlPath);
                         }
+                        using (StreamReader reader = new StreamReader(stream))
+                            urls = YamlHelper.Deserializer.Deserialize<DataBaseUrls>(reader);
                     }
-                    return _urls;
+                    return urls;
                 }
             }
             
             // Performance related, may contain non existent hashes because of updating mods, its fine
-            private static Dictionary<ModInfo, string> CachedHashes = new Dictionary<ModInfo, string>();
+            private static readonly Dictionary<ModInfo, string> CachedHashes = new();
 
-            private Dictionary<int, ModDBInfo> _rawDataBase = new Dictionary<int, ModDBInfo>();
+            private readonly Dictionary<int, ModDBInfo> rawDataBase = new();
             // Maps gamebanana id to info
             public Dictionary<int, ModDBInfo> RawDataBase {
                 get {
-                    if (_rawDataBase.Count == 0 || invalidateModDataBase)
+                    if (rawDataBase.Count == 0 || invalidateModDataBase)
                         this.DownloadModDataBase();
-                    return _rawDataBase;
+                    return rawDataBase;
                 }
             }
 
-            private Dictionary<string, ModDBUpdateInfo> _rawUpdateDataBase = new Dictionary<string, ModDBUpdateInfo>();
+            private Dictionary<string, ModDBUpdateInfo> rawUpdateDataBase = new();
 
             // Maps name to info
             public Dictionary<string, ModDBUpdateInfo> RawUpdateDataBase { 
                 get {
-                    if (_rawUpdateDataBase.Count == 0) 
+                    if (rawUpdateDataBase.Count == 0) 
                         this.DownloadUpdateDataBase();
-                    return _rawUpdateDataBase;
+                    return rawUpdateDataBase;
                 }
             }
 
-            private bool invalidateModDataBase = false;
+            private bool invalidateModDataBase;
 
             private DateTime lastSearchDBRefresh = DateTime.MinValue;
 
             // minimum time between redownloading the DB
-            private static readonly TimeSpan noRedownloadInterval = new TimeSpan(0, 5, 0); // 5 min
+            private static readonly TimeSpan NoRedownloadInterval = new TimeSpan(0, 5, 0); // 5 min
 
-            public void InvalidateModDatabase() {
-                if (DateTime.Now - lastSearchDBRefresh > noRedownloadInterval) {
-                    invalidateModDataBase = true;
-                    lastSearchDBRefresh = DateTime.Now;
-                }
+            private void InvalidateModDatabase() {
+                if (DateTime.Now - lastSearchDBRefresh <= NoRedownloadInterval) return;
+                
+                invalidateModDataBase = true;
+                lastSearchDBRefresh = DateTime.Now;
             }
             
             // Downloads and loads the yaml containing everything in gamebanana
@@ -308,11 +314,11 @@ namespace Olympus {
                     Console.WriteLine("Redownloading DB");
                     
 
-                    using (HttpClient wc = new HttpClient()) {
+                    using (HttpClient wc = new()) {
                         Console.WriteLine("Downloading...");
                         string dataBaseUrl = Urls.ModDataBase;
 
-                        yamlData = Task.Run<string>(async() => await wc.GetStringAsync(dataBaseUrl)).Result;
+                        yamlData = Task.Run(async() => await wc.GetStringAsync(dataBaseUrl)).Result;
 
                         File.WriteAllText(Path.Join(Config.GetDefaultDir(), DBName), yamlData);
                         Console.WriteLine("Saved DB");
@@ -320,10 +326,11 @@ namespace Olympus {
                 }
                 List<ModDBInfo> listDB = YamlHelper.Deserializer.Deserialize<List<ModDBInfo>>(yamlData);
                 Console.WriteLine("Deserialized db");
-                _rawDataBase.Clear();
-                // We are foced to copy aaaaa (i think)
+                rawDataBase.Clear();
+                
+                // We are forced to copy (i think)
                 foreach (ModDBInfo entry in listDB) {
-                    _rawDataBase.Add(entry.GameBananaId, entry);
+                    rawDataBase.Add(entry.GameBananaId, entry);
                 }
 
                 invalidateModDataBase = false;
@@ -332,69 +339,68 @@ namespace Olympus {
             // Download the everest_update.yaml, downloaded on each boot
             private void DownloadUpdateDataBase() {
                 Console.WriteLine("Downloading UpdateDB");
-                string yamlData = "";
-                string dbUrl = "";
-                using (HttpClient wc = new HttpClient()) {
+                string yamlData;
+                string dbUrl;
+                using (HttpClient wc = new()) {
                     Console.WriteLine("Obtaining updaterDB url");
-                    dbUrl = Task.Run<string>(async() => await wc.GetStringAsync(Urls.ModUpdateDataBase)).Result;
+                    dbUrl = Task.Run(async() => await wc.GetStringAsync(Urls.ModUpdateDataBase)).Result;
 
                     Console.WriteLine("Downloading everest-update.yaml");
-                    yamlData = Task.Run<string>(async() => await wc.GetStringAsync(dbUrl)).Result;
+                    yamlData = Task.Run(async() => await wc.GetStringAsync(dbUrl)).Result;
 
                 }
-                _rawUpdateDataBase = YamlHelper.Deserializer.Deserialize<Dictionary<string, ModDBUpdateInfo>>(yamlData);
-                foreach (string name in _rawUpdateDataBase.Keys) {
-                    _rawUpdateDataBase[name].Name = name;
+                rawUpdateDataBase = YamlHelper.Deserializer.Deserialize<Dictionary<string, ModDBUpdateInfo>>(yamlData);
+                foreach (string name in rawUpdateDataBase.Keys) {
+                    rawUpdateDataBase[name].Name = name;
                 }
                 Console.WriteLine("Deserialized updaterDB");
             }
 
             // Returns the corresponding ModDBInfo for every ModInfo
-            public Dictionary<ModInfo, ModDBInfo> QueryModDBInfoForMods(List<ModInfo> targetMods, bool CacheMods) {
+            public Dictionary<ModInfo, ModDBInfo> QueryModDBInfoForMods(List<ModInfo> targetMods, bool cacheMods) {
                 Console.WriteLine("Querying Db");
-                Dictionary<ModInfo, ModDBInfo> filteredMods = new Dictionary<ModInfo, ModDBInfo>(targetMods.Count);
+                Dictionary<ModInfo, ModDBInfo> filteredMods = new(targetMods.Count);
+                
                 // Method explanation: We need to map ModInfo to ModDBInfo but unluckily theres no way to do that directly (as of now)
                 // so we must rely on the everest_update.yaml, because it contains the names from everest.yaml from each mod and the 
-                // gamebanana id for each mod, which ModDBInfo also has
+                // gamebanana id for each mod, which ModDBInfo has as well
                 // so in the end the connection is ModInfo -> ModDBUpdateInfo -> ModDBInfo
 
                 // Check cache
                 // Dict for performance
-                Dictionary<string, ModInfo> mappedMods = new Dictionary<string, ModInfo>(targetMods.Count); // .Count possible performance optimization?
+                Dictionary<string, ModInfo> mappedMods = new(targetMods.Count); // .Count possible performance optimization?
                 foreach (ModInfo mod in targetMods) {
+                    if (Path.GetFileName(mod.Path).Contains("modupdate")) continue; // skip leftover mod update files
+                        
                     ModDBInfo? cachedInfo = QueryFromCache(mod);
                     if (cachedInfo != null) {
                         filteredMods.Add(mod, cachedInfo);
                         continue;
                     }
-                    mappedMods.Add(mod.Name, mod);
+                    if (!mappedMods.TryAdd(mod.Name, mod)) // TODO: check hashes to determinate if they're the same version
+                        Console.WriteLine($"Mod {mod.Name} from {mod.Path} is duplicate, skipping");
                 }
 
                 foreach (KeyValuePair<string, ModInfo> entry in mappedMods) {
-                    if (RawUpdateDataBase.ContainsKey(entry.Key)) {
-                        int GBId = RawUpdateDataBase[entry.Key].GameBananaId;
-                        if (RawDataBase.ContainsKey(GBId)) {
-                            ModDBInfo dBInfo = RawDataBase[GBId];
-                            if (CacheMods) {
+                    if (RawUpdateDataBase.TryGetValue(entry.Key, out ModDBUpdateInfo? updateDBEntry)) {
+                        int GBId = updateDBEntry.GameBananaId;
+                        if (RawDataBase.TryGetValue(GBId, out ModDBInfo? dBInfo)) {
+                            if (cacheMods) {
                                 string validName = ValidateName(entry.Key);
-                                Console.WriteLine("Cacheing mod: {0}", entry.Key);
-                                if (!Directory.Exists(modCachePath))
-                                    Directory.CreateDirectory(modCachePath);
+                                Console.WriteLine("Caching mod: {0}", entry.Key);
+                                if (!Directory.Exists(ModCachePath))
+                                    Directory.CreateDirectory(ModCachePath);
                                 
-                                if (CachedHashes.ContainsKey(entry.Value)) 
-                                    dBInfo.Hash = CachedHashes[entry.Value];
+                                if (CachedHashes.TryGetValue(entry.Value, out string? hash)) 
+                                    dBInfo.Hash = hash;
                                 else {
-                                    using (FileStream modFile = File.OpenRead(entry.Value.Path))
-                                        dBInfo.Hash = BitConverter.ToString(Hasher.ComputeHash(modFile)).Replace("-", "").ToLowerInvariant();
+                                    dBInfo.Hash = ModUpdater.CalculateChecksum(entry.Value.Path);
                                     CachedHashes.Add(entry.Value, dBInfo.Hash);
                                 }
-                                Console.WriteLine("Hashed mod");
                                 
-                                using (FileStream file = File.OpenWrite(Path.Join(modCachePath, validName + ".yaml")))
+                                using (FileStream file = File.OpenWrite(Path.Join(ModCachePath, validName + ".yaml")))
                                 using (StreamWriter writer = new StreamWriter(file))
                                     YamlHelper.Serializer.Serialize(writer, dBInfo);
-                                
-                                Console.WriteLine("Cached mod");
                             }
                             filteredMods.Add(entry.Value, dBInfo);
                         } else {
@@ -409,37 +415,39 @@ namespace Olympus {
             }
 
             private ModDBInfo? QueryFromCache(ModInfo mod) {
-                string filePath = Path.Join(modCachePath, ValidateName(mod.Name) + ".yaml");
-                if (File.Exists(filePath)) {
-                    Console.Write("Queriyng from cache {0}... ", mod.Name);
-                    // Read cache
-                    ModDBInfo readData;
-                    using (StreamReader file = File.OpenText(filePath))
-                        readData = YamlHelper.Deserializer.Deserialize<ModDBInfo>(file);
+                string filePath = Path.Join(ModCachePath, ValidateName(mod.Name) + ".yaml");
+                if (!File.Exists(filePath)) return null;
+                Console.Write("Queriyng from cache {0}... ", mod.Name);
+                // Read cache
+                ModDBInfo readData;
+                using (StreamReader file = File.OpenText(filePath))
+                    readData = YamlHelper.Deserializer.Deserialize<ModDBInfo>(file);
                     
-                    // Hash installed mod to detect updates
-                    string realHash;
-                    if (CachedHashes.ContainsKey(mod)) {
-                        realHash = CachedHashes[mod];
-                    } else {
-                        using (FileStream modFile = File.OpenRead(mod.Path))
-                            realHash = BitConverter.ToString(Hasher.ComputeHash(modFile)).Replace("-", "").ToLowerInvariant();
-                        CachedHashes.Add(mod, realHash);
-                    }
-                    if (!readData.Hash.Equals(realHash)) { // It has been updated
-                        Console.WriteLine("cache oudated");
-                        this.InvalidateModDatabase(); // The mod was modified (thus probably updated)
-                        // so we need to update the DB
-                        File.Delete(filePath); // Delete it so it can be re-cached from new DB
-                        return null;
-                    }
-                    Console.WriteLine("success!");
-                    return readData;
+                // Hash installed mod to detect updates
+                string realHash;
+                if (CachedHashes.TryGetValue(mod, out string? hash)) {
+                    realHash = hash;
+                } else {
+                    realHash = ModUpdater.CalculateChecksum(mod.Path);
+                    CachedHashes.Add(mod, realHash);
                 }
-                return null;
+                if (!readData.Hash.Equals(realHash)) { // It has been updated
+                    Console.WriteLine("cache outdated");
+                    this.InvalidateModDatabase(); // The mod was modified (thus probably updated)
+                    // so we need to update the DB
+                    File.Delete(filePath); // Delete it so it can be re-cached from new DB
+                    return null;
+                }
+                Console.WriteLine("success!");
+                return readData;
             }
 
-            private static Dictionary<char, bool> forbiddenChars = new Dictionary<char, bool>() {
+            public ModDBUpdateInfo? QueryUpdateInfo(ModInfo mod) {
+                RawUpdateDataBase.TryGetValue(mod.Name, out ModDBUpdateInfo? updateDBEntry);
+                return updateDBEntry;
+            }
+
+            private static readonly Dictionary<char, bool> ForbiddenChars = new() {
                     {'<', true},
                     {'>', true},
                     {':', true},
@@ -452,20 +460,20 @@ namespace Olympus {
                     {' ', true}
                 };
 
-            static ModDataBase() { // Populate forbidenChars
+            static ModDataBase() { // Populate forbiddenChars
                 // add [0-32] ascii chars
                 for (int i = 0; i < 32; i++) {
-                    forbiddenChars.Add((char)i, true);
+                    ForbiddenChars.Add((char)i, true);
                 }
             }
 
             // Modifies a name to be valid on all file systems
-            public static string ValidateName(string name) {
+            private static string ValidateName(string name) {
                 string res = "";
                 name = name.Trim();
 
                 foreach (char c in name) {
-                    if (!forbiddenChars.GetValueOrDefault(c, false)) {
+                    if (!ForbiddenChars.GetValueOrDefault(c, false)) {
                         res += c;
                     }
                 }
@@ -482,7 +490,7 @@ namespace Olympus {
         public class ModDBInfo {
             public string Name = "";
             public string GameBananaType = "";
-            public int GameBananaId;
+            public int GameBananaId = 0;
             public string Author = "";
             public string Description = "";
             public string[] Screenshots = {};
@@ -501,9 +509,7 @@ namespace Olympus {
             public string _VersionString = "";
             [YamlMember(Alias = "Version")]
             public string VersionString  {
-                get {
-                    return _VersionString;
-                }
+                get => _VersionString;
                 set {
                     _VersionString = value;
                     Version? nullableVer = null;

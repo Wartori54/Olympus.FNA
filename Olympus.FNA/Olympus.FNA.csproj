@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFrameworks Condition="'$(TargetFrameworks)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">net7.0;net7.0-windows</TargetFrameworks>
     <TargetFrameworks Condition="'$(TargetFrameworks)' == ''">net7.0</TargetFrameworks>
+    <DefineConstants>HIGHER_VERSIONS</DefineConstants>
     <RootNamespace>Olympus</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
@@ -54,6 +55,7 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="SharpDX" Version="4.2.0" Condition="$(TargetIsWindows)" />
     <PackageReference Include="SharpDX.DXGI" Version="4.2.0" Condition="$(TargetIsWindows)" />
+    <PackageReference Include="Standart.Hash.xxHash" Version="4.0.5" />
     <PackageReference Include="System.Management" Version="7.0.1" Condition="$(TargetIsWindows)" />
     <PackageReference Include="YamlDotNet" Version="13.1.0" />
   </ItemGroup>

@@ -3,10 +3,13 @@ using Microsoft.Xna.Framework.Graphics;
 using OlympUI;
 using OlympUI.Animations;
 using Olympus.ColorThief;
+using Olympus.Utils;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -595,7 +598,7 @@ namespace Olympus {
         private (Version? everestVersion, List<ModList.ModInfo> installedMods) GenerateModList() {
             if (Config.Instance.Installation == null) {
                 Console.WriteLine("GenerateModList called before config was loaded!");
-                return new(); // shouldn't ever happen
+                return new ValueTuple<Version?, List<ModList.ModInfo>>(); // shouldn't ever happen
             }
             (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
             = Config.Instance.Installation.ScanVersion(false);
@@ -608,6 +611,10 @@ namespace Olympus {
 
         // Builds the pannel list from the installed mods, to be run on UI
         private ObservableCollection<Element> GenerateModListPanels(Version? everestVersion, List<ModList.ModInfo> mods) {
+            if (Config.Instance.Installation == null) {
+                 Console.WriteLine("GenerateModList called before config was loaded!");
+                 return new ObservableCollection<Element>(); // shouldn't ever happen
+            }
             Console.WriteLine("Generating mod panels");
             Panel everestPanel = new Panel() {
                 Layout = {
@@ -641,11 +648,13 @@ namespace Olympus {
             };
 
             foreach (ModList.ModInfo mod in mods) {
+                if (Config.Instance.Installation == null) continue;
                 ModPanel modPanel = new(mod) {
                     Layout = {
                         Layouts.Fill(1, 0),
                         Layouts.Column(),
                     },
+                    Clip = false,
                     Children = {
                         new HeaderSmall(mod.Name),
                         new Label(mod.Description == "" ? "Description could not be loaded or empty" : mod.Description) {
@@ -660,9 +669,10 @@ namespace Olympus {
                                 Layouts.Column()
                             },
                             Children = {
+                                new LabelSmall("Path: " + Path.GetRelativePath(Config.Instance.Installation.Root, mod.Path)),
                                 new LabelSmall("Installed Version: " + mod.Version),
-                                new LabelSmall((mod.NewVersion == null || mod.NewVersion.Equals(mod.Version)) 
-                                ? "Up to date" : "Update available: " + mod.NewVersion),
+                                new LabelSmall(mod.NewVersion == null || mod.NewVersion.Equals(mod.Version) 
+                                    ? "Up to date" : "Update available: " + mod.NewVersion),
                                 new LabelSmall("") {
                                     Data = {
                                         {"subscribe_click",
@@ -672,8 +682,88 @@ namespace Olympus {
                                 },
                             }
                         },
+                        
                     }
                 };
+
+                if (mod.NewVersion == null || mod.NewVersion.Equals(mod.Version)) {
+                    panels.Add(modPanel);
+                    continue;
+                }
+                
+                modPanel.Children.Add( 
+                    new Group() {
+                        Layout = {
+                            Layouts.Fill(1, 0),
+                            Layouts.Column()
+                        },
+                        Children = {
+                            new Button("update", b => {
+                                Group? parent = b.Parent as Group; // Should never be null
+                                if (parent == null) {
+                                    Console.WriteLine("ModPanel button parent was null!!!!");
+                                    b.Text = "Error!";
+                                    return;
+                                }
+
+                                ModPanel? panelParent = parent.Parent as ModPanel;
+                                if (panelParent == null) {
+                                    Console.WriteLine("ModPanel button parent was null!!!!");
+                                    b.Text = "Error!";
+                                    return;
+                                }
+                                panelParent.PreventNextClick();
+                                if (b.Data.TryGet("updating", out bool updating) && updating) {
+                                    b.Data.Add("cancel", true);
+                                    b.Text = "Canceling...";
+                                    return;
+                                }
+                                b.Data.Add("cancel", false);
+                                b.Data.Add("updating", true); // Add will replace existing values
+                                
+
+                                b.Text = "Starting download...";
+
+                                ModUpdater.UpdateMod(panelParent.Mod, (position, length, speed) => {
+                                    UI.Run(() => {
+                                        b.Text =
+                                            $"Press to Cancel | {(int) Math.Floor(100D * (position / (double) length))}% @ {speed} KiB/s";
+                                    });
+                                    bool exists = b.Data.TryGet("cancel", out bool cancel);
+                                    Console.WriteLine(exists);
+                                    if (exists) {
+                                        return !cancel;
+                                    }
+
+                                    return true;
+                                }, (success, isDone) => {
+                                    UI.Run(() => { 
+                                        if (isDone) {
+                                            b.Text = success ? "Mod updated!" : "Mod update failed! Press to retry";
+                                            b.Data.Add("updating", false);
+                                            b.Data.Add("cancel", false);
+                                            if (success)
+                                                b.Enabled = false;
+                                        } else if (!success) {
+                                            b.Text = "Retrying in 3 seconds...";
+                                        } else { // !isDone && success
+                                            b.Text = "Update canceled";
+                                            b.Data.Add("updating", false);
+                                            b.Data.Add("cancel", false);
+                                        }
+                                    });
+                                });
+                            }) {
+                                Enabled = !mod.IsUpdaterBlacklisted,
+                                Layout = {
+                                    Layouts.Fill(1, 0),
+                                },
+                                Data = {
+                                    {"updating", false},
+                                }
+                            }
+                        },
+                    });
 
                 panels.Add(modPanel);
             }
@@ -710,9 +800,13 @@ namespace Olympus {
 
             private bool Disabled;
 
-            private readonly ModList.ModInfo mod;
+            public readonly ModList.ModInfo Mod;
 
             private List<Tuple<Element, Action<bool, Element>>> subscribedClicks = new();
+
+            private bool preventNextClick = false;
+
+            public void PreventNextClick() => preventNextClick = true;
 
             private void ParseChilds(IEnumerable<Element> elements) {
                 foreach (Element el in elements) {
@@ -732,8 +826,8 @@ namespace Olympus {
 
             public ModPanel(ModList.ModInfo mod)
             : base() {
-                this.mod = mod;
-                this.Disabled = this.mod.IsBlacklisted;
+                this.Mod = mod;
+                this.Disabled = this.Mod.IsBlacklisted;
                 this.Children.CollectionChanged += (sender, args) => {
                     if (args.NewItems == null) return;
                     ParseChilds(args.NewItems.Cast<Element>());
@@ -749,9 +843,13 @@ namespace Olympus {
             }
 
             private void OnClick(MouseEvent.Click e) {
+                if (preventNextClick) {
+                    preventNextClick = false;
+                    return;
+                }
                 Disabled = !Disabled;
-                mod.IsBlacklisted = Disabled;
-                ModList.BlackListUpdate(mod);
+                Mod.IsBlacklisted = Disabled;
+                ModList.BlackListUpdate(Mod);
                 foreach (Tuple<Element, Action<bool, Element>> subbed in subscribedClicks) {
                     subbed.Item2.Invoke(this.Disabled, subbed.Item1);
                 }
