@@ -1,2 +1,14 @@
-ModDataBase: https://maddie480.ovh/celeste/mod_search_database.yaml 
-ModUpdateDataBase: https://everestapi.github.io/modupdater.txt
+# Entries are in the following format:
+# url : provides another url
+ModDataBase:
+  UrlList:
+    - url: https://maddie480.ovh/celeste/mod_search_database.yaml
+      provides_url: false
+      preferred: true
+ModUpdateDataBase:
+  UrlList:
+    - url: https://everestapi.github.io/modupdater.txt
+      provides_url: true
+      preferred: true
+    - url: https://maddie480.ovh/celeste/everest_update.yaml
+      provides_url: false
