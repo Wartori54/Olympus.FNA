@@ -3,7 +3,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 
-namespace Olympus.Launch {
+namespace Olympus.Utils {
     public class GameLauncher {
         public static LaunchResult LaunchCurrent(bool vanilla) {
             if (Config.Instance.Installation == null) return LaunchResult.MissingInstall;

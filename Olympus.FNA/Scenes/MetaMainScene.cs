@@ -2,8 +2,10 @@
 using Microsoft.Xna.Framework.Graphics;
 using OlympUI;
 using Olympus.NativeImpls;
+using Olympus.Utils;
 using SDL2;
 using System;
+using System.Collections.ObjectModel;
 
 namespace Olympus {
     public partial class MetaMainScene : Scene {
@@ -11,6 +13,9 @@ namespace Olympus {
         public const int SidebarButtonWidth = 72;
 
         public bool Real = true;
+
+        private static bool subscribed = false;
+        private static Action<Installation?> installUpdateProxy = i => {};
 
         public override Element Generate()
             => new Group() {
@@ -97,13 +102,7 @@ namespace Olympus {
                                             Layouts.Top(),
                                         },
                                         Children = {
-                                            new SidebarPlayButton("play_wheel", "Everest", _ => Launch.GameLauncher.LaunchCurrent(false)),
-                                            new SidebarPlayButton("play", "Vanilla", _ => Launch.GameLauncher.LaunchCurrent(true)),
-                                            new SidebarNavButton("everest", "Home", Scener.Get<HomeScene>()),
-                                            new SidebarNavButton("gamebanana", "Find Mods", Scener.Get<TestScene>()),
-                                            new SidebarNavButton("loenn", "Lönn", new MetaMainScene() { Real = false }),
-                                            // new SidebarNavButton("ahorn", "Ahorn", new MetaMainScene() { Real = false }),
-                                            new SidebarNavButton("wiki", "Wiki", Scener.Get<TestScene>()),
+                                            
                                         }
                                     },
                                     new Group() {
@@ -177,9 +176,70 @@ namespace Olympus {
                 }
             };
 
+        public override Element PostGenerate(Element root) {
+            Element sidebarBox = root.GetChild<Group>("MainBox")
+                .GetChild<Group>("SidebarBox").GetChild<Group>("SidebarTop");
+            Console.WriteLine("postgeneratesfae");
+            
+            if (!subscribed)
+                Config.Instance.SubscribeInstallUpdateNotify(i => {
+                    installUpdateProxy.Invoke(i);
+                });
+
+            installUpdateProxy = i => {
+                UI.Run(() => {
+                    sidebarBox.DisposeChildren();
+                    sidebarBox.Children = GenerateSidebarTop(i);
+                });
+            };
+            sidebarBox.DisposeChildren();
+            sidebarBox.Children = GenerateSidebarTop(Config.Instance.Installation);
+            
+            return root;
+        }
+
+        private static ObservableCollection<Element> GenerateSidebarTop(Installation? install) {
+            SidebarPlayButton? everestPlay;
+            SidebarPlayButton? vanillaPlay;
+            if (install == null) { // Install not selected
+                everestPlay = new SidebarPlayButton("pin", "Missing install!", _ => Scener.Push<InstallManagerScene>());
+                vanillaPlay = new SidebarPlayButton("pin", "Missing install!", _ => Scener.Push<InstallManagerScene>());
+            } else {
+                (bool _, string _, Version? Version, string? _, string? _,
+                        Version? ModVersion)
+                    = install.ScanVersion(false);
+                if (Version == null) { // Install is broken
+                    everestPlay = new SidebarPlayButton("pin", "Broken", _ => Scener.Push<InstallManagerScene>());
+                    vanillaPlay = new SidebarPlayButton("pin", "Broken", _ => Scener.Push<InstallManagerScene>());
+                } else {
+                    if (ModVersion == null) // Install unmodded
+                        everestPlay = new SidebarPlayButton("pin", "Install Everest",
+                            _ => Scener.Push<EverestInstallScreen>());
+                    else
+                        everestPlay = new SidebarPlayButton("play_wheel", "Everest",
+                            _ => GameLauncher.LaunchCurrent(false));
+                    
+                    // Allow always launching vanilla
+                    vanillaPlay = new SidebarPlayButton("play", "Vanilla", _ => GameLauncher.LaunchCurrent(true));
+                }
+            }
+
+            ObservableCollection<Element> children = new() {
+                everestPlay,
+                vanillaPlay,
+                new SidebarNavButton("everest", "Home", Scener.Get<HomeScene>()),
+                new SidebarNavButton("gamebanana", "Find Mods", Scener.Get<TestScene>()),
+                new SidebarNavButton("loenn", "Lönn", new MetaMainScene() { Real = false }),
+                // new SidebarNavButton("ahorn", "Ahorn", new MetaMainScene() { Real = false }),
+                new SidebarNavButton("wiki", "Wiki", Scener.Get<TestScene>()),
+            };
+
+            return children;
+        }
+
         public partial class ContentContainer : Panel {
 
-            public static readonly new Style DefaultStyle = new() {
+            public new static readonly Style DefaultStyle = new() {
                 { StyleKeys.Background, new ColorFader(0x08, 0x08, 0x08, 0xB0) },
                 { StyleKeys.Border, new ColorFader(0x08, 0x08, 0x08, 0x40) },
                 { StyleKeys.BorderSize, 1f },

@@ -33,7 +33,7 @@ namespace Olympus {
         private Installation? Install;
 
         public Installation? Installation {
-            get {return Install;}
+            get => Install;
             set {
                 Install = value;
                 foreach (Action<Installation?> subscribed in InstallUpdateEvents) {

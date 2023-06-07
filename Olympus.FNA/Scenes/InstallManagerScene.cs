@@ -78,21 +78,6 @@ namespace Olympus {
                                         Layouts.Column()
                                     },
                                     Children = {
-
-                                        new Group() {
-                                            Style = {
-                                                { Group.StyleKeys.Spacing, 8 },
-                                            },
-                                            Layout = {
-                                                Layouts.Fill(1, 0, 0, 8),
-                                                Layouts.Column(),
-                                            },
-                                            Children = {
-                                                new HeaderSmall("Managed by Olympus"),
-                                                new Label("TODO"),
-                                            }
-                                        },
-
                                         new Group() {
                                             Style = {
                                                 { Group.StyleKeys.Spacing, 8 },
@@ -163,7 +148,7 @@ namespace Olympus {
 
         public override Element PostGenerate(Element root) {
             SelectedInstall ??= Config.Instance.Installation;
-            App.Instance.FinderManager.Updated += UpdateInstallList;
+            App.Instance.FinderManager.Updated += UpdateInstallList; // TODO: save to disk found installs
             UpdateInstallList();
             return root;
         }
@@ -202,7 +187,7 @@ namespace Olympus {
             }
         }
 
-        private void AddManualInstallation() { // TODO: Save to disk
+        private void AddManualInstallation() {
 
             string filter;
 
