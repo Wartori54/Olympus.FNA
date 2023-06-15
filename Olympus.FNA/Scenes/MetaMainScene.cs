@@ -14,8 +14,18 @@ namespace Olympus {
 
         public bool Real = true;
 
-        private static bool subscribed = false;
-        private static Action<Installation?> installUpdateProxy = i => {};
+        private Action<Installation?> InstallUpdateProxy {
+            get => installUpdateProxy ??= i => {};
+            set {
+                if (installUpdateProxy == null) { // not subscribed yet
+                    Config.Instance.SubscribeInstallUpdateNotify(i => {
+                        InstallUpdateProxy.Invoke(i);
+                    }); 
+                }
+                installUpdateProxy = value;
+            }
+        }
+        private static Action<Installation?>? installUpdateProxy;
 
         public override Element Generate()
             => new Group() {
@@ -179,14 +189,8 @@ namespace Olympus {
         public override Element PostGenerate(Element root) {
             Element sidebarBox = root.GetChild<Group>("MainBox")
                 .GetChild<Group>("SidebarBox").GetChild<Group>("SidebarTop");
-            Console.WriteLine("postgeneratesfae");
             
-            if (!subscribed)
-                Config.Instance.SubscribeInstallUpdateNotify(i => {
-                    installUpdateProxy.Invoke(i);
-                });
-
-            installUpdateProxy = i => {
+            InstallUpdateProxy = i => {
                 UI.Run(() => {
                     sidebarBox.DisposeChildren();
                     sidebarBox.Children = GenerateSidebarTop(i);
@@ -214,7 +218,7 @@ namespace Olympus {
                 } else {
                     if (ModVersion == null) // Install unmodded
                         everestPlay = new SidebarPlayButton("pin", "Install Everest",
-                            _ => Scener.Push<EverestInstallScreen>());
+                            _ => Scener.Push<EverestInstallScene>());
                     else
                         everestPlay = new SidebarPlayButton("play_wheel", "Everest",
                             _ => GameLauncher.LaunchCurrent(false));

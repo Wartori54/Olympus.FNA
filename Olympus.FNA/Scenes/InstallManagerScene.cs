@@ -221,7 +221,7 @@ namespace Olympus {
 
         private Panel CreateEntry(Installation install) {
             Label labelVersion;
-            SelectablePanel panel = new(install, b => {
+            InstallerSelectablePanel panel = new(install, b => {
                 SelectedInstall = install;
                 Config.Instance.Installation = install;
                 Config.Instance.Save();
@@ -331,7 +331,7 @@ namespace Olympus {
 
         }
 
-        public partial class SelectablePanel : Panel {
+        public partial class InstallerSelectablePanel : Panel { // TODO: merge this with the other SelectablePanel
 
             public static readonly new Style DefaultStyle = new() { // TODO: selected on dark mode looks awful
                 {
@@ -363,10 +363,10 @@ namespace Olympus {
 
             private bool preventNextClick = false;
 
-            private Action<SelectablePanel> callback;
+            private Action<InstallerSelectablePanel> callback;
             private Installation install;
             
-            public SelectablePanel(Installation install, Action<SelectablePanel> cb)
+            public InstallerSelectablePanel(Installation install, Action<InstallerSelectablePanel> cb)
             : base() {
                 this.callback = cb;
                 this.install = install;

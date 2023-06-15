@@ -157,6 +157,11 @@ namespace Olympus {
                                             H = 200,
                                             Layout = { Layouts.Fill(1, 0) },
                                         },
+                                        new SelectablePanel() {
+                                            Children = {
+                                            new Label("text"),
+                                            }
+                                        }
                                     },
                                 }
                             }
@@ -178,6 +183,7 @@ namespace Olympus {
                             }
                         }
                     },
+                    
                 }
             };
 
