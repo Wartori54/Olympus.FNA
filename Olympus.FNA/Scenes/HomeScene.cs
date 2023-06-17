@@ -16,10 +16,12 @@ using System.Threading.Tasks;
 namespace Olympus {
     public class HomeScene : Scene {
 
-        private Action<Installation?>? refreshModList;
+        private LockedAction<Installation?>? refreshModList;
 
         public HomeScene() {
-            Config.Instance.SubscribeInstallUpdateNotify(i => (refreshModList ?? (_ => {}))(i));
+            Config.Instance.SubscribeInstallUpdateNotify(i => {
+                refreshModList?.TryRun(i);
+            });
         }
 
         public override Element Generate()
@@ -418,7 +420,7 @@ namespace Olympus {
                                                     });
                                                 });
 
-                                                refreshModList = _ => {
+                                                refreshModList = new LockedAction<Installation?>(_ => {
                                                     try {
                                                         UI.Run(() => { // remove old and add loading screen
                                                             el.DisposeChildren();
@@ -449,8 +451,8 @@ namespace Olympus {
                                                         Console.WriteLine("Stacktrace: {0}", e.StackTrace);
                                                     }
                                                     
-                                                };
-                                                await Task.Run(() => refreshModList(null)); // pass null because i is ignored
+                                                }); 
+                                                refreshModList.TryRun(null); // pass null because i is ignored
                                                 // the correct install will get picked through Config.Instance.Install
                                             })
                                         }
@@ -609,8 +611,8 @@ namespace Olympus {
             return (ModVersion, installedMods);
         }
 
-        // Builds the pannel list from the installed mods, to be run on UI
-        private ObservableCollection<Element> GenerateModListPanels(Version? everestVersion, List<ModList.ModInfo> mods) {
+        // Builds the panel list from the installed mods, to be run on thread UI
+        private static ObservableCollection<Element> GenerateModListPanels(Version? everestVersion, List<ModList.ModInfo> mods) {
             if (Config.Instance.Installation == null) {
                  Console.WriteLine("GenerateModList called before config was loaded!");
                  return new ObservableCollection<Element>(); // shouldn't ever happen
