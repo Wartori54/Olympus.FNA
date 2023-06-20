@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using OlympUI;
 using OlympUI.Animations;
+using OlympUI.Modifiers;
 using Olympus.ColorThief;
 using Olympus.Utils;
 using System;
@@ -680,6 +681,9 @@ namespace Olympus {
                                         {"subscribe_click",
                                             (bool disabled, Element label) => 
                                             { (label as LabelSmall)!.Text = disabled ? "Disabled" : "";}}
+                                    },
+                                    Modifiers = {
+                                        new OpacityModifier(0.7f),
                                     }
                                 },
                             }

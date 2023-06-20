@@ -9,14 +9,14 @@ using System.Linq;
 namespace OlympUI {
     public partial class SelectionBox : ScrollBox {
 
-        public new ObservableCollection<ISelectionBoxEntry> Content = new();
+        public new readonly ObservableCollection<ISelectionBoxEntry> Content = new();
 
         private BasicMesh BackgroundMesh;
         protected Style.Entry StyleBackground = new(new ColorFader(0x08, 0x08, 0x08, 0xd0));
         
         private Color PrevBackground;
         private bool PrevClip;
-        private Point PrevWH;       
+        private Point PrevWH;
 
         public int Selected { get; private set; } = -1;
 

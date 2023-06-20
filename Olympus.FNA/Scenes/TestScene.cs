@@ -104,7 +104,7 @@ namespace Olympus {
                             Layouts.Top(0.5f, -0.5f),
                             Layouts.Fill(0.5f, 0.5f),
                         },
-                        Cached = false,
+                        // Cached = false,
                         Children = {
                             new ScrollBox() {
                                 Layout = {

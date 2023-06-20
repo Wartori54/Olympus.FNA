@@ -12,3 +12,8 @@ ModUpdateDataBase:
       preferred: true
     - url: https://maddie480.ovh/celeste/everest_update.yaml
       provides_url: false
+EverestVersions:
+  UrlList:
+    - url: https://maddie480.ovh/celeste/everest-versions
+      provides_url: false
+      preferred: true
