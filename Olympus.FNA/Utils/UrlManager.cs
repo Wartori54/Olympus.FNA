@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
+using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 
 namespace Olympus.Utils {
@@ -43,7 +44,8 @@ namespace Olympus.Utils {
             /// Tries all urls from this list until success, throws HttpRequestException otherwise
             /// </summary>
             /// <returns>The data from the url as a string</returns>
-            public string TryHttpGetData() {
+            public string TryHttpGetData(ICollection<string>? withFlags = null) {
+                withFlags ??= new List<string>();
                 if (UrlList.Count == 0)
                     throw new FormatException($"Couldn't read urls from {UrlsYamlPath}");
                 // make sure the preferred url is on front, because yamldotnet doesn't ensure it
@@ -58,15 +60,23 @@ namespace Olympus.Utils {
                 }
                 using HttpClient wc = new();
                 wc.Timeout = TimeSpan.FromMilliseconds(10000); // 10s timeout
-                foreach (var urlEntry in UrlList) {
+                foreach (DataBaseUrlEntry urlEntry in UrlList) {
                     try {
-                        string urlString = urlEntry.Url;
+                        string? urlString = urlEntry.Url;
                         if (urlEntry.ProvidesUrl) {
                             Console.WriteLine($"Obtaining url from {urlString}");
                             // The following wrapper makes it possible to call async method from a sync context
                             // Note that calling the get accessor on Result forcibly waits until the task is done
                             urlString = Task.Run(async () => await wc.GetStringAsync(urlString)).Result
                                 .TrimEnd(Environment.NewLine.ToCharArray()); // remove newline at the end
+                        }
+
+                        foreach (string flag in withFlags) {
+                            if (!urlEntry.Flags.TryGetValue(flag, out string? temp)) {
+                                Console.WriteLine($"Unknown flag ({flag}) for url: {urlEntry.Url}, skipping...");
+                                continue;
+                            }
+                            urlString += temp;
                         }
 
                         Console.WriteLine($"Downloading content from {urlString}");
@@ -84,11 +94,13 @@ namespace Olympus.Utils {
 
         public class DataBaseUrlEntry {
             [YamlMember(Alias = "url", ApplyNamingConventions = false)]
-            public string Url = "";
+            public string? Url = "";
             [YamlMember(Alias = "provides_url", ApplyNamingConventions = false)]
             public bool ProvidesUrl = false;
             [YamlMember(Alias = "preferred", ApplyNamingConventions = false)]
             public bool Preferred = false;
+            [YamlMember(Alias = "flags", ApplyNamingConventions = false)]
+            public Dictionary<string, string?> Flags = new ();
         }
 
     }

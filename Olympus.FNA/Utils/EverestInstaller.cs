@@ -9,7 +9,7 @@ namespace Olympus.Utils {
     public static class EverestInstaller {
 
         public static ICollection<EverestVersion>? QueryEverestVersions() {
-            string jsonData = UrlManager.Urls.EverestVersions.TryHttpGetData();
+            string jsonData = UrlManager.Urls.EverestVersions.TryHttpGetData(new List<string>{"includeCore"});
             List<EverestVersion>? versions = JsonConvert.DeserializeObject<List<EverestVersion>>(jsonData);
             return versions;
         }
@@ -57,7 +57,7 @@ namespace Olympus.Utils {
                 if (!fieldInfos.Any()) throw new FieldAccessException("No fields found in EverestBranch, (something is very wrong D:)");
                 foreach (var fieldInfo in fieldInfos) {
                     EverestBranch everestBranch = (EverestBranch?) fieldInfo.GetValue(null) ?? throw new MissingFieldException("Couldn't cast field");
-                    if (everestBranch.asString == str)
+                    if (string.Equals(everestBranch.asString, str, StringComparison.InvariantCultureIgnoreCase))
                         return everestBranch;
                 }
 

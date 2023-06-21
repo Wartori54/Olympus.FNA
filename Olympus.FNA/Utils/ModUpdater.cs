@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 namespace Olympus.Utils {
     public static class ModUpdater {
         
-        public static void UpdateAllMods(Installation install) {
+        public static void UpdateAllMods(Installation install) { //TODO: add update all button and auto update mods
             List<ModList.ModInfo> mods = ModList.GatherModList(install, true, true, true, false);
 
             bool TickCallback(int progress, long lenght, int speed) {

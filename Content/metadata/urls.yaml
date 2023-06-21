@@ -17,3 +17,5 @@ EverestVersions:
     - url: https://maddie480.ovh/celeste/everest-versions
       provides_url: false
       preferred: true
+      flags:
+        includeCore: ?supportsNativeBuilds=true
