@@ -9,6 +9,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
@@ -77,53 +78,79 @@ namespace Olympus.Utils {
 
             // 2nd part: the installation
             yield return new Status("Running miniInstaller", 0.5f, Status.Stage.InProgress);
-            if (isNativeArtifact)
-                foreach (Status s in RunMiniInstallerNative(install))
-                    yield return s;
-            else
-                await foreach (Status s in RunMiniInstaller(install)) {
-                    yield return s;
-                }
+            await foreach (Status s in RunMiniInstaller(install, SetupAndGetMiniInstallerName(install, isNativeArtifact))) {
+                yield return s;
+            }
             
             // Delete the zip file
             File.Delete(outFile);
         }
 
-
-        private static async IAsyncEnumerable<Status> RunMiniInstaller(Installation install) {
-            string binaryName = "";
+        private static string SetupAndGetMiniInstallerName(Installation install, bool isNative) {
+            string binaryName;
             if (PlatformHelper.Is(Platform.Windows)) {
-                binaryName = "MiniInstaller.exe";
-            } else if (PlatformHelper.Is(Platform.Linux)) {
-                binaryName = "MiniInstaller.bin.x86_64";
+                binaryName = isNative ? 
+                                 PlatformHelper.Is(Platform.Bits64) ? 
+                                 "MiniInstaller-win64.exe" 
+                                 : "MiniInstaller-win.exe" 
+                             : "MiniInstaller.exe";
+                return binaryName;
+            }
+
+            if (PlatformHelper.Is(Platform.Linux)) {
+                if (isNative) {
+                    binaryName = "MiniInstaller-linux";
+                    chmod(Path.Combine(install.Root, binaryName), 0755);
+                    return binaryName;
+                }
+
+                string kickStartName = PlatformHelper.Is(Platform.Bits64)
+                    ? "Celeste.bin.x86_64"
+                    : "Celeste.bin.x86";
+                
+                binaryName = PlatformHelper.Is(Platform.Bits64) ? 
+                    "MiniInstaller.bin.x86_64" 
+                    : "MiniInstaller.bin.x86";
                 // we'll use the monokickstart that celeste uses to run miniinstaller
-                if (File.Exists(Path.Combine(install.Root, "Celeste.bin.x86_64"))) {
+                if (File.Exists(Path.Combine(install.Root, kickStartName))) {
                     if (!File.Exists(Path.Combine(install.Root, binaryName))) {
-                        File.Copy(Path.Combine(install.Root, "Celeste.bin.x86_64"),
+                        File.Copy(Path.Combine(install.Root, kickStartName),
                             Path.Combine(install.Root, binaryName));
-                        
                     }
                 } else {
-                    yield return new Status("Celeste monokickstart missing! (is it non native?)", 1f,
-                        Status.Stage.Fail);
+                    throw new FileNotFoundException("Celeste monokickstart missing! (is it non native?)");
                 }
-            } else if (PlatformHelper.Is(Platform.MacOS)) {
-                binaryName = "MiniInstaller.bin.osx";
-                 // we'll use the monokickstart that celeste uses to run miniinstaller
-                 if (File.Exists(Path.Combine(install.Root, "Celeste.bin.osx"))) {
-                     if (!File.Exists(Path.Combine(install.Root, binaryName))) {
-                         File.Copy(Path.Combine(install.Root, "Celeste.bin.osx"),
-                             Path.Combine(install.Root, binaryName));
-                     }
-                 } else {
-                     yield return new Status("Celeste monokickstart missing! (is it non native?)", 1f,
-                         Status.Stage.Fail);
-                 }
-            } else {
-                yield return new Status("Unable to recognize platform! (manual install required)", 1f, Status.Stage.Fail);
-                yield break;
+
+                return binaryName; // Note: no chmod needed here since the celeste kickstart will already be executable and it'll be kept
             }
+
+            if (PlatformHelper.Is(Platform.MacOS)) {
+                if (isNative) {
+                    binaryName = "MiniInstaller-osx";
+                    chmod(Path.Combine(install.Root, binaryName), 0755);
+                    return binaryName;
+                }
                 
+                binaryName = "MiniInstaller.bin.osx";
+                
+                // we'll use the monokickstart that celeste uses to run miniinstaller
+                if (File.Exists(Path.Combine(install.Root, "Celeste.bin.osx"))) {
+                    if (!File.Exists(Path.Combine(install.Root, binaryName))) {
+                        File.Copy(Path.Combine(install.Root, "Celeste.bin.osx"),
+                            Path.Combine(install.Root, binaryName));
+                    }
+                } else {
+                    throw new FileNotFoundException("Celeste monokickstart missing! (is it non native?)");
+                }
+
+                return binaryName; // Note: no chmod needed here since the celeste kickstart will already be executable and it'll be kept
+            }
+
+            throw new PlatformNotSupportedException("Unable to recognize platform! (manual install required)");
+        }
+
+
+        private static async IAsyncEnumerable<Status> RunMiniInstaller(Installation install, string binaryName) {
             ProcessStartInfo config = new() {
                 WorkingDirectory = install.Root,
                 CreateNoWindow = true,
@@ -149,8 +176,6 @@ namespace Olympus.Utils {
                 processStdData.Writer.TryWrite((e.Data ?? "", true));
                 stdError = true; // Assume fail if there's any stdError data
             };
-
-
 
             (bool, Exception?) startSuccess = (true, null);
             try { // Those are the only statements that can throw
@@ -199,10 +224,6 @@ namespace Olympus.Utils {
             Config.Instance.Installation = Config.Instance.Installation; // neat hack to update all ui stuff
         }
         
-        private static IEnumerable<Status> RunMiniInstallerNative(Installation install) {
-             yield break;
-        }
-
         private static IEnumerable<Status> UnpackThere(string targetFile, string zipPrefix = "") {
             ZipArchive zip = new(File.OpenRead(targetFile));
             
@@ -230,6 +251,8 @@ namespace Olympus.Utils {
 
                 if (File.Exists(to))
                     File.Delete(to);
+                else if (!Directory.Exists(Path.GetDirectoryName(to)))
+                    Directory.CreateDirectory(Path.GetDirectoryName(to)!);
 
                 using (FileStream fs = File.OpenWrite(to))
                 using (Stream compressed = entry.Open())
@@ -238,6 +261,13 @@ namespace Olympus.Utils {
 
             yield return new Status($"Unzipped {count} files", -1, Status.Stage.InProgress);
         }
+
+#if WINDOWS
+        private static int chmod(string pathname, int mode) {}
+#else
+        [DllImport("libc", SetLastError = true)]
+        private static extern int chmod(string pathname, int mode);
+#endif
 
 
 

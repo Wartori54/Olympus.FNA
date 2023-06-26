@@ -309,7 +309,6 @@ namespace Olympus {
         /// - ModName: The name of the installed mod loader.
         /// - ModVersion: The version of the installed mod loader.
         /// </returns>
-
         public (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) ScanVersion(bool force) {
             if (!force && VersionLast != default)
                 return VersionLast;
@@ -319,6 +318,8 @@ namespace Olympus {
             if (!File.Exists(Path.Combine(root, "Celeste.exe"))) {
                 return VersionLast = (false, "Celeste.exe missing", null, null, null, null);
             }
+            
+            
 
             // Check if we're dealing with the UWP version.
             if (File.Exists(Path.Combine(root, "AppxManifest.xml")) &&
