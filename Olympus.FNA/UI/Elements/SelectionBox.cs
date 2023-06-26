@@ -18,7 +18,9 @@ namespace OlympUI {
         private bool PrevClip;
         private Point PrevWH;
 
-        public int Selected { get; private set; } = -1;
+        public int SelectedIdx { get; private set; } = -1;
+
+        public ISelectionBoxEntry? Selected => SelectedIdx == -1 ? null : Content[SelectedIdx];
 
         public SelectionBox() {
             Content.CollectionChanged += ContentUpdate;
@@ -52,7 +54,7 @@ namespace OlympUI {
                 case NotifyCollectionChangedAction.Replace:
                 case NotifyCollectionChangedAction.Reset: // Regenerate for everything else
                     base.Content.DisposeChildren();
-                    Selected = -1;
+                    SelectedIdx = -1;
                     foreach (ISelectionBoxEntry el in Content) {
                         base.Content.Children.Add(GenerateEntry(el));
                     }
@@ -88,21 +90,21 @@ namespace OlympUI {
             int childIdx = 0;
             foreach (Element element in base.Content.Children) {
                 if (element.Contains(e.XY)) {
-                    if (Selected == childIdx) {
+                    if (SelectedIdx == childIdx) {
                         // Unselect it instead 
-                        Selected = -1;
+                        SelectedIdx = -1;
                     } else
-                        Selected = childIdx;
+                        SelectedIdx = childIdx;
                     
                     int entryIdx = 0;
                     foreach (ISelectionBoxEntry entry in Content) {
-                        entry.OnUpdate(entryIdx == Selected);
+                        entry.OnUpdate(entryIdx == SelectedIdx);
                         entryIdx++;
                     }
 
                     int elemIdx = 0;
                     foreach (Element elem in base.Content.Children) {
-                        (elem as SelectablePanel)!.Selected = Selected == elemIdx;
+                        (elem as SelectablePanel)!.Selected = SelectedIdx == elemIdx;
                         elemIdx++;
                     }
                     

@@ -12,6 +12,7 @@ namespace Olympus {
         public override bool Alert => true;
         public override Element Generate() 
             => new Group() {
+            ID = "base",
             Style = {
                 { Group.StyleKeys.Spacing, 16 },
             },
@@ -22,15 +23,17 @@ namespace Olympus {
             Children = {
                 new HeaderBig("Versions"),
                 new Group() {
+                    ID = "boxGroup",
                     Layout = {
                         Layouts.Fill(1, 1, 0, (20 + 8)*2*2),
                     },
                     Children = {
                         new SelectionBox() {
+                            ID = "box",
                             Layout = {
                                 Layouts.Fill(),
                             }, Clip = true, Cached = true, //TODO: (maybe find better solution?) This removes the shadow from the element but it is required for clip to work
-                            Init = RegisterRefresh<SelectionBox>(async el => {
+                            Init = RegisterRefresh<SelectionBox>(async el => { // TODO: add a loading spinner to make it more responsive
                                 ICollection<EverestInstaller.EverestVersion>? versions = EverestInstaller.QueryEverestVersions();
                                 if (versions == null) return;
                                 await UI.Run(() => {
@@ -48,7 +51,8 @@ namespace Olympus {
                                         el.Content.Add(new VersionEntry($"{version.Branch}: {version.version}",
                                             version.date.ToShortDateString() + " " + version.date.ToShortTimeString(),
                                             desc, 
-                                            b => {}));
+                                            b => {},
+                                            version));
                                     }
                                 });
 
@@ -57,6 +61,7 @@ namespace Olympus {
                     }
                 },
                 new Group() {
+                    ID = "buttons",
                     Clip = false,
                     Layout = {
                         Layouts.Row(),
@@ -66,21 +71,21 @@ namespace Olympus {
                         { Group.StyleKeys.Spacing, 16 },
                     },
                     Children = {
-                        // new Group() {
-                        //     Clip = false,
-                        //     Layout = {
-                        //         Layouts.Fill(0.5f, 0f),
-                        //     },
-                        //     Children = {
-                        //         new Button("Install", button => {
-                        //         }) {
-                        //             Layout = {
-                        //                                             Layouts.Fill(0.5f, 0f),
-                        //                                         },
-                        //         },
-                        //     }
-                        // },
-                        new Button("Install", button => {
+                        new Button("Install", async button => {
+                            ISelectionBoxEntry? boxEntry = button.GetParent()
+                                                     .GetParent()
+                                                     .GetChild("boxGroup")!
+                                                     .GetChild<SelectionBox>("box")
+                                                     .Selected;
+                            if (boxEntry == null) return; // TODO: warn maybe?
+
+                            if (Config.Instance.Installation == null) return; // TODO: make it impossible to happen
+
+                            await foreach (var status in 
+                                           EverestInstaller.InstallVersion(((VersionEntry) boxEntry).EverestVersion,
+                                               Config.Instance.Installation)) {
+                                Console.WriteLine(status.Text + " | " + status.Progress + " | " + status.CurrentStage);
+                            }
                         }) {
                             Layout = {
                                 Layouts.Fill(0.5f, 0f, 8),
@@ -119,11 +124,14 @@ namespace Olympus {
             private readonly string description;
             private readonly Action<bool> click;
 
-            public VersionEntry(string title, string subTitle, string description, Action<bool> click) {
+            public readonly EverestInstaller.EverestVersion EverestVersion;
+
+            public VersionEntry(string title, string subTitle, string description, Action<bool> click, EverestInstaller.EverestVersion everestVersion) {
                 this.title = title;
                 this.subTitle = subTitle;
                 this.description = description; 
                 this.click = click;
+                this.EverestVersion = everestVersion;
             }
             public string GetTitle() {
                 return title;

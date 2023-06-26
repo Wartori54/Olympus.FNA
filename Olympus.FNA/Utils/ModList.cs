@@ -293,7 +293,7 @@ namespace Olympus.Utils {
                 }
                 if (invalidateModDataBase) {
                     Console.WriteLine("Redownloading DB");
-                    yamlData = UrlManager.Urls.ModDataBase.TryHttpGetData();
+                    yamlData = UrlManager.Urls.ModDataBase.TryHttpGetDataString();
                     
                     File.WriteAllText(Path.Join(Config.GetDefaultDir(), DBName), yamlData);
                     Console.WriteLine("Saved DB");
@@ -313,7 +313,7 @@ namespace Olympus.Utils {
             // Download the everest_update.yaml, downloaded on each boot
             private void DownloadUpdateDataBase() {
                 Console.WriteLine("Downloading UpdateDB");
-                string yamlData = UrlManager.Urls.ModUpdateDataBase.TryHttpGetData();
+                string yamlData = UrlManager.Urls.ModUpdateDataBase.TryHttpGetDataString();
                 
                 rawUpdateDataBase = YamlHelper.Deserializer.Deserialize<Dictionary<string, ModDBUpdateInfo>>(yamlData);
                 foreach (string name in rawUpdateDataBase.Keys) {

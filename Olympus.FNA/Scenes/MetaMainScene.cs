@@ -202,7 +202,8 @@ namespace Olympus {
             return root;
         }
 
-        private static ObservableCollection<Element> GenerateSidebarTop(Installation? install) {
+        private static ObservableCollection<Element> GenerateSidebarTop(Installation? install) { //TODO: make an actual icon for "pin"
+            //TODO: Text doesnt fit
             SidebarPlayButton? everestPlay;
             SidebarPlayButton? vanillaPlay;
             if (install == null) { // Install not selected

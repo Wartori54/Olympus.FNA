@@ -296,6 +296,19 @@ namespace Olympus {
 
             return false;
         }
+        
+        /// <summary>
+        /// Retrieves info about an install
+        /// </summary>
+        /// <param name="force">Whether to re scan the install for changes</param>
+        /// <returns>A Tuple:
+        /// - Modifiable: Whether the install can be modded or not
+        /// - Full: A summary of the install as a string
+        /// - Version: Represents the Celeste version
+        /// - Framework: Represents the rendering framework as a string, either "FNA" or "XNA"
+        /// - ModName: The name of the installed mod loader.
+        /// - ModVersion: The version of the installed mod loader.
+        /// </returns>
 
         public (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) ScanVersion(bool force) {
             if (!force && VersionLast != default)
@@ -401,7 +414,7 @@ namespace Olympus {
 
                     return !string.IsNullOrEmpty(versionEverestFull) && versionEverest is not null && versionEverestValid ?
                         VersionLast = (true, $"Celeste {version}-{framework} + Everest {versionEverestFull}", version, framework, "Everest", versionEverest) :
-                        VersionLast = (false, $"Celeste {version}-{framework} + Everest ?", version, framework, "Everest", null);
+                        VersionLast = (true, $"Celeste {version}-{framework} + Everest ?", version, framework, "Everest", null);
                 }
 
                 return VersionLast = (true, $"Celeste {version}-{framework}", version, framework, null, null);
