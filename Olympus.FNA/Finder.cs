@@ -246,7 +246,7 @@ namespace Olympus {
 
             if (File.Exists(root)) { // root probably points to Celeste.exe
                 string? newRoot = Path.GetDirectoryName(root);
-                if (newRoot != null && newRoot != "") {
+                if (!string.IsNullOrEmpty(newRoot)) {
                     root = newRoot;
                 }
             }
@@ -257,7 +257,8 @@ namespace Olympus {
 
             // Early exit check if possible.
             string path = root;
-            if (File.Exists(Path.Combine(path, "Celeste.exe"))) {
+            if (File.Exists(Path.Combine(path, "Celeste.exe")) 
+                || File.Exists(Path.Combine(path, "Celeste.dll"))) {
                 Root = path;
                 return true;
             }
@@ -275,7 +276,8 @@ namespace Olympus {
             }
 
             path = root;
-            if (File.Exists(Path.Combine(path, "Celeste.exe"))) {
+            if (File.Exists(Path.Combine(path, "Celeste.exe")) 
+                || File.Exists(Path.Combine(path, "Celeste.dll"))) {
                 Root = path;
                 return true;
             }
@@ -315,11 +317,9 @@ namespace Olympus {
 
             string root = Root;
 
-            if (!File.Exists(Path.Combine(root, "Celeste.exe"))) {
-                return VersionLast = (false, "Celeste.exe missing", null, null, null, null);
+            if (!File.Exists(Path.Combine(root, "Celeste.exe")) && !File.Exists(Path.Combine(root, "Celeste.dll"))) {
+                return VersionLast = (false, "Celeste.exe or Celeste.dll missing", null, null, null, null);
             }
-            
-            
 
             // Check if we're dealing with the UWP version.
             if (File.Exists(Path.Combine(root, "AppxManifest.xml")) &&
@@ -335,19 +335,29 @@ namespace Olympus {
             }
 
             try {
-                using ModuleDefinition game = ModuleDefinition.ReadModule(Path.Combine(root, "Celeste.exe"));
+                string fileName;
+                if (File.Exists(Path.Combine(root, "Celeste.exe")))
+                    fileName = "Celeste.exe";
+                else // Safe to assume Celeste.dll exists since it was already checked
+                    fileName = "Celeste.dll";
+                
 
+                using ModuleDefinition game = ModuleDefinition.ReadModule(Path.Combine(root, fileName));
+                
                 // Celeste's version is set by - and thus stored in - the Celeste .ctor
                 if (game.GetType("Celeste.Celeste") is not TypeDefinition t_Celeste)
-                    return VersionLast = (false, "Malformed Celeste.exe: Can't find main type", null, null, null, null);
+                    return VersionLast = (false, "Malformed Celeste.exe: Can't find main type", null, null, null,
+                        null);
 
                 MethodDefinition? c_Celeste =
                     t_Celeste.FindMethod("System.Void orig_ctor_Celeste()") ??
                     t_Celeste.FindMethod("System.Void .ctor()");
                 if (c_Celeste is null)
-                    return VersionLast = (false, "Malformed Celeste.exe: Can't find constructor", null, null, null, null);
+                    return VersionLast = (false, "Malformed Celeste.exe: Can't find constructor", null, null, null,
+                        null);
                 if (!c_Celeste.HasBody)
-                    return VersionLast = (false, "Malformed Celeste.exe: Constructor without code", null, null, null, null);
+                    return VersionLast = (false, "Malformed Celeste.exe: Constructor without code", null, null,
+                        null, null);
 
                 // Grab the version from the .ctor, in hopes that any mod loader 
                 Version? version = null;
@@ -356,7 +366,9 @@ namespace Olympus {
                         ILCursor c = new(il);
 
                         MethodReference? c_Version = null;
-                        if (!c.TryGotoNext(i => i.MatchNewobj(out c_Version) && c_Version?.DeclaringType?.FullName == "System.Version") || c_Version is null)
+                        if (!c.TryGotoNext(i =>
+                                i.MatchNewobj(out c_Version) &&
+                                c_Version?.DeclaringType?.FullName == "System.Version") || c_Version is null)
                             return;
 
                         if (c_Version.Parameters.All(p => p.ParameterType.MetadataType == MetadataType.Int32)) {
@@ -380,14 +392,17 @@ namespace Olympus {
                                     break;
                             }
 
-                        } else if (c_Version.Parameters.Count == 1 && c_Version.Parameters[0].ParameterType.MetadataType == MetadataType.String && c.Prev.Operand is string arg) {
+                        } else if (c_Version.Parameters.Count == 1 &&
+                                   c_Version.Parameters[0].ParameterType.MetadataType == MetadataType.String &&
+                                   c.Prev.Operand is string arg) {
                             version = new(arg);
                         }
                     });
                 }
 
                 if (version is null)
-                    return VersionLast = (false, "Malformed Celeste.exe: Can't parse version", null, null, null, null);
+                    return VersionLast = (false, "Malformed Celeste.exe: Can't parse version", null, null, null,
+                        null);
 
                 string framework = game.AssemblyReferences.Any(r => r.Name == "FNA") ? "FNA" : "XNA";
 
@@ -404,18 +419,23 @@ namespace Olympus {
                     using (ILContext il = new(c_Everest)) {
                         il.Invoke(il => {
                             ILCursor c = new(il);
-                            while (!versionEverestValid && c.TryGotoNext(i => i.MatchLdstr(out versionEverestFull)) && versionEverestFull is not null) {
+                            while (!versionEverestValid &&
+                                   c.TryGotoNext(i => i.MatchLdstr(out versionEverestFull)) &&
+                                   versionEverestFull is not null) {
                                 int split = versionEverestFull.IndexOf('-');
-                                versionEverestValid = split != -1 ?
-                                    Version.TryParse(versionEverestFull.AsSpan(0, split), out versionEverest) :
-                                    Version.TryParse(versionEverestFull, out versionEverest);
+                                versionEverestValid = split != -1
+                                    ? Version.TryParse(versionEverestFull.AsSpan(0, split), out versionEverest)
+                                    : Version.TryParse(versionEverestFull, out versionEverest);
                             }
                         });
                     }
 
-                    return !string.IsNullOrEmpty(versionEverestFull) && versionEverest is not null && versionEverestValid ?
-                        VersionLast = (true, $"Celeste {version}-{framework} + Everest {versionEverestFull}", version, framework, "Everest", versionEverest) :
-                        VersionLast = (true, $"Celeste {version}-{framework} + Everest ?", version, framework, "Everest", null);
+                    return !string.IsNullOrEmpty(versionEverestFull) && versionEverest is not null &&
+                           versionEverestValid
+                        ? VersionLast = (true, $"Celeste {version}-{framework} + Everest {versionEverestFull}",
+                            version, framework, "Everest", versionEverest)
+                        : VersionLast = (true, $"Celeste {version}-{framework} + Everest ?", version, framework,
+                            "Everest", null);
                 }
 
                 return VersionLast = (true, $"Celeste {version}-{framework}", version, framework, null, null);
