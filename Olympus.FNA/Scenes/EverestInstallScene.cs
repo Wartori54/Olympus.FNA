@@ -113,11 +113,6 @@ namespace Olympus {
             }
         };
 
-        public override Element PostGenerate(Element root) {
-            EverestInstaller.QueryEverestVersions();
-            return base.PostGenerate(root);
-        }
-
         private class VersionEntry : ISelectionBoxEntry {
             private readonly string title;
             private readonly string subTitle;

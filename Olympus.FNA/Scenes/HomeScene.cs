@@ -421,7 +421,7 @@ namespace Olympus {
                                                     });
                                                 });
 
-                                                refreshModList = new LockedAction<Installation?>(_ => {
+                                                refreshModList = new LockedAction<Installation?>(async _ => {
                                                     try {
                                                         UI.Run(() => { // remove old and add loading screen
                                                             el.DisposeChildren();
@@ -446,6 +446,7 @@ namespace Olympus {
                                                         UI.Run(() => {
                                                             el.DisposeChildren();
                                                             el.Children = GenerateModListPanels(everestVersion, installedMods);
+                                                            UI.Root.InvalidateForce(); // TODO: find a real fix for panels with buttons not resizing properly the first time
                                                         });
                                                     } catch (Exception e) {
                                                         Console.WriteLine("refreshModList crashed with exception {0}", e);
@@ -619,6 +620,14 @@ namespace Olympus {
                  return new ObservableCollection<Element>(); // shouldn't ever happen
             }
             Console.WriteLine("Generating mod panels");
+            EverestInstaller.EverestVersion? everestUpdate = null;
+            EverestInstaller.EverestBranch? branch = EverestInstaller.DeduceBranch(Config.Instance.Installation);
+            if (branch != null) {
+                EverestInstaller.EverestVersion? version = EverestInstaller.GetLatestForBranch(branch);
+                if (everestVersion != null && version != null && version.version > everestVersion.Minor) {
+                    everestUpdate = version;
+                }
+            }
             Panel everestPanel = new Panel() {
                 Layout = {
                     Layouts.Fill(1, 0),
@@ -630,21 +639,31 @@ namespace Olympus {
                         Wrap = true,
                     },
                     new Group() {
-                        Style = {
-                            { Group.StyleKeys.Spacing, 0 },
-                        },
                         Layout = {
                             Layouts.Fill(1, 0),
-                            Layouts.Column()
+                            Layouts.Row(),
                         },
                         Children = {
-                            new LabelSmall(everestVersion == null ? "Unknown version" : 
-                                "Installed version: " + everestVersion),
-                            new LabelSmall("Update Available: TODO"),
+                            new Group() {
+                                Style = {
+                                    { Group.StyleKeys.Spacing, 0 },
+                                },
+                                Layout = {
+                                    Layouts.Fill(0.8f, 0),
+                                    Layouts.Column()
+                                },
+                                Children = {
+                                    new LabelSmall(everestVersion == null ? "Unknown version" : 
+                                        "Installed version: " + everestVersion),
+                                    new LabelSmall(everestUpdate == null ? "Up to date" : $"Update available: {everestUpdate.version}"),
+                                }
+                            },
+                            new Button("Change version", _ => Scener.Push<EverestInstallScene>()),
                         }
-                    },
+                    }
                 }
             };
+
 
             ObservableCollection<Element> panels = new() {
                 everestPanel,

@@ -10,16 +10,25 @@ using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using JsonException = Newtonsoft.Json.JsonException;
 
 namespace Olympus.Utils {
     public static class EverestInstaller {
 
-        public static ICollection<EverestVersion>? QueryEverestVersions() {
-            string jsonData = UrlManager.Urls.EverestVersions.TryHttpGetDataString(new List<string>{"includeCore"});
-            List<EverestVersion>? versions = JsonConvert.DeserializeObject<List<EverestVersion>>(jsonData);
-            return versions;
+        private static readonly TimeSpan QueryRefreshInterval = new TimeSpan(0, 5, 0);
+        private static (DateTime? Time, ICollection<EverestVersion>? Cache) everestVersionCache = (DateTime.MinValue, null);
+
+        public static ICollection<EverestVersion> QueryEverestVersions() {
+            if (everestVersionCache.Cache == null || DateTime.Now - everestVersionCache.Time >= QueryRefreshInterval) {
+                string jsonData = UrlManager.Urls.EverestVersions.TryHttpGetDataString(new List<string>{"includeCore"});
+                List<EverestVersion>? versions = JsonConvert.DeserializeObject<List<EverestVersion>>(jsonData);
+                everestVersionCache.Time = DateTime.Now;
+                everestVersionCache.Cache = versions ?? throw new JsonException("Couldn't parse json!");
+            }
+            return everestVersionCache.Cache;
         }
 
         // Note: here the progress values will be: 50% of it for the download, and 50% for the install process
@@ -260,6 +269,33 @@ namespace Olympus.Utils {
             }
 
             yield return new Status($"Unzipped {count} files", -1, Status.Stage.InProgress);
+        }
+
+        public static EverestBranch? DeduceBranch(Installation install) {
+            (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
+                = install.ScanVersion(true);
+            if (ModVersion == null) return null;
+            ICollection<EverestVersion>? everestVersions = QueryEverestVersions();
+            foreach (EverestVersion everestVersion in everestVersions) {
+                if (everestVersion.version == ModVersion.Minor) { // everest version gets stored in minor
+                    return everestVersion.Branch;
+                }
+            }
+
+            return null;
+        }
+
+        public static EverestVersion? GetLatestForBranch(EverestBranch branch) {
+            ICollection<EverestVersion>? everestVersions = QueryEverestVersions();
+            EverestVersion? latestFound = null;
+            foreach (EverestVersion everestVersion in everestVersions) {
+                if (everestVersion.Branch == branch 
+                    && (latestFound == null ||  latestFound.version < everestVersion.version)) {
+                    latestFound = everestVersion;
+                }
+            }
+
+            return latestFound;
         }
 
 #if WINDOWS
