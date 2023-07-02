@@ -275,7 +275,7 @@ namespace Olympus.Utils {
             (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
                 = install.ScanVersion(true);
             if (ModVersion == null) return null;
-            ICollection<EverestVersion>? everestVersions = QueryEverestVersions();
+            ICollection<EverestVersion> everestVersions = QueryEverestVersions();
             foreach (EverestVersion everestVersion in everestVersions) {
                 if (everestVersion.version == ModVersion.Minor) { // everest version gets stored in minor
                     return everestVersion.Branch;
@@ -286,7 +286,7 @@ namespace Olympus.Utils {
         }
 
         public static EverestVersion? GetLatestForBranch(EverestBranch branch) {
-            ICollection<EverestVersion>? everestVersions = QueryEverestVersions();
+            ICollection<EverestVersion> everestVersions = QueryEverestVersions();
             EverestVersion? latestFound = null;
             foreach (EverestVersion everestVersion in everestVersions) {
                 if (everestVersion.Branch == branch 
@@ -332,15 +332,17 @@ namespace Olympus.Utils {
         }
 
         public class EverestBranch {
-            public static EverestBranch Stable = new("Stable");
-            public static EverestBranch Beta = new("Beta");
-            public static EverestBranch Dev = new("Dev");
-            public static EverestBranch Core = new("Core");
+            public static EverestBranch Stable = new("Stable", 0);
+            public static EverestBranch Beta = new("Beta", 1);
+            public static EverestBranch Dev = new("Dev", 2);
+            public static EverestBranch Core = new("Core", 2);
 
             private readonly string asString;
+            private readonly int importance;
 
-            private EverestBranch(string asString) {
+            private EverestBranch(string asString, int importance) {
                 this.asString = asString;
+                this.importance = importance;
             }
 
             public static EverestBranch FromString(string str) {
@@ -356,6 +358,9 @@ namespace Olympus.Utils {
                 throw new MissingFieldException($"Branch {str} not found!");
 
             }
+
+            public bool IsImportant(EverestBranch branch) 
+                => branch.importance >= this.importance;
 
             public override string ToString() {
                 return asString;

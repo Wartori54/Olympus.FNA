@@ -56,7 +56,13 @@ namespace Olympus {
                 Children = {
 
                     new HeaderBig("Celeste Installations"),
-
+#if DEBUG
+                    new Button("Deselect", b => {
+                        SelectedInstall = null;
+                        Config.Instance.Installation = null;
+                        Config.Instance.Save();
+                    }),
+#endif
                     new Group() {
                         Clip = true,
                         ClipExtend = 16,

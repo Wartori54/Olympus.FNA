@@ -421,8 +421,14 @@ namespace Olympus {
                                                     });
                                                 });
 
-                                                refreshModList = new LockedAction<Installation?>(async _ => {
+                                                refreshModList = new LockedAction<Installation?>(_ => {
                                                     try {
+                                                        if (Config.Instance.Installation == null) return;
+                                                        (bool Modifiable, string Full, Version? Version,
+                                                                string? Framework, string? ModName,
+                                                                Version? ModVersion)
+                                                            = Config.Instance.Installation.ScanVersion(false);
+                                                        if (ModName == null || ModVersion == null) return;
                                                         UI.Run(() => { // remove old and add loading screen
                                                             el.DisposeChildren();
                                                             el.Children = new ObservableCollection<Element>() {
@@ -560,14 +566,14 @@ namespace Olympus {
         private static string GetInstallationName() {
             if (Config.Instance.Installation != null) return Config.Instance.Installation.Name;
             Console.WriteLine("GetInstallationName called before config was loaded!");
-            return "Loading...";
+            return "No install selected";
 
         }
 
         private static string GetInstallationInfo() {
             if (Config.Instance.Installation == null) {
                 Console.WriteLine("GetInstallationInfo called before config was loaded!");
-                return "Loading...";
+                return "No install selected";
             }
             (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
             = Config.Instance.Installation.ScanVersion(false);
@@ -655,7 +661,7 @@ namespace Olympus {
                                 Children = {
                                     new LabelSmall(everestVersion == null ? "Unknown version" : 
                                         "Installed version: " + everestVersion),
-                                    new LabelSmall(everestUpdate == null ? "Up to date" : $"Update available: {everestUpdate.version}"),
+                                    new LabelSmall(everestUpdate == null ? "Up to date" : $"Update available: 1.{everestUpdate.version}.0"),
                                 }
                             },
                             new Button("Change version", _ => Scener.Push<EverestInstallScene>()),
