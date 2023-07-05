@@ -372,13 +372,24 @@ namespace OlympUI {
                     }
                     break;
 
-                case NotifyCollectionChangedAction.Reset:
-                    foreach (Modifier item in sender as ObservableCollection<Modifier> ?? throw new NullReferenceException("Modifiers clear didn't give sender")) {
-                        item.Detach();
+                case NotifyCollectionChangedAction.Reset: // BIG NOTE: this doesn't only imply a .clear operation was performed
+                    // Because of the above, just regenerate everything from the actual state of the collection
+                    
+                    // Remove everything, since all of this may be invalid
+                    _ModifiersDraw.Clear();
+                    _ModifiersUpdate.Clear();
+                    _ModifiersUpdateAdd.Clear();
+                    _ModifiersUpdateRemove.Clear();
+                    
+                    // Just refill from the beginning
+                    foreach (Modifier item in sender as ObservableCollection<Modifier> ??
+                                              throw new NullReferenceException("Modifiers clear didn't give sender")) {
+                        item.Attach(this);
                         if (item.Meta.Update)
-                            _ModifiersUpdateRemove.Add(item);
+                            _ModifiersUpdateAdd.Add(item);
                         if (item.Meta.ModifyDraw)
-                            _ModifiersDraw.Remove(item);
+                            _ModifiersDraw.Add(item);
+                        
                     }
                     break;
 

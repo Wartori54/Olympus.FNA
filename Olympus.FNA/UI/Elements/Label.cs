@@ -23,6 +23,7 @@ namespace OlympUI {
                     return;
                 _Text = value;
                 InvalidateFull();
+                LayoutNormal(LayoutEvent.Instance); // Recalculate size early
             }
         }
 
@@ -106,6 +107,13 @@ namespace OlympUI {
             }
 
             WH.Y = Math.Max(WH.Y, maxHeight ?? 0);
+        }
+
+        public Bounds GetTextBounds(string text = "The quick brown fox jumps over the lazy dog.") {
+            Bounds bounds = new();
+            DynamicSpriteFont font = StyleFont.GetCurrent<DynamicSpriteFont>();
+            font.TextBounds(text, new(0f, 0f), ref bounds, new(1f, 1f));
+            return bounds;
         }
 
     }

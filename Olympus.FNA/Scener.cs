@@ -189,6 +189,13 @@ namespace Olympus {
                 return PopAlert();
             return PopScene();
         }
-
+        
+#if DEBUG
+        public static Scene Regenerate(Type sceneType) {
+            Generated[sceneType] = Activator.CreateInstance(sceneType) as Scene 
+                                   ?? throw new ArgumentException($"Couldn't instantiate {sceneType}, is it a scene?");
+            return Generated[sceneType];
+        }
+#endif
     }
 }

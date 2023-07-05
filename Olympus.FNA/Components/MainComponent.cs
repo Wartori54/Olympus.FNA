@@ -76,6 +76,12 @@ namespace Olympus {
                 }
             }
 
+            if (UIInput.Pressed(Keys.F3) && Scener.Front != null) {
+                Type sceneType = Scener.Front.GetType();
+                Scener.PopFront();
+                Scener.Push(Scener.Regenerate(sceneType));
+            }
+
             if (UIInput.Pressed(Keys.F5)) {
                 string path = Path.Combine(Environment.CurrentDirectory, "skin.yaml");
                 Console.WriteLine($"Loading skin from {path}");

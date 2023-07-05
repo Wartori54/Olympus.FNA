@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using FontStashSharp;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using OlympUI;
 using OlympUI.Animations;
@@ -634,6 +635,14 @@ namespace Olympus {
                     everestUpdate = version;
                 }
             }
+
+            Button versionButton = new Button("Change version", _ => Scener.Push<EverestInstallScene>()) {
+                Layout = {
+                    Layouts.Right(),
+                },
+            };
+            int versionButtonWidth = versionButton.GetChild<Label>().W + versionButton.Padding.W;
+            // TODO: make use of LayoutConsts.Prev instead of this hack
             Panel everestPanel = new Panel() {
                 Layout = {
                     Layouts.Fill(1, 0),
@@ -646,17 +655,14 @@ namespace Olympus {
                     },
                     new Group() {
                         Layout = {
-                            Layouts.Fill(1, 0),
+                            Layouts.Fill(1, 0, versionButtonWidth, 0),
                             Layouts.Row(),
                         },
                         Children = {
                             new Group() {
-                                Style = {
-                                    { Group.StyleKeys.Spacing, 0 },
-                                },
                                 Layout = {
-                                    Layouts.Fill(0.8f, 0),
-                                    Layouts.Column()
+                                    Layouts.Fill(1f, 0, 0, 0),
+                                    Layouts.Column(),
                                 },
                                 Children = {
                                     new LabelSmall(everestVersion == null ? "Unknown version" : 
@@ -664,7 +670,7 @@ namespace Olympus {
                                     new LabelSmall(everestUpdate == null ? "Up to date" : $"Update available: 1.{everestUpdate.version}.0"),
                                 }
                             },
-                            new Button("Change version", _ => Scener.Push<EverestInstallScene>()),
+                            versionButton,
                         }
                     }
                 }

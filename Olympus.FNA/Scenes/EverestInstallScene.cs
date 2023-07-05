@@ -12,6 +12,10 @@ namespace Olympus {
     public class EverestInstallScene : Scene {
         
         public override bool Alert => true;
+
+        public bool ShowAllEntries = false;
+
+        private Func<SelectionBox, Task> selectionBoxGenerate = el => Task.CompletedTask;
         public override Element Generate() 
             => new Group() {
                 ID = "base",
@@ -40,7 +44,7 @@ namespace Olympus {
                     new Group() {
                         ID = "boxGroup",
                         Layout = {
-                            Layouts.Fill(1, 1, 0, (20 + 8)*2*2),
+                            Layouts.Fill(1, 1, 0,166),
                         },
                         Children = {
                             new SelectionBox() {
@@ -49,73 +53,110 @@ namespace Olympus {
                                     Layouts.Fill(),
                                 }, 
                                 Clip = true, Cached = true, // TODO: (maybe find better solution?) This removes the shadow from the element but it is required for clip to work
-                                Init = RegisterRefresh<SelectionBox>(async el => { // TODO: add a loading spinner to make it more responsive
-                                    if (Config.Instance.Installation == null) { // Refuse to load
-                                        return;
-                                    }
-                                    await UI.Run(() => { // remove old and add loading screen
-                                        el.Content.Clear();
-                                        el.Children.Add(
-                                        new Group() {
-                                            Layout = {
-                                                Layouts.Left(0.5f, -0.5f),
-                                                Layouts.Row(8),
-                                            },
-                                            Children = {
-                                                new Spinner() {
-                                                    Layout = { Layouts.Top(0.5f, -0.5f) },
-                                                },
-                                                new Label("Loading") {
-                                                    Layout = { Layouts.Top(0.5f, -0.5f) },
-                                                },
-                                            }
+                                Init = RegisterRefresh<SelectionBox>(async el1 => {
+                                    selectionBoxGenerate = async el => {
+                                        if (Config.Instance.Installation == null) {
+                                            // Refuse to load
+                                            return;
+                                        }
+
+                                        await UI.Run(() => {
+                                            // remove old and add loading screen
+                                            el.Content.Clear();
+                                            el.Children.Add(
+                                                new Group() {
+                                                    Layout = { Layouts.Left(0.5f, -0.5f), Layouts.Row(8), },
+                                                    Children = {
+                                                        new Spinner() { Layout = { Layouts.Top(0.5f, -0.5f) }, },
+                                                        new Label("Loading") { Layout = { Layouts.Top(0.5f, -0.5f) }, },
+                                                    }
+                                                });
                                         });
-                                    });
-                                    ICollection<EverestInstaller.EverestVersion> versions = EverestInstaller.QueryEverestVersions();
-                                    EverestInstaller.EverestBranch? branch =
-                                        EverestInstaller.DeduceBranch(Config.Instance.Installation);
-                                    if (branch != null) {
-                                        List<EverestInstaller.EverestVersion> filteredVersions 
-                                            = versions.Where(version => version.Branch.IsImportant(branch)).ToList();
-                                        versions = filteredVersions;
-                                    }
-
-                                    (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
-                                        = Config.Instance.Installation.ScanVersion(false);
-                                    
-                                    await UI.Run(() => {
-                                        // Its needed to be careful when removing children since we only want to remove loading elements
-                                        for (int i = 0; i < el.Children.Count; i++) {
-                                            Element child = el.Children[i];
-                                            if (child is not Group group) continue;
-                                            if (group.Children.Count == 0) continue;
-                                            if (group.Children[0] is not Spinner) continue;
-                                            el.Children.RemoveAt(i);
-                                            break;
+                                        ICollection<EverestInstaller.EverestVersion> versions =
+                                            EverestInstaller.QueryEverestVersions();
+                                        EverestInstaller.EverestBranch? branch =
+                                            EverestInstaller.DeduceBranch(Config.Instance.Installation);
+                                        if (branch != null && !ShowAllEntries) {
+                                            List<EverestInstaller.EverestVersion> filteredVersions
+                                                = versions.Where(version => version.Branch.IsImportant(branch))
+                                                    .ToList();
+                                            versions = filteredVersions;
                                         }
 
-                                        foreach (EverestInstaller.EverestVersion version in versions) {
-                                            string desc = "";
-                                            if (version.description != "") {
-                                                desc += version.description;
-                                            }
+                                        (bool Modifiable, string Full, Version? Version, string? Framework,
+                                                string? ModName,
+                                                Version? ModVersion)
+                                            = Config.Instance.Installation.ScanVersion(false);
 
-                                            if (version.author != "") {
-                                                desc += (version.description != "" ? " (by " : "")
-                                                        + version.author
-                                                        + (version.description != "" ? ")" : "");
-                                            }
-                                            el.Content.Add(new VersionEntry($"{version.Branch}: {version.version}" + (version.version == ModVersion.Minor ? "(Current)" : ""),
-                                                version.date.ToShortDateString() + " " + version.date.ToShortTimeString(),
-                                                desc, 
-                                                b => {},
-                                                version));
-                                        }
-                                    });
+                                        await UI.Run(() => {
+                                                // Its needed to be careful when removing children since we only want to remove loading elements
+                                                for (int i = 0; i < el.Children.Count; i++) {
+                                                    Element child = el.Children[i];
+                                                    if (child is not Group group) continue;
+                                                    if (group.Children.Count == 0) continue;
+                                                    if (group.Children[0] is not Spinner) continue;
+                                                    el.Children.RemoveAt(i);
+                                                    break;
+                                                }
 
+                                                foreach (EverestInstaller.EverestVersion version in versions) {
+                                                    string desc = "";
+                                                    if (version.description != "") {
+                                                        desc += version.description;
+                                                    }
+
+                                                    if (version.author != "") {
+                                                        desc += (version.description != "" ? " (by " : "")
+                                                                + version.author
+                                                                + (version.description != "" ? ")" : "");
+                                                    }
+
+                                                    el.Content.Add(new VersionEntry(
+                                                        $"{version.Branch}: {version.version}" +
+                                                        (version.version == ModVersion?.Minor ? " (Current)" : ""),
+                                                        version.date.ToShortDateString() + " " +
+                                                        version.date.ToShortTimeString(),
+                                                        desc,
+                                                        b => { },
+                                                        version));
+                                                }
+                                            }
+                                        );
+                                    };
+                                    await selectionBoxGenerate(el1);
                                 })
                             },
                         }
+                    },
+                    new Group() {
+                        Layout = {
+                            Layouts.Row(),
+                            Layouts.Fill(0, 0),
+                        },
+                        Children = {
+                            new Button("Broken text", b => {
+                                ShowAllEntries = !ShowAllEntries;
+                                if (ShowAllEntries) {
+                                    b.Text = "Reduce view";
+                                } else {
+                                    b.Text = "Show all entries";
+                                }
+
+                                SelectionBox box = b.GetParent().GetParent().GetChild<Group>("boxGroup").GetChild<SelectionBox>("box");
+                                Task.Run(() => selectionBoxGenerate(box));
+                            }) {
+                                Init = RegisterRefresh<Button>(async el => {
+                                    await UI.Run(() => {
+                                        if (ShowAllEntries) {
+                                            el.Text = "Reduce view";
+                                        } else {
+                                            el.Text = "Show all entries";
+                                        }
+                                    });
+                                }),
+                            }
+                        }
+                        
                     },
                     new Group() {
                         ID = "buttons",
