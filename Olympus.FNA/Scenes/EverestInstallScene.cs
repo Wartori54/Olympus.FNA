@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Olympus {
@@ -60,22 +61,39 @@ namespace Olympus {
                                             return;
                                         }
 
-                                        await UI.Run(() => {
-                                            // remove old and add loading screen
-                                            el.Content.Clear();
-                                            el.Children.Add(
-                                                new Group() {
-                                                    Layout = { Layouts.Left(0.5f, -0.5f), Layouts.Row(8), },
-                                                    Children = {
-                                                        new Spinner() { Layout = { Layouts.Top(0.5f, -0.5f) }, },
-                                                        new Label("Loading") { Layout = { Layouts.Top(0.5f, -0.5f) }, },
-                                                    }
-                                                });
+                                        CancellationTokenSource token = new();
+                                        CancellationToken ct = token.Token;
+
+                                        Task loadingScreenTask = new(async () => { 
+
+                                            await Task.Delay(200); // Neat hack to only put loading screen if processing is taking more than 200 ms
+
+                                            if (ct.IsCancellationRequested) return;
+
+                                            await UI.Run(() => {
+                                                Console.WriteLine("Added loading screen");
+                                                // Add loading screen
+                                                el.Content.Clear();
+                                                el.Children.Add(
+                                                    new Group() {
+                                                        Layout = { Layouts.Left(0.5f, -0.5f), Layouts.Row(8), },
+                                                        Children = {
+                                                            new Spinner() { Layout = { Layouts.Top(0.5f, -0.5f) }, },
+                                                            new Label("Loading") {
+                                                                Layout = { Layouts.Top(0.5f, -0.5f) },
+                                                            },
+                                                        }
+                                                    });
+                                            });
                                         });
+                                        loadingScreenTask.Start();
                                         ICollection<EverestInstaller.EverestVersion> versions =
                                             EverestInstaller.QueryEverestVersions();
                                         EverestInstaller.EverestBranch? branch =
                                             EverestInstaller.DeduceBranch(Config.Instance.Installation);
+                                        // await Task.Delay(1000);
+
+
                                         if (branch != null && !ShowAllEntries) {
                                             List<EverestInstaller.EverestVersion> filteredVersions
                                                 = versions.Where(version => version.Branch.IsImportant(branch))
@@ -87,41 +105,47 @@ namespace Olympus {
                                                 string? ModName,
                                                 Version? ModVersion)
                                             = Config.Instance.Installation.ScanVersion(false);
+                                        
+                                        token.Cancel();
+                                        await loadingScreenTask; // Await to prevent race conditions
 
                                         await UI.Run(() => {
-                                                // Its needed to be careful when removing children since we only want to remove loading elements
-                                                for (int i = 0; i < el.Children.Count; i++) {
-                                                    Element child = el.Children[i];
-                                                    if (child is not Group group) continue;
-                                                    if (group.Children.Count == 0) continue;
-                                                    if (group.Children[0] is not Spinner) continue;
-                                                    el.Children.RemoveAt(i);
-                                                    break;
-                                                }
-
-                                                foreach (EverestInstaller.EverestVersion version in versions) {
-                                                    string desc = "";
-                                                    if (version.description != "") {
-                                                        desc += version.description;
-                                                    }
-
-                                                    if (version.author != "") {
-                                                        desc += (version.description != "" ? " (by " : "")
-                                                                + version.author
-                                                                + (version.description != "" ? ")" : "");
-                                                    }
-
-                                                    el.Content.Add(new VersionEntry(
-                                                        $"{version.Branch}: {version.version}" +
-                                                        (version.version == ModVersion?.Minor ? " (Current)" : ""),
-                                                        version.date.ToShortDateString() + " " +
-                                                        version.date.ToShortTimeString(),
-                                                        desc,
-                                                        b => { },
-                                                        version));
-                                                }
+                                            if (el.Content.Count != 0) {
+                                                el.Content.Clear();
                                             }
-                                        );
+                                    
+                                            // Its needed to be careful when removing children since we only want to remove loading elements
+                                            for (int i = 0; i < el.Children.Count; i++) {
+                                                Element child = el.Children[i];
+                                                if (child is not Group group) continue;
+                                                if (group.Children.Count == 0) continue;
+                                                if (group.Children[0] is not Spinner) continue;
+                                                el.Children.RemoveAt(i);
+                                                break;
+                                            }
+
+                                            foreach (EverestInstaller.EverestVersion version in versions) {
+                                                string desc = "";
+                                                if (version.description != "") {
+                                                    desc += version.description;
+                                                }
+
+                                                if (version.author != "") {
+                                                    desc += (version.description != "" ? " (by " : "")
+                                                            + version.author
+                                                            + (version.description != "" ? ")" : "");
+                                                }
+
+                                                el.Content.Add(new VersionEntry(
+                                                    $"{version.Branch}: {version.version}" +
+                                                    (version.version == ModVersion?.Minor ? " (Current)" : ""),
+                                                    version.date.ToShortDateString() + " " +
+                                                    version.date.ToShortTimeString(),
+                                                    desc,
+                                                    b => { },
+                                                    version));
+                                            }
+                                        });
                                     };
                                     await selectionBoxGenerate(el1);
                                 })
