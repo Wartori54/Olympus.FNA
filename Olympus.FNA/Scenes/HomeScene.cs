@@ -335,7 +335,32 @@ namespace Olympus {
                                     Layouts.Row(),
                                 },
                                 Children = {
-                                    new HeaderMedium("Your Mods"),
+                                    new HeaderMedium("Your mods") {
+                                        Init = RegisterRefresh<HeaderMedium>(el => {
+                                            void NameGen(Installation? i) {
+                                                UI.Run(() => {
+                                                    if (i == null) {
+                                                        el.Text = "No storby";
+                                                        return;
+                                                    }
+
+                                                    (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
+                                                        = i.ScanVersion(false);
+                                                    if (!Modifiable) {
+                                                        el.Text = "Wrong game";
+                                                    } else if (ModName == null || ModVersion == null) {
+                                                        el.Text = "No Mods :(";
+                                                    } else {
+                                                        el.Text = "Your Mods";
+                                                    }
+                                                });
+                                            }
+                                            
+                                            Config.Instance.SubscribeInstallUpdateNotify(NameGen);
+                                            NameGen(Config.Instance.Installation);
+                                            return Task.CompletedTask; // Cheese it this way since it only schedules functions to run
+                                        }),
+                                    },
                                     new Group() {
                                         Layout = {
                                             Layouts.Fill(1, 0, LayoutConsts.Prev, 0),
@@ -423,13 +448,78 @@ namespace Olympus {
                                                 });
 
                                                 refreshModList = new LockedAction<Installation?>(_ => {
+                                                    if (Config.Instance.Installation == null) {
+                                                        UI.Run(() => {
+                                                            el.DisposeChildren();
+                                                            el.Children.Add(new Panel() {
+                                                                Layout = {
+                                                                    Layouts.Fill(1, 0),
+                                                                    Layouts.Column(),
+                                                                },
+                                                                Children = {
+                                                                    new HeaderSmall("Mods start here"),
+                                                                    new Label("You have yet to select your celeste installation.\nDo so by pressing on the \"Manage Installs\" button above.") {
+                                                                        Wrap = true,
+                                                                    },
+                                                                }
+                                                            });
+                                                            UI.Root.InvalidateForce();
+                                                        });
+                                                        return;
+                                                    }
+                                                    (bool Modifiable, string Full, Version? Version,
+                                                            string? Framework, string? ModName,
+                                                            Version? ModVersion)
+                                                        = Config.Instance.Installation.ScanVersion(false);
+                                                    if (!Modifiable) {
+                                                        UI.Run(() => {
+                                                            el.DisposeChildren();
+                                                            el.Children.Add(new Panel() {
+                                                                Layout = {
+                                                                    Layouts.Fill(1, 0),
+                                                                    Layouts.Column(),
+                                                                },
+                                                                Children = {
+                                                                    new HeaderSmall("*Confusion noises*"),
+                                                                    new Label("Seems like your currently selected celeste install is malformed or unreadable, try revising it.\nOr choose another one by pressing on the \"Manage Installs\" button above.") {
+                                                                        Wrap = true,
+                                                                    },
+                                                                }
+                                                            });
+                                                            UI.Root.InvalidateForce();
+                                                        });
+                                                        return;
+                                                    }
+                                                    if (ModName == null || ModVersion == null) {
+                                                        UI.Run(() => {
+                                                            el.DisposeChildren();
+                                                            el.Children.Add(new Panel() {
+                                                                Layout = {
+                                                                    Layouts.Fill(1, 0),
+                                                                    Layouts.Column(),
+                                                                },
+                                                                Children = {
+                                                                    new HeaderSmall("Vanilla Celeste"),
+                                                                    new Label("The currently selected celeste installation is not yet modded.\nInstall Everest now to play with mods") {
+                                                                        Wrap = true,
+                                                                    },
+                                                                    new Group() {
+                                                                        Layout = {
+                                                                            Layouts.Fill(1, 0, 0, 0),
+                                                                            Layouts.Row(),
+                                                                        },
+                                                                        Children = {
+                                                                            new Button("Install Everest", 
+                                                                                b => Scener.Push<EverestInstallScene>()),
+                                                                        }
+                                                                    }
+                                                                }
+                                                            });
+                                                            UI.Root.InvalidateForce();
+                                                        });
+                                                        return;
+                                                    }
                                                     try {
-                                                        if (Config.Instance.Installation == null) return;
-                                                        (bool Modifiable, string Full, Version? Version,
-                                                                string? Framework, string? ModName,
-                                                                Version? ModVersion)
-                                                            = Config.Instance.Installation.ScanVersion(false);
-                                                        if (ModName == null || ModVersion == null) return;
                                                         UI.Run(() => { // remove old and add loading screen
                                                             el.DisposeChildren();
                                                             el.Children = new ObservableCollection<Element>() {
