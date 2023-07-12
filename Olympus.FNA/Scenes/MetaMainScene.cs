@@ -219,7 +219,7 @@ namespace Olympus {
                 } else {
                     if (ModVersion == null) // Install unmodded
                         everestPlay = new SidebarPlayButton("pin", "Install Everest",
-                            _ => Scener.Push<EverestInstallScene>());
+                            _ => Scener.Push<EverestSimpleInstallScene>());
                     else
                         everestPlay = new SidebarPlayButton("play_wheel", "Everest",
                             _ => GameLauncher.LaunchCurrent(false));

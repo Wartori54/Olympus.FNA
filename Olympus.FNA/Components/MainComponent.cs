@@ -115,6 +115,7 @@ namespace Olympus {
 
             if (UIInput.Pressed(Keys.F8)) {
                 // Run debug code that prints to stdout here
+                UI.Root.InvalidateForce();
             }
 
             if (UIInput.Pressed(Keys.F10)) {
@@ -152,7 +153,7 @@ namespace Olympus {
                     $"Pool MSAA Used: {UI.MegaCanvas.PoolMSAA.Used.Count}\n" +
                     $"Pool MSAA Memory: {GetHumanFriendlyBytes(UI.MegaCanvas.PoolMSAA.UsedMemory)} / {GetHumanFriendlyBytes(UI.MegaCanvas.PoolMSAA.TotalMemory)} \n" +
                     $"Atlas Pages: {UI.MegaCanvas.Pages.Count} x {GetHumanFriendlyBytes(UI.MegaCanvas.PageSize * UI.MegaCanvas.PageSize * 4)} \n" +
-                    "";
+                    $"Element: {UI.Hovering}, WH: {UI.Hovering?.WH}";
             }
 
             Scener.Update(dt);

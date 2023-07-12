@@ -28,6 +28,7 @@ namespace Olympus {
 
         public override Element Generate()
             => new Group() {
+                ID = "HomeScene",
                 Style = {
                     { Group.StyleKeys.Padding, 8 },
                 },
@@ -510,7 +511,7 @@ namespace Olympus {
                                                                         },
                                                                         Children = {
                                                                             new Button("Install Everest", 
-                                                                                b => Scener.Push<EverestInstallScene>()),
+                                                                                b => Scener.Push<EverestSimpleInstallScene>()),
                                                                         }
                                                                     }
                                                                 }
@@ -543,7 +544,6 @@ namespace Olympus {
                                                         UI.Run(() => {
                                                             el.DisposeChildren();
                                                             el.Children = GenerateModListPanels(everestVersion, installedMods);
-                                                            UI.Root.InvalidateForce(); // TODO: find a real fix for panels with buttons not resizing properly the first time
                                                         });
                                                     } catch (Exception e) {
                                                         Console.WriteLine("refreshModList crashed with exception {0}", e);
@@ -726,7 +726,7 @@ namespace Olympus {
                 }
             }
 
-            Button versionButton = new Button("Change version", _ => Scener.Push<EverestInstallScene>()) {
+            Button versionButton = new Button("Change version", _ => Scener.Push<EverestSimpleInstallScene>()) {
                 Layout = {
                     Layouts.Right(),
                 },
@@ -734,6 +734,7 @@ namespace Olympus {
             int versionButtonWidth = versionButton.GetChild<Label>().W + versionButton.Padding.W;
             // TODO: make use of LayoutConsts.Prev instead of this hack
             Panel everestPanel = new Panel() {
+                ID = "everestPanel",
                 Layout = {
                     Layouts.Fill(1, 0),
                     Layouts.Column(),

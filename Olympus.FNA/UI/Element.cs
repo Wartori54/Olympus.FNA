@@ -499,6 +499,7 @@ namespace OlympUI {
             }
 
             UI.Root.InvalidateCollect();
+            UI.Root.InvalidateForce();  // TODO: Performance sink, look into only reflowing the modified elements
             InvalidateFull();
         }
 
