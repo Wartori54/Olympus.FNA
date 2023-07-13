@@ -4,9 +4,7 @@ using OlympUI;
 using Olympus.Utils;
 using System;
 using System.Collections.Generic;
-using System.Net.NetworkInformation;
 using System.Reflection;
-using System.Threading.Tasks;
 
 namespace Olympus; 
 
@@ -82,7 +80,11 @@ public class EverestSimpleInstallScene : Scene {
 
                         EverestInstaller.EverestBranch? branch =
                             CurrentInstallBranch();
-                        if (branch != null && branch != (selectedBranch ?? branch)) {
+                        if (branch == null) {
+                            el.IsUpdate = true;
+                            el.Text = "Install";
+                            return;
+                        } else if (branch != (selectedBranch ?? branch)) {
                             el.IsUpdate = true;
                             el.Text = "Switch";
                             return;
@@ -117,20 +119,28 @@ public class EverestSimpleInstallScene : Scene {
                                     // Refuse to load
                                     return;
                                 }
-
-                                (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
-                                    = Config.Instance.Installation.ScanVersion(false);
-
+                                
                                 EverestInstaller.EverestBranch? branch =
                                     CurrentInstallBranch();
 
+                                (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
+                                    = Config.Instance.Installation.ScanVersion(false);
+                                
                                 await UI.Run(() => {
-                                    el.Text = $"{branch?.ToString() ?? "Unknown"}: {ModVersion?.Minor.ToString() ?? "Unknown"}";
+                                    if (branch != null)
+                                        el.Text = $"{branch?.ToString() ?? "Unknown"}: {ModVersion?.Minor.ToString() ?? "Unknown"}";
+                                    else {
+                                        el.Text = $"Everest not installed";
+                                        el.GetParent().GetChild<Label>("desc").Text = // Too lazy to add an Init to the label right below
+                                            "Seems like Everest is not yet installed on this copy of celeste\nInstall it now to enjoy mods!";
+                                    }
                                 });
 
                             })
                         },
-                        new Label("This is your current Everest version."),
+                        new Label("This is your current Everest version.") {
+                            ID = "desc",
+                        },
                     }
                 },
                 new Group() {
@@ -143,8 +153,8 @@ public class EverestSimpleInstallScene : Scene {
                     },
                     Init = RegisterRefresh<Group>(async el => {
                         if (Config.Instance.Installation == null) return;
-                        EverestInstaller.EverestBranch? branch =
-                             CurrentInstallBranch();
+                        EverestInstaller.EverestBranch branch =
+                             CurrentInstallBranch() ?? EverestInstaller.EverestBranch.Stable;
                         await UI.Run(() => {
                             el.DisposeChildren();
                             FieldInfo[] allBranches = typeof(EverestInstaller.EverestBranch).GetFields(BindingFlags.Public | BindingFlags.Static);
@@ -198,10 +208,9 @@ public class EverestSimpleInstallScene : Scene {
                         (sender ?? throw new Exception("Cache returned null sender"));
                     if (Config.Instance.Installation == null) return null;
                     EverestInstaller.EverestBranch? branch = scene.selectedBranch ??
-                                                             CurrentInstallBranch();
+                                                             CurrentInstallBranch() ?? 
+                                                             EverestInstaller.EverestBranch.Stable; // Default to stable
 
-                    if (branch == null) // Everest is too old
-                        return null;
 
                     ICollection<EverestInstaller.EverestVersion> versions =
                         EverestInstaller.QueryEverestVersions();

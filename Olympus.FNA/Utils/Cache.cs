@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 
 namespace Olympus.Utils {
 
@@ -9,6 +10,8 @@ namespace Olympus.Utils {
 
         protected readonly object? Sender;
 
+        private readonly Mutex mut = new();
+
         protected Cache(Func<object?, T> generator, object? sender) {
             this.generator = generator;
             Sender = sender;
@@ -16,9 +19,12 @@ namespace Olympus.Utils {
 
         public T Value {
             get {
+                mut.WaitOne();
                 if (!IsValid()) {
                     Regenerate();
                 }
+
+                mut.ReleaseMutex();
 
                 return InternalCache;
             }

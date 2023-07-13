@@ -18,17 +18,16 @@ using JsonException = Newtonsoft.Json.JsonException;
 namespace Olympus.Utils {
     public static class EverestInstaller {
 
-        private static readonly TimeSpan QueryRefreshInterval = new TimeSpan(0, 5, 0);
-        private static (DateTime? Time, ICollection<EverestVersion>? Cache) everestVersionCache = (DateTime.MinValue, null);
+        private static readonly TimedCache<ICollection<EverestVersion>> everestVersionCache =
+            new TimedCache<ICollection<EverestVersion>>(new(0, 5, 0),
+                o => {
+                    string jsonData = UrlManager.Urls.EverestVersions.TryHttpGetDataString(new List<string>{"includeCore"});
+                    List<EverestVersion>? versions = JsonConvert.DeserializeObject<List<EverestVersion>>(jsonData);
+                    return versions ?? throw new JsonException("Couldn't parse json!");
+                }, null);
 
         public static ICollection<EverestVersion> QueryEverestVersions() {
-            if (everestVersionCache.Cache == null || DateTime.Now - everestVersionCache.Time >= QueryRefreshInterval) {
-                string jsonData = UrlManager.Urls.EverestVersions.TryHttpGetDataString(new List<string>{"includeCore"});
-                List<EverestVersion>? versions = JsonConvert.DeserializeObject<List<EverestVersion>>(jsonData);
-                everestVersionCache.Time = DateTime.Now;
-                everestVersionCache.Cache = versions ?? throw new JsonException("Couldn't parse json!");
-            }
-            return everestVersionCache.Cache;
+            return everestVersionCache.Value;
         }
 
         // Note: here the progress values will be: 50% of it for the download, and 50% for the install process
