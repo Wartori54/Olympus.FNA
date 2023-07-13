@@ -71,7 +71,14 @@ public class EverestSimpleInstallScene : Scene {
                         },
                     }
                 },
-                new UpdateButton("download", "Update", b => {Console.WriteLine("Updateee");}) {
+                new UpdateButton("download", "Update", async b => {
+                    if (Config.Instance.Installation == null) return;
+                    await foreach (var status in 
+                                   EverestInstaller.InstallVersion(GetLatest()!, // Only returns null when no installation is selected
+                                       Config.Instance.Installation)) {
+                        Console.WriteLine(status.Text + " | " + status.Progress + " | " + status.CurrentStage);
+                    }
+                }) {
                     Init = RegisterRefresh<UpdateButton>(async el => {
                         if (Config.Instance.Installation == null) {
                             // Refuse to load
@@ -200,38 +207,37 @@ public class EverestSimpleInstallScene : Scene {
     private TimedCache<EverestInstaller.EverestVersion?>? VersionCache; 
 
     private EverestInstaller.EverestVersion? GetLatest() {
-        if (VersionCache == null) {
-            VersionCache = new TimedCache<EverestInstaller.EverestVersion?>(
-                new(0, 5, 0),
-                sender => {
-                    EverestSimpleInstallScene scene = (EverestSimpleInstallScene)
-                        (sender ?? throw new Exception("Cache returned null sender"));
-                    if (Config.Instance.Installation == null) return null;
-                    EverestInstaller.EverestBranch? branch = scene.selectedBranch ??
-                                                             CurrentInstallBranch() ?? 
-                                                             EverestInstaller.EverestBranch.Stable; // Default to stable
+        if (VersionCache != null) return VersionCache.Value;
+        VersionCache = new TimedCache<EverestInstaller.EverestVersion?>(
+            new(0, 5, 0),
+            sender => {
+                EverestSimpleInstallScene scene = (EverestSimpleInstallScene)
+                    (sender ?? throw new Exception("Cache returned null sender"));
+                if (Config.Instance.Installation == null) return null;
+                EverestInstaller.EverestBranch? branch = scene.selectedBranch ??
+                                                         CurrentInstallBranch() ?? 
+                                                         EverestInstaller.EverestBranch.Stable; // Default to stable
 
 
-                    ICollection<EverestInstaller.EverestVersion> versions =
-                        EverestInstaller.QueryEverestVersions();
-                    EverestInstaller.EverestVersion newest =
-                        new EverestInstaller.EverestVersion() { version = 0 };
+                ICollection<EverestInstaller.EverestVersion> versions =
+                    EverestInstaller.QueryEverestVersions();
+                EverestInstaller.EverestVersion newest =
+                    new EverestInstaller.EverestVersion() { version = 0 };
 
-                    foreach (EverestInstaller.EverestVersion version in versions) {
-                        if (version.Branch == branch && version.version > newest.version) {
-                            newest = version;
-                        }
+                foreach (EverestInstaller.EverestVersion version in versions) {
+                    if (version.Branch == branch && version.version > newest.version) {
+                        newest = version;
                     }
+                }
 
-                    if (newest.version == 0) {
-                        // Shouldn't happen
-                        throw new Exception();
-                    }
+                if (newest.version == 0) {
+                    // Shouldn't happen
+                    throw new Exception();
+                }
 
-                    return newest;
-                }, this);
-            Config.Instance.SubscribeInstallUpdateNotify(i => VersionCache.Invalidate());
-        }
+                return newest;
+            }, this);
+        Config.Instance.SubscribeInstallUpdateNotify(i => VersionCache.Invalidate());
 
         return VersionCache.Value;
     }
@@ -240,15 +246,14 @@ public class EverestSimpleInstallScene : Scene {
 
 
     private EverestInstaller.EverestBranch? CurrentInstallBranch() {
-        if (CurrentBranchCache == null) {
-            CurrentBranchCache = new ManualCache<EverestInstaller.EverestBranch?>(
-                sender => {
-                    if (Config.Instance.Installation == null) return null;
-                    return EverestInstaller.DeduceBranch(Config.Instance.Installation);
-                }, this);
+        if (CurrentBranchCache != null) return CurrentBranchCache.Value;
+        CurrentBranchCache = new ManualCache<EverestInstaller.EverestBranch?>(
+            sender => {
+                if (Config.Instance.Installation == null) return null;
+                return EverestInstaller.DeduceBranch(Config.Instance.Installation);
+            }, this);
             
-            Config.Instance.SubscribeInstallUpdateNotify(i => CurrentBranchCache.Invalidate());
-        }
+        Config.Instance.SubscribeInstallUpdateNotify(i => CurrentBranchCache.Invalidate());
 
         return CurrentBranchCache.Value;
     }

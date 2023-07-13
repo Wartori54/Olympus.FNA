@@ -508,6 +508,7 @@ namespace Olympus {
                                                                         Layout = {
                                                                             Layouts.Fill(1, 0, 0, 0),
                                                                             Layouts.Row(),
+                                                                            Layouts.Right(),
                                                                         },
                                                                         Children = {
                                                                             new Button("Install Everest", 
