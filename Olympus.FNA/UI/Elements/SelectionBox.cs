@@ -22,6 +22,8 @@ namespace OlympUI {
 
         public ISelectionBoxEntry? Selected => SelectedIdx == -1 ? null : Content[SelectedIdx];
 
+        public Action<SelectionBox>? Callback;
+
         public SelectionBox() {
             Content.CollectionChanged += ContentUpdate;
             base.Content = new Group() {
@@ -108,11 +110,11 @@ namespace OlympUI {
                         elemIdx++;
                     }
                     
-                    return;
+                    break;
                 }
-
                 childIdx++;
             }
+            Callback?.Invoke(this);
         }
 
         public override void DrawContent() {
