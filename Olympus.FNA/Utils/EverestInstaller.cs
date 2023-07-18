@@ -32,11 +32,26 @@ namespace Olympus.Utils {
 
         // Note: here the progress values will be: 50% of it for the download, and 50% for the install process
         public static async IAsyncEnumerable<Status> InstallVersion(EverestVersion version, Installation install) {
+            bool canDelete = true;
+            // Before everything, verify if a everest cache can be deleted
+            foreach (Installation ins in App.Instance.FinderManager.Found.Concat(App.Instance.FinderManager.Added)) {
+                (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
+                    = ins.ScanVersion(false);
+                if (ModVersion == null) continue;
+                if (ModVersion.Minor != version.version) continue;
+                canDelete = false;
+                break;
+            }
+
+            string outFile = Path.Combine(Config.GetCacheDir(), "everestVersions", $"everest_{version.version}.zip");
+            if (canDelete && File.Exists(outFile)) {
+                File.Delete(outFile);
+            }
             
             // 1st part: the download
             (bool modifiable, string? full, Version? celesteVersion, string? framework, string? modLoaderName, Version? everestVersion) = install.ScanVersion(true);
             if (!modifiable) {
-                yield return new Status("Installation is not mod-able", 1f, Status.Stage.Fail);
+                yield return new Status("Installation is not modifiable", 1f, Status.Stage.Fail);
             }
 
             // MiniInstaller reads orig/Celeste.exe and copies Celeste.exe into it but only if missing.
@@ -51,16 +66,19 @@ namespace Olympus.Utils {
 
             // Here "Native" is used as a synonym for "from the core branch"
             bool isNativeCurrentInstall = File.Exists(Path.Combine(install.Root, "Celeste.dll"));
-            bool isNativeArtifact = version.Branch == EverestBranch.Core;
+            bool isNativeArtifact = !version.Branch.IsNonNative;
 
             using HttpClient wc = new HttpClient();
             wc.Timeout = TimeSpan.FromMilliseconds(10000); // 10 s timeout
             
-            // The following uses a channel to be able to yield return data from the lamba to the main method
+            // The following uses a channel to be able to yield return data from the lambda to the main method
             // Note that it runs the job async, but the channel wont die until it finishes. 
             Channel<Status> statusChannel = Channel.CreateUnbounded<Status>();
+
+            if (!Directory.Exists(Path.Combine(Config.GetCacheDir(), "everestVersions"))) {
+                Directory.CreateDirectory(Path.Combine(Config.GetCacheDir(), "everestVersions"));
+            }
             
-            string outFile = Path.Combine(install.Root, "everest_update.zip");
             Task<bool> job = UrlManager.Stream2FileWithProgress(outFile,
                 wc.GetStreamAsync(version.mainDownload), version.mainFileSize,
                 (progress, total, speed) => {
@@ -82,16 +100,13 @@ namespace Olympus.Utils {
             job.Wait(); // Wait anyways to prevent jank
             
             // Finally extract it
-            foreach (Status status in UnpackThere(outFile, "main/")) yield return status;
+            foreach (Status status in UnpackTo(outFile, install.Root, "main/")) yield return status;
 
             // 2nd part: the installation
             yield return new Status("Running miniInstaller", 0.5f, Status.Stage.InProgress);
             await foreach (Status s in RunMiniInstaller(install, SetupAndGetMiniInstallerName(install, isNativeArtifact))) {
                 yield return s;
             }
-            
-            // Delete the zip file
-            File.Delete(outFile);
         }
 
         private static string SetupAndGetMiniInstallerName(Installation install, bool isNative) {
@@ -108,7 +123,7 @@ namespace Olympus.Utils {
             if (PlatformHelper.Is(Platform.Linux)) {
                 if (isNative) {
                     binaryName = "MiniInstaller-linux";
-                    chmod(Path.Combine(install.Root, binaryName), 0755);
+                    chmod(Path.Combine(install.Root, binaryName), Convert.ToInt32("0755", 8));
                     return binaryName;
                 }
 
@@ -125,8 +140,19 @@ namespace Olympus.Utils {
                         File.Copy(Path.Combine(install.Root, kickStartName),
                             Path.Combine(install.Root, binaryName));
                     }
-                } else {
-                    throw new FileNotFoundException("Celeste monokickstart missing! (is it non native?)");
+                } else { // Assume that its core
+                    string[] filesToCopy = { kickStartName, "monoconfig", "monomachineconfig" };
+                    foreach (string file in filesToCopy) {
+                        if (File.Exists(Path.Combine(install.Root, "orig/" + file))) { // Core moves the kickstart to the orig folder
+                            if (!File.Exists(Path.Combine(install.Root, file))) {
+                                File.Copy(Path.Combine(install.Root, "orig/" + file),
+                                    Path.Combine(install.Root, file));
+                            }
+                        } else {
+                            throw new FileNotFoundException(
+                                $"File {file} does not exist on orig folder, is it non core?");
+                        }
+                    }
                 }
 
                 return binaryName; // Note: no chmod needed here since the celeste kickstart will already be executable and it'll be kept
@@ -232,7 +258,7 @@ namespace Olympus.Utils {
             Config.Instance.Installation = Config.Instance.Installation; // neat hack to update all ui stuff
         }
         
-        private static IEnumerable<Status> UnpackThere(string targetFile, string zipPrefix = "") {
+        private static IEnumerable<Status> UnpackTo(string targetFile, string outDir, string zipPrefix = "") {
             ZipArchive zip = new(File.OpenRead(targetFile));
             
             int count = zip.Entries.Count(entry => entry.FullName.StartsWith(zipPrefix));
@@ -254,7 +280,7 @@ namespace Olympus.Utils {
                 yield return new Status($"Unzipping #{i} / {count}: {name}", -1f, Status.Stage.InProgress);
                 i++;
 
-                string to = Path.Combine(Path.GetDirectoryName(targetFile)!, name);
+                string to = Path.Combine(outDir, name);
                 Console.Out.WriteLine($"{name} -> {to}");
 
                 if (File.Exists(to))
@@ -298,7 +324,7 @@ namespace Olympus.Utils {
         }
 
 #if WINDOWS
-        private static int chmod(string pathname, int mode) {}
+        private static int chmod(string pathname, int mode) { return 0; }
 #else
         [DllImport("libc", SetLastError = true)]
         private static extern int chmod(string pathname, int mode);
@@ -327,42 +353,45 @@ namespace Olympus.Utils {
             public string branch = "";
             public int version;
 
-            public EverestBranch Branch => EverestBranch.FromString(branch);
+            public EverestBranch Branch => EverestBranch.FromString(branch, branch != "core");
         }
 
         public class EverestBranch {
-            public static EverestBranch Stable = new("Stable", 0);
-            public static EverestBranch Beta = new("Beta", 1);
-            public static EverestBranch Dev = new("Dev", 2);
-            public static EverestBranch Core = new("Core", 2);
+            public readonly ReleaseType type;
+            public readonly bool IsNonNative;
 
-            private readonly string asString;
-            private readonly int importance;
-
-            private EverestBranch(string asString, int importance) {
-                this.asString = asString;
-                this.importance = importance;
-            }
-
-            public static EverestBranch FromString(string str) {
-                IEnumerable<FieldInfo> fieldInfos = typeof(EverestBranch).GetFields(BindingFlags.Public | BindingFlags.Static)
-                    .Where(f => f.FieldType == typeof(EverestBranch)).ToList();
-                if (!fieldInfos.Any()) throw new FieldAccessException("No fields found in EverestBranch, (something is very wrong D:)");
-                foreach (var fieldInfo in fieldInfos) {
-                    EverestBranch everestBranch = (EverestBranch?) fieldInfo.GetValue(null) ?? throw new MissingFieldException("Couldn't cast field");
-                    if (string.Equals(everestBranch.asString, str, StringComparison.InvariantCultureIgnoreCase))
-                        return everestBranch;
+            public static EverestBranch FromString(string name, bool isNonNative) {
+                switch (name) {
+                    case "stable":
+                        return new EverestBranch(ReleaseType.Stable, isNonNative);
+                    case "beta":
+                        return new EverestBranch(ReleaseType.Beta, isNonNative);
+                    case "dev" or "core":
+                        return new EverestBranch(ReleaseType.Dev, isNonNative);
+                    default:
+                        throw new Exception($"Unknown name for branch: {name}.");
                 }
-
-                throw new MissingFieldException($"Branch {str} not found!");
-
             }
 
-            public bool IsImportant(EverestBranch branch) 
-                => branch.importance >= this.importance;
+            public EverestBranch(ReleaseType type, bool isNonNative) {
+                this.type = type;
+                IsNonNative = isNonNative;
+            }
 
             public override string ToString() {
-                return asString;
+                return type.ToString();
+            }
+
+            public override bool Equals(object? obj) {
+                if (obj is not EverestBranch branch) return false;
+                if (type != branch.type) return false;
+                return IsNonNative == branch.IsNonNative;
+            }
+
+            public enum ReleaseType {
+                Stable,
+                Beta,
+                Dev
             }
         }
         

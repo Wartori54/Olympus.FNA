@@ -40,10 +40,13 @@ public class EverestSimpleInstallScene : Scene {
                                 }
 
                                 EverestInstaller.EverestVersion? newest = GetLatest();
-                                if (newest == null) return;
 
                                 await UI.Run(() => {
-                                    el.Text = $"{newest.Branch}: {newest.version}";
+                                    if (newest != null)
+                                        el.Text = $"{newest.Branch}: {newest.version}{(newest.Branch.IsNonNative ? " (Non native)" : "")}";
+                                    else {
+                                        el.Text = "Not found!";
+                                    }
                                 });
 
                             })
@@ -56,15 +59,18 @@ public class EverestSimpleInstallScene : Scene {
                                 }
                                 
                                 EverestInstaller.EverestVersion? newest = GetLatest();
-                                if (newest == null) return;
                                 
                                 (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
                                                                     = Config.Instance.Installation.ScanVersion(false);
 
                                 await UI.Run(() => {
-                                    el.Text = ModVersion?.Minor == newest.version
-                                        ? "Up to date!\nYou still can reinstall if some funkiness is going on..."
-                                        : "There's a new version of Everest\nUpdate now to get all the new features!";
+                                    if (newest != null)
+                                        el.Text = ModVersion?.Minor == newest.version
+                                            ? "Up to date!\nYou still can reinstall if some funkiness is going on..."
+                                            : "There's a new version of Everest\nUpdate now to get all the new features!";
+                                    else {
+                                        el.Text = "Couldn't find any everest version matching your criteria, try again";
+                                    }
                                 });
 
                             })
@@ -91,7 +97,7 @@ public class EverestSimpleInstallScene : Scene {
                             el.IsUpdate = true;
                             el.Text = "Install";
                             return;
-                        } else if (branch != (selectedBranch ?? branch)) {
+                        } else if (!Equals(branch, selectedBranch ?? branch)) {
                             el.IsUpdate = true;
                             el.Text = "Switch";
                             return;
@@ -135,7 +141,7 @@ public class EverestSimpleInstallScene : Scene {
                                 
                                 await UI.Run(() => {
                                     if (branch != null)
-                                        el.Text = $"{branch?.ToString() ?? "Unknown"}: {ModVersion?.Minor.ToString() ?? "Unknown"}";
+                                        el.Text = $"{branch}: {ModVersion?.Minor.ToString() ?? "Unknown"}{(branch.IsNonNative ? " (Non native)" : "")}";
                                     else {
                                         el.Text = $"Everest not installed";
                                         el.GetParent().GetChild<Label>("desc").Text = // Too lazy to add an Init to the label right below
@@ -161,23 +167,27 @@ public class EverestSimpleInstallScene : Scene {
                     Init = RegisterRefresh<Group>(async el => {
                         if (Config.Instance.Installation == null) return;
                         EverestInstaller.EverestBranch branch =
-                             CurrentInstallBranch() ?? EverestInstaller.EverestBranch.Stable;
+                             CurrentInstallBranch() ?? new EverestInstaller.EverestBranch(EverestInstaller.EverestBranch.ReleaseType.Stable, true);
                         await UI.Run(() => {
                             el.DisposeChildren();
-                            FieldInfo[] allBranches = typeof(EverestInstaller.EverestBranch).GetFields(BindingFlags.Public | BindingFlags.Static);
-                            foreach (FieldInfo branchType in allBranches) {
-                                object? tmpBranch = branchType.GetValue(null);
-                                if (tmpBranch == null) continue;
-                                EverestInstaller.EverestBranch currBranch = (EverestInstaller.EverestBranch) tmpBranch;
-                                if ((selectedBranch ?? branch) == currBranch) continue;
-                                el.Children.Add(new Button($"{(branch == currBranch ? "Back" : "Switch")} to {currBranch}", b => {
-                                    selectedBranch = currBranch;
+                            EverestInstaller.EverestBranch.ReleaseType[] allBranches = Enum.GetValues<EverestInstaller.EverestBranch.ReleaseType>();
+                            foreach (EverestInstaller.EverestBranch.ReleaseType currBranch in allBranches) {
+                                if ((selectedBranch ?? branch).type == currBranch) continue;
+                                el.Children.Add(new Button($"{(branch.type == currBranch ? "Back" : "Switch")} to {currBranch}", b => {
+                                    selectedBranch ??= branch;
+                                    selectedBranch = new EverestInstaller.EverestBranch(currBranch, selectedBranch.IsNonNative);
                                     VersionCache.Invalidate();
                                     Refresh();
                                 }) {
                                     ID = currBranch.ToString(),
                                 });
                             }
+                            el.Children.Add(new Button($"Use{((selectedBranch ?? branch).IsNonNative ? "" : " non")} Native", b => {
+                                selectedBranch ??= branch;
+                                selectedBranch = new EverestInstaller.EverestBranch(selectedBranch.type, !selectedBranch.IsNonNative);
+                                VersionCache.Invalidate();
+                                Refresh();
+                            }));
                         });
                     }),
                 },
@@ -216,7 +226,7 @@ public class EverestSimpleInstallScene : Scene {
                 if (Config.Instance.Installation == null) return null;
                 EverestInstaller.EverestBranch? branch = scene.selectedBranch ??
                                                          CurrentInstallBranch() ?? 
-                                                         EverestInstaller.EverestBranch.Stable; // Default to stable
+                                                         new EverestInstaller.EverestBranch(EverestInstaller.EverestBranch.ReleaseType.Stable, true); // Default to stable
 
 
                 ICollection<EverestInstaller.EverestVersion> versions =
@@ -225,14 +235,13 @@ public class EverestSimpleInstallScene : Scene {
                     new EverestInstaller.EverestVersion() { version = 0 };
 
                 foreach (EverestInstaller.EverestVersion version in versions) {
-                    if (version.Branch == branch && version.version > newest.version) {
+                    if (version.Branch.Equals(branch) && version.version > newest.version) {
                         newest = version;
                     }
                 }
 
                 if (newest.version == 0) {
-                    // Shouldn't happen
-                    throw new Exception();
+                    return null;
                 }
 
                 return newest;

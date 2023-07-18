@@ -22,6 +22,7 @@ namespace Olympus {
 
         public Config Config = new();
 
+        public static readonly string Name = "Olympus.FNA";
         public static readonly Version Version = typeof(App).Assembly.GetName().Version ?? new Version(1, 0, 0, 0);
 
         public static readonly object[] EmptyArgs = new object[0];
@@ -107,9 +108,9 @@ namespace Olympus {
             };
 
 #if DEBUG
-            Window.Title = "Olympus.FNA (DEBUG)";
+            Window.Title = $"{App.Name} (DEBUG)";
 #else
-            Window.Title = "Olympus.FNA";
+            Window.Title = $"{App.Name}";
 #endif
             Window.AllowUserResizing = true;
             IsMouseVisible = true;

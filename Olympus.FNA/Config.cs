@@ -55,22 +55,22 @@ namespace Olympus {
             if (PlatformHelper.Is(Platform.MacOS)) {
                 string? home = Environment.GetEnvironmentVariable("HOME");
                 if (!string.IsNullOrEmpty(home)) {
-                    return System.IO.Path.Combine(home, "Library", "Application Support", "Olympus.FNA");
+                    return System.IO.Path.Combine(home, "Library", "Application Support", App.Name);
                 }
             }
 
             if (PlatformHelper.Is(Platform.Unix)) {
                 string? config = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
                 if (!string.IsNullOrEmpty(config)) {
-                    return System.IO.Path.Combine(config, "Olympus.FNA");
+                    return System.IO.Path.Combine(config, App.Name);
                 }
                 string? home = Environment.GetEnvironmentVariable("HOME");
                 if (!string.IsNullOrEmpty(home)) {
-                    return System.IO.Path.Combine(home, ".config", "Olympus.FNA");
+                    return System.IO.Path.Combine(home, ".config", App.Name);
                 }
             }
 
-            return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Olympus.FNA");
+            return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), App.Name);
         }
 
         public static string GetDefaultPath() {
@@ -81,22 +81,22 @@ namespace Olympus {
             if (PlatformHelper.Is(Platform.MacOS)) {
                 string? home = Environment.GetEnvironmentVariable("HOME");
                 if (!string.IsNullOrEmpty(home)) {
-                    return System.IO.Path.Combine(home, "Library", "Caches", "Olympus.FNA");
+                    return System.IO.Path.Combine(home, "Library", "Caches", App.Name);
                 }
             }
 
             if (PlatformHelper.Is(Platform.Unix)) {
                 string? config = Environment.GetEnvironmentVariable("XDG_CACHE_HOME");
                 if (!string.IsNullOrEmpty(config)) {
-                    return System.IO.Path.Combine(config, "Olympus.FNA");
+                    return System.IO.Path.Combine(config, App.Name);
                 }
                 string? home = Environment.GetEnvironmentVariable("HOME");
                 if (!string.IsNullOrEmpty(home)) {
-                    return System.IO.Path.Combine(home, ".cache", "Olympus.FNA");
+                    return System.IO.Path.Combine(home, ".cache", App.Name);
                 }
             }
 
-            return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Olympus.FNA");
+            return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), App.Name);
         }
 
         public void Load() {

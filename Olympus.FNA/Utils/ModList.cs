@@ -413,35 +413,35 @@ namespace Olympus.Utils {
                 return updateDBEntry;
             }
 
-            private static readonly Dictionary<char, bool> ForbiddenChars = new() {
-                    {'<', true},
-                    {'>', true},
-                    {':', true},
-                    {'\"', true},
-                    {'\\', true},
-                    {'|', true},
-                    {'?', true},
-                    {'*', true},
-                    {'/', true},
-                    {' ', true}
+            private static readonly Dictionary<char, char> ForbiddenChars = new() {
+                    {'<', '\0'},
+                    {'>', '\0'},
+                    {':', '\0'},
+                    {'\"', '\0'},
+                    {'\\', '_'},
+                    {'|', '\0'},
+                    {'?', '\0'},
+                    {'*', '\0'},
+                    {'/', '_'},
+                    {' ', '\0'}
                 };
 
             static ModDataBase() { // Populate forbiddenChars
                 // add [0-32] ascii chars
                 for (int i = 0; i < 32; i++) {
-                    ForbiddenChars.Add((char)i, true);
+                    ForbiddenChars.Add((char)i, '\0');
                 }
             }
 
             // Modifies a name to be valid on all file systems
-            private static string ValidateName(string name) {
+            public static string ValidateName(string name) {
                 string res = "";
                 name = name.Trim();
 
                 foreach (char c in name) {
-                    if (!ForbiddenChars.GetValueOrDefault(c, false)) {
-                        res += c;
-                    }
+                    char newC = ForbiddenChars.GetValueOrDefault(c, c);
+                    if (newC != '\0')
+                        res += newC;
                 }
 
                 return res.ToLower();

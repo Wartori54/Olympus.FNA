@@ -10,8 +10,7 @@ namespace Olympus.Utils {
 
     public static class UrlManager {
         
-        private const string UrlsYamlPath = "metadata/urls.yaml";
-        
+        private static readonly string UrlsYamlPath = Path.Combine("metadata","urls.yaml");
         
         private static DataBaseUrls? urls;
         
