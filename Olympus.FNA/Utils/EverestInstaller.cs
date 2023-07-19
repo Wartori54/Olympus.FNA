@@ -32,30 +32,35 @@ namespace Olympus.Utils {
 
         // Note: here the progress values will be: 50% of it for the download, and 50% for the install process
         public static async IAsyncEnumerable<Status> InstallVersion(EverestVersion version, Installation install) {
-            bool canDelete = true;
-            // Before everything, verify if a everest cache can be deleted
-            foreach (Installation ins in App.Instance.FinderManager.Found.Concat(App.Instance.FinderManager.Added)) {
-                (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
-                    = ins.ScanVersion(false);
-                if (ModVersion == null) continue;
-                if (ModVersion.Minor != version.version) continue;
-                canDelete = false;
-                break;
-            }
-
-            string outFile = Path.Combine(Config.GetCacheDir(), "everestVersions", $"everest_{version.version}.zip");
-            if (canDelete && File.Exists(outFile)) {
-                File.Delete(outFile);
-            }
-            
             // 1st part: the download
             (bool modifiable, string? full, Version? celesteVersion, string? framework, string? modLoaderName, Version? everestVersion) = install.ScanVersion(true);
             if (!modifiable) {
                 yield return new Status("Installation is not modifiable", 1f, Status.Stage.Fail);
             }
+            
+            if (everestVersion != null) {
+                bool canDelete = true;
+                // Before everything, verify if a everest cache can be deleted
+                foreach (Installation ins in
+                         App.Instance.FinderManager.Found.Concat(App.Instance.FinderManager.Added)) {
+                    (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName,
+                            Version? ModVersion)
+                        = ins.ScanVersion(false);
+                    if (ModVersion == null) continue;
+                    if (ModVersion.Minor != everestVersion.Minor) continue;
+                    canDelete = false;
+                    break;
+                }
+
+                string cacheFile = Path.Combine(Config.GetCacheDir(), "everestVersions",
+                                                $"everest_{everestVersion.Minor}.zip");
+                if (canDelete && File.Exists(cacheFile)) {
+                    File.Delete(cacheFile);
+                }
+            }
 
             // MiniInstaller reads orig/Celeste.exe and copies Celeste.exe into it but only if missing.
-            // Olympus can help out and delete the orig folder if the existing Celeste.exe isn't modded.
+            // We can help out and delete the orig folder if the existing Celeste.exe isn't modded.
             if (modLoaderName == null) { // Install is vanilla
                 string orig = Path.Combine(install.Root, "orig");
                 if (Directory.Exists(orig)) {
@@ -68,6 +73,11 @@ namespace Olympus.Utils {
             bool isNativeCurrentInstall = File.Exists(Path.Combine(install.Root, "Celeste.dll"));
             bool isNativeArtifact = !version.Branch.IsNonNative;
 
+            if (isNativeArtifact != isNativeCurrentInstall) { // types are not normally upgradable
+                yield return new Status("Uninstalling current version...", 0f, Status.Stage.InProgress);
+                await foreach (Status status in UninstallEverest(install)) yield return status;
+            }
+
             using HttpClient wc = new HttpClient();
             wc.Timeout = TimeSpan.FromMilliseconds(10000); // 10 s timeout
             
@@ -79,34 +89,66 @@ namespace Olympus.Utils {
                 Directory.CreateDirectory(Path.Combine(Config.GetCacheDir(), "everestVersions"));
             }
             
-            Task<bool> job = UrlManager.Stream2FileWithProgress(outFile,
-                wc.GetStreamAsync(version.mainDownload), version.mainFileSize,
-                (progress, total, speed) => {
-                    statusChannel.Writer.TryWrite(new Status($"Downloading files: {(float) progress/total*100}%, {speed} Kb/s", 
-                        (float) progress / total, Status.Stage.InProgress));
-                    if (progress == total) {
-                        statusChannel.Writer.TryComplete();
-                    }
-                    
-                    return true; // no cancellation (yet)
-                });
+            string outFile = Path.Combine(Config.GetCacheDir(), "everestVersions",
+                                $"everest_{version.version}.zip");
+            if (!File.Exists(outFile)) { // Download only if necessary
+                Task<bool> job = UrlManager.Stream2FileWithProgress(outFile,
+                    wc.GetStreamAsync(version.mainDownload), version.mainFileSize,
+                    (progress, total, speed) => {
+                        statusChannel.Writer.TryWrite(new Status(
+                            $"Downloading files: {(float) progress / total * 100}%, {speed} Kb/s",
+                            (float) progress / total, Status.Stage.InProgress));
+                        if (progress == total) {
+                            statusChannel.Writer.TryComplete();
+                        }
 
-            while (await statusChannel.Reader.WaitToReadAsync())
+                        return true; // no cancellation (yet)
+                    });
+
+                while (await statusChannel.Reader.WaitToReadAsync())
                 while (statusChannel.Reader.TryRead(out Status? s)) {
-                     Status temp = new(s.Text, s.Progress / 2, s.CurrentStage);
-                     yield return temp;
+                    Status temp = new(s.Text, s.Progress / 2, s.CurrentStage);
+                    yield return temp;
                 }
 
-            job.Wait(); // Wait anyways to prevent jank
-            
+                job.Wait(); // Wait anyways to prevent jank
+            }
+
             // Finally extract it
             foreach (Status status in UnpackTo(outFile, install.Root, "main/")) yield return status;
+            
+            // Right before miniinstaller, analyze the files
+            HashSet<string> initialFiles = new(GetFilesInDirectory(install.Root));
+            // That *can* and *will* be expensive on slow storage devices, but since installing is rarely done, we might as well not care
 
             // 2nd part: the installation
             yield return new Status("Running miniInstaller", 0.5f, Status.Stage.InProgress);
             await foreach (Status s in RunMiniInstaller(install, SetupAndGetMiniInstallerName(install, isNativeArtifact))) {
                 yield return s;
             }
+            
+            // List files again
+            IEnumerable<string> finalFiles = GetFilesInDirectory(install.Root);
+
+            // Find overlap
+            LinkedList<string> newFiles = new();
+            foreach (string file in finalFiles) {
+                if (!initialFiles.Contains(file)) {
+                    newFiles.AddLast(Path.GetRelativePath(install.Root, file));
+                }
+            }
+
+            string installCacheDir = Path.Combine(Config.GetCacheDir(), "uninstallData");
+            if (!Directory.Exists(installCacheDir)) {
+                Directory.CreateDirectory(installCacheDir);
+            }
+
+            await using (FileStream file = File.Create(Path.Combine(
+                                 installCacheDir, 
+                             ModList.ModDataBase.ValidateName(install.Root) + version.version + ".yaml")))
+            await using (TextWriter writer = new StreamWriter(file))    
+                YamlHelper.Serializer.Serialize(writer, newFiles);
+            yield return new Status("Caches done!", 1f, Status.Stage.Success);
         }
 
         private static string SetupAndGetMiniInstallerName(Installation install, bool isNative) {
@@ -182,6 +224,198 @@ namespace Olympus.Utils {
 
             throw new PlatformNotSupportedException("Unable to recognize platform! (manual install required)");
         }
+        
+        
+
+        // Uninstall process... This is a huge method
+        // Steps:
+        // 1. Get a file listing for stock celeste
+        // 2. Compare it to the currently installed everest version zip and delete the ones which aren't part of the celeste stock install
+        // 3. Try using a cache to determinate those files that miniinstaller generated and delete them
+        // Simple, right?
+        public static async IAsyncEnumerable<Status> UninstallEverest(Installation install) {
+            (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
+                                = install.ScanVersion(true);
+            if (ModVersion == null) {
+                yield return new Status("Tried to uninstall from vanilla install", 1f, Status.Stage.Fail);
+                yield break;
+            }
+            string file_listing = "";
+            if (PlatformHelper.Is(Platform.Linux)) {
+                file_listing = "celeste_files_linux.yaml";
+            } else if (PlatformHelper.Is(Platform.MacOS)) {
+                file_listing = "celeste_files_mac.yaml";
+            } else if (PlatformHelper.Is(Platform.Windows)) {
+                file_listing = "celeste_files_windows.yaml";
+            } else {
+                throw new PlatformNotSupportedException("Cannot deduce OS!"); // Note: intentional exception throw
+            }
+
+            Stream? file = OlympUI.Assets.OpenStream(Path.Combine("metadata", "celeste-files-listings", file_listing));
+            if (file == null) {
+                yield return new Status("Cannot open celeste file listings!", 1f, Status.Stage.Fail);
+                yield break;
+            }
+
+            List<string> celesteFiles;
+            using (StreamReader reader = new(file))
+               celesteFiles = YamlHelper.Deserializer.Deserialize<List<string>>(reader);
+
+            string everestCache = Path.Combine(Config.GetCacheDir(), "everestVersions", $"everest_{ModVersion.Minor}.zip");
+            if (!File.Exists(everestCache)) { // Download it
+                EverestVersion? version = null;
+                foreach (EverestVersion ver in QueryEverestVersions()) {
+                    if (ver.version == ModVersion.Minor) {
+                        version = ver;
+                    }
+                }
+
+                if (version == null) {
+                    yield return new Status("Couldn't deduce current version, (is it too old?)", 1f, Status.Stage.Fail);
+                    yield break;
+                }
+
+                using HttpClient wc = new HttpClient();
+                wc.Timeout = TimeSpan.FromMilliseconds(10000); // 10 s timeout
+                
+                // The following uses a channel to be able to yield return data from the lambda to the main method
+                // Note that it runs the job async, but the channel wont die until it finishes. 
+                Channel<Status> statusChannel = Channel.CreateUnbounded<Status>();
+    
+                if (!Directory.Exists(Path.Combine(Config.GetCacheDir(), "everestVersions"))) {
+                    Directory.CreateDirectory(Path.Combine(Config.GetCacheDir(), "everestVersions"));
+                }
+                
+                Task<bool> job = UrlManager.Stream2FileWithProgress(everestCache,
+                    wc.GetStreamAsync(version.mainDownload), version.mainFileSize,
+                    (progress, total, speed) => {
+                        statusChannel.Writer.TryWrite(new Status($"Downloading files: {(float) progress/total*100}%, {speed} Kb/s", 
+                            (float) progress / total, Status.Stage.InProgress));
+                        if (progress == total) {
+                            statusChannel.Writer.TryComplete();
+                        }
+                        
+                        return true; // no cancellation (yet)
+                    });
+    
+                while (await statusChannel.Reader.WaitToReadAsync())
+                    while (statusChannel.Reader.TryRead(out Status? s)) {
+                         Status temp = new(s.Text, s.Progress / 2, s.CurrentStage);
+                         yield return temp;
+                    }
+    
+                job.Wait(); // Wait anyways to prevent jank
+            } else {
+                yield return new Status("Cache found!", 0.5f, Status.Stage.InProgress);
+            }
+
+            yield return new Status("Restoring orig", 0.5f, Status.Stage.InProgress);
+
+            void CopyFilesRecursively(string path, string orig, string target) {
+                if (!File.Exists(path) && !Directory.Exists(path)) return;
+                FileInfo info = new(path);
+                if (info.LinkTarget != null) return; // Skip symbolic links
+                string targetFile = Path.Combine(target, Path.GetRelativePath(orig, path));
+                if (Directory.Exists(path)) {
+                    Directory.CreateDirectory(targetFile);
+                    foreach (string entry in Directory.EnumerateFileSystemEntries(path)) {
+                        CopyFilesRecursively(entry, orig, target);
+                    }
+                } else {
+                    File.Copy(path, targetFile, true);
+                }
+            }
+
+            string[] origFiles = Directory.GetFileSystemEntries(Path.Combine(install.Root, "orig"));
+            int i = 0;
+            foreach (string origFile in origFiles) {
+                yield return new Status($"Copying files... ({i}/{origFiles.Length})",
+                     0.5f + 0.25f * ((float) i / origFiles.Length), Status.Stage.InProgress);
+                CopyFilesRecursively(origFile, Path.Combine(install.Root, "orig"), install.Root);
+                i++;
+            }
+            yield return new Status($"Copied files! ({i}/{origFiles.Length})",
+                                 0.5f + 0.25f * ((float) i / origFiles.Length), Status.Stage.InProgress);
+
+            void DirectoryCleaning(string path) {
+                string? parentDir = Path.GetDirectoryName(path);
+                if (string.IsNullOrEmpty(parentDir)) return;
+                string targetDir = Path.Combine(install.Root, parentDir);
+                if (!Directory.Exists(targetDir)
+                    || Directory.EnumerateFileSystemEntries(targetDir).Any()) return;
+                Directory.Delete(targetDir);
+                DirectoryCleaning(parentDir);
+            }
+
+            ZipArchive zip = new ZipArchive(File.OpenRead(everestCache));
+
+            i = 0;
+            string zipPrefix = "main/";
+            foreach (ZipArchiveEntry entry in zip.Entries) {
+                string name = entry.FullName;
+                if (string.IsNullOrEmpty(name) || name.EndsWith("/"))
+                    continue;
+
+                if (!string.IsNullOrEmpty(zipPrefix)) {
+                    if (!name.StartsWith(zipPrefix))
+                        continue;
+                    name = name.Substring(zipPrefix.Length);
+                }
+
+                if (!celesteFiles.Contains(name) && File.Exists(Path.Combine(install.Root, name))) {
+                    File.Delete(Path.Combine(install.Root, name));
+                    yield return new Status($"Deleting file {name} ({i}/{zip.Entries.Count})",
+                        0.75f + 0.125f * ((float) i / zip.Entries.Count), Status.Stage.InProgress);
+                    DirectoryCleaning(name);
+                }
+                i++;
+            }
+            
+            // Finally check for caches, and delete final files
+            string cacheTarget = Path.Combine(Config.GetCacheDir(), "uninstallData",
+                ModList.ModDataBase.ValidateName(install.Root) + ModVersion.Minor + ".yaml");
+
+            if (File.Exists(cacheTarget)) {
+                yield return new Status("Cleaning residual files...", 0.875f, Status.Stage.InProgress);
+                List<string> residualFiles = YamlHelper.Deserializer.Deserialize<List<string>>(new StreamReader(File.OpenRead(cacheTarget)));
+
+                i = 0;
+                foreach (string residualFile in residualFiles) {
+                    string absolutePathFile = Path.Combine(install.Root, residualFile);
+                    if (!File.Exists(absolutePathFile)) continue;
+                    File.Delete(absolutePathFile);
+                    yield return new Status($"Deleting file {absolutePathFile} ({i}/{residualFiles.Count}",
+                        0.875f + 0.125f * ((float) i / residualFiles.Count), Status.Stage.InProgress);
+                    DirectoryCleaning(residualFile);
+                    i++;
+                }
+            } else {
+                yield return new Status("Nonexistent cache for this install, uninstall may be incomplete!", 1f,
+                    Status.Stage.InProgress);
+            }
+
+            yield return new Status("Success!", 1f, Status.Stage.Success);
+
+            bool canDelete = true;
+            // After everything, verify if a everest cache can be deleted
+            foreach (Installation ins in App.Instance.FinderManager.Found.Concat(App.Instance.FinderManager.Added)) {
+                (bool Modifiable1, string Full1, Version? Version1, string? Framework1, string? ModName1, Version? ModVersion1) 
+                    = ins.ScanVersion(false);
+                if (ModVersion1 == null) continue;
+                if (ModVersion1.Minor != ModVersion.Minor) continue;
+                canDelete = false;
+                break;
+            }
+            
+            if (canDelete && File.Exists(everestCache)) {
+                File.Delete(everestCache);
+            }
+            
+            
+            install.ScanVersion(true);
+            Config.Instance.Installation = Config.Instance.Installation; // neat hack to update all ui stuff
+            
+        }
 
 
         private static async IAsyncEnumerable<Status> RunMiniInstaller(Installation install, string binaryName) {
@@ -254,7 +488,7 @@ namespace Olympus.Utils {
             yield return new Status("Everest install finished", 1f, Status.Stage.Success);
 
 
-            Config.Instance.Installation?.ScanVersion(true);
+            install.ScanVersion(true);
             Config.Instance.Installation = Config.Instance.Installation; // neat hack to update all ui stuff
         }
         
@@ -322,6 +556,20 @@ namespace Olympus.Utils {
 
             return latestFound;
         }
+        
+        public static IEnumerable<string> GetFilesInDirectory(string dir) {
+            foreach (string f in Directory.GetFiles(dir)) {
+                yield return f;
+            }
+            foreach (string d in Directory.GetDirectories(dir)) {
+                
+                if (new DirectoryInfo(d).LinkTarget != null) continue;
+
+                foreach (string s in GetFilesInDirectory(d)) 
+                    yield return s;
+            }
+        }
+
 
 #if WINDOWS
         private static int chmod(string pathname, int mode) { return 0; }
@@ -329,8 +577,6 @@ namespace Olympus.Utils {
         [DllImport("libc", SetLastError = true)]
         private static extern int chmod(string pathname, int mode);
 #endif
-
-
 
         [Serializable]
         public class EverestVersion {

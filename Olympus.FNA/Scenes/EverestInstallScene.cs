@@ -193,7 +193,10 @@ namespace Olympus {
                                     Layouts.Fill(0.5f, 0f, 8),
                                 },
                             },
-                            new Button("Uninstall", button => {
+                            new Button("Uninstall", async button => {
+                                if (Config.Instance.Installation == null) return;
+                                await foreach (EverestInstaller.Status status in EverestInstaller.UninstallEverest(Config.Instance.Installation))
+                                    Console.WriteLine(status.Text + " | " + status.Progress + " | " + status.CurrentStage);
                             }) {
                                 Layout = {
                                     Layouts.Fill(0.5f, 0f, 8),

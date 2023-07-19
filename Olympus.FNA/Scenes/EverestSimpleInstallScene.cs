@@ -84,6 +84,7 @@ public class EverestSimpleInstallScene : Scene {
                                        Config.Instance.Installation)) {
                         Console.WriteLine(status.Text + " | " + status.Progress + " | " + status.CurrentStage);
                     }
+                    Refresh();
                 }) {
                     Init = RegisterRefresh<UpdateButton>(async el => {
                         if (Config.Instance.Installation == null) {
