@@ -79,11 +79,13 @@ public class EverestSimpleInstallScene : Scene {
                 },
                 new UpdateButton("download", "Update", async b => {
                     if (Config.Instance.Installation == null) return;
-                    await foreach (var status in 
-                                   EverestInstaller.InstallVersion(GetLatest()!, // Only returns null when no installation is selected
-                                       Config.Instance.Installation)) {
-                        Console.WriteLine(status.Text + " | " + status.Progress + " | " + status.CurrentStage);
-                    }
+                    EverestInstaller.EverestVersion? version = GetLatest();
+                    if (version != null)
+                        await foreach (var status in 
+                                       EverestInstaller.InstallVersion(version, // Only returns null when no installation is selected
+                                           Config.Instance.Installation)) {
+                            Console.WriteLine(status.Text + " | " + status.Progress + " | " + status.CurrentStage);
+                        }
                     Refresh();
                 }) {
                     Init = RegisterRefresh<UpdateButton>(async el => {
@@ -91,6 +93,13 @@ public class EverestSimpleInstallScene : Scene {
                             // Refuse to load
                             return;
                         }
+                        EverestInstaller.EverestVersion? newest = GetLatest();
+                        if (newest == null) {
+                            el.Enabled = false;
+                            return;
+                        }
+
+                        el.Enabled = true;
 
                         EverestInstaller.EverestBranch? branch =
                             CurrentInstallBranch();
@@ -104,8 +113,7 @@ public class EverestSimpleInstallScene : Scene {
                             return;
                         }
                         
-                        EverestInstaller.EverestVersion? newest = GetLatest();
-                        if (newest == null) return;
+                        
                         
                         (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
                                                             = Config.Instance.Installation.ScanVersion(false);
