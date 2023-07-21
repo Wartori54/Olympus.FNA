@@ -73,9 +73,15 @@ namespace Olympus.Utils {
             bool isNativeCurrentInstall = File.Exists(Path.Combine(install.Root, "Celeste.dll"));
             bool isNativeArtifact = !version.Branch.IsNonNative;
 
-            if (isNativeArtifact != isNativeCurrentInstall) { // types are not normally upgradable
+            // Uninstall only if caches are present for this install
+            if (everestVersion != null && 
+                File.Exists(Path.Combine(
+                    Config.GetCacheDir(), "uninstallData",
+                    ModList.ModDataBase.ValidateName(install.Root) + everestVersion.Minor + ".yaml"))) {
                 yield return new Status("Uninstalling current version...", 0f, Status.Stage.InProgress);
                 await foreach (Status status in UninstallEverest(install)) yield return status;
+                
+                (modifiable, full, celesteVersion, framework, modLoaderName, everestVersion) = install.ScanVersion(true);
             }
 
             using HttpClient wc = new HttpClient();
@@ -118,37 +124,41 @@ namespace Olympus.Utils {
             foreach (Status status in UnpackTo(outFile, install.Root, "main/")) yield return status;
             
             // Right before miniinstaller, analyze the files
-            HashSet<string> initialFiles = new(GetFilesInDirectory(install.Root));
-            // That *can* and *will* be expensive on slow storage devices, but since installing is rarely done, we might as well not care
+            HashSet<string>? initialFiles = null; 
+            if (modLoaderName == null) // only if it was vanilla generate caches
+                initialFiles = new(GetFilesInDirectory(install.Root));
+                // That *can* and *will* be expensive on slow storage devices, but since installing is rarely done, we might as well not care
 
             // 2nd part: the installation
             yield return new Status("Running miniInstaller", 0.5f, Status.Stage.InProgress);
             await foreach (Status s in RunMiniInstaller(install, SetupAndGetMiniInstallerName(install, isNativeArtifact))) {
                 yield return s;
             }
-            
-            // List files again
-            IEnumerable<string> finalFiles = GetFilesInDirectory(install.Root);
 
-            // Find overlap
-            LinkedList<string> newFiles = new();
-            foreach (string file in finalFiles) {
-                if (!initialFiles.Contains(file)) {
-                    newFiles.AddLast(Path.GetRelativePath(install.Root, file));
+            if (modLoaderName == null) { // Only if vanilla make caches
+                // List files again
+                IEnumerable<string> finalFiles = GetFilesInDirectory(install.Root);
+
+                // Find overlap
+                LinkedList<string> newFiles = new();
+                foreach (string file in finalFiles) {
+                    if (!initialFiles!.Contains(file)) { // initialFiles cannot be null here
+                        newFiles.AddLast(Path.GetRelativePath(install.Root, file));
+                    }
                 }
-            }
 
-            string installCacheDir = Path.Combine(Config.GetCacheDir(), "uninstallData");
-            if (!Directory.Exists(installCacheDir)) {
-                Directory.CreateDirectory(installCacheDir);
-            }
+                string installCacheDir = Path.Combine(Config.GetCacheDir(), "uninstallData");
+                if (!Directory.Exists(installCacheDir)) {
+                    Directory.CreateDirectory(installCacheDir);
+                }
 
-            await using (FileStream file = File.Create(Path.Combine(
-                                 installCacheDir, 
-                             ModList.ModDataBase.ValidateName(install.Root) + version.version + ".yaml")))
-            await using (TextWriter writer = new StreamWriter(file))    
-                YamlHelper.Serializer.Serialize(writer, newFiles);
-            yield return new Status("Caches done!", 1f, Status.Stage.Success);
+                await using (FileStream file = File.Create(Path.Combine(
+                                 installCacheDir,
+                                 ModList.ModDataBase.ValidateName(install.Root) + version.version + ".yaml")))
+                await using (TextWriter writer = new StreamWriter(file))
+                    YamlHelper.Serializer.Serialize(writer, newFiles);
+                yield return new Status("Caches done!", 1f, Status.Stage.Success);
+            }
         }
 
         private static string SetupAndGetMiniInstallerName(Installation install, bool isNative) {
