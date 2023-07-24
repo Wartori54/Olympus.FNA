@@ -140,10 +140,8 @@ namespace Olympus {
                                     });
                                 }),
                                 Callback = el => {
-                                    foreach (Element childs in el.GetParent().GetParent().GetChild<Group>("buttons").Children) {
-                                        if (childs is Button button) {
-                                            button.Enabled = el.SelectedIdx != -1;
-                                        }
+                                    if (el.GetParent().GetParent().GetChild<Group>("buttons").GetChild("installButton") is Button button) {
+                                        button.Enabled = el.SelectedIdx != -1;
                                     }
                                 }
                             },
@@ -191,7 +189,7 @@ namespace Olympus {
                             }) {
                                 ID = "installButton",
                                 Layout = {
-                                    Layouts.Fill(0.5f, 0f, 8),
+                                    Layouts.Fill(0.8f, 0f, 8),
                                 },
                             },
                             new Button("Uninstall", async button => {
@@ -200,7 +198,7 @@ namespace Olympus {
                                     Console.WriteLine(status.Text + " | " + status.Progress + " | " + status.CurrentStage);
                             }) {
                                 Layout = {
-                                    Layouts.Fill(0.5f, 0f, 8),
+                                    Layouts.Fill(0.2f, 0f, 8),
                                 },
                             },
                             // new Group() {
@@ -215,7 +213,8 @@ namespace Olympus {
                             //     }
                             // }
                         }
-                    }
+                    },
+
                 }
             };
 

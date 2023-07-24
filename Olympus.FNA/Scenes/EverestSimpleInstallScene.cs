@@ -214,7 +214,13 @@ public class EverestSimpleInstallScene : Scene {
                             Scener.Push<EverestInstallScene>();
                         }),
                     }
-                }
+                },
+#if DEBUG
+                new Button("Open WorkingOnItScene", b => {
+                    Scener.PopFront();
+                    Scener.Push<WorkingOnItScene>();
+                })
+#endif
             }
         };
 
