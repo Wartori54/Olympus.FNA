@@ -424,14 +424,60 @@ namespace OlympUI {
         }
 
         public void Add(Line shape) {
-            Vector2 normal = GetNormal(shape.XY1, shape.XY2) * (shape.Width != 0f ? shape.Width : Line.DefaultWidth) * 0.5f;
-            Add(new Quad() {
+            Vector2 normal = GetNormal(shape.XY1, shape.XY2) *
+                            (shape.Width != 0f ? shape.Width : Line.DefaultWidth) * 0.5f;
+            if (shape.Radius == 0f) {
+                Add(new Quad() {
+                    Color = shape.Color,
+                    XY1 = shape.XY1 + normal,
+                    XY2 = shape.XY2 + normal,
+                    XY3 = shape.XY1 - normal,
+                    XY4 = shape.XY2 - normal
+                });
+                return;
+            }
+
+            if (shape.Radius > shape.Width)
+                shape.Width = shape.Radius;
+            
+            int pointsPerBend = shape.RadiusPoints;
+            if (pointsPerBend == 0) {
+                pointsPerBend = AutoPoints;
+            }
+            
+            Poly poly = new() {
                 Color = shape.Color,
-                XY1 = shape.XY1 + normal,
-                XY2 = shape.XY2 + normal,
-                XY3 = shape.XY1 - normal,
-                XY4 = shape.XY2 - normal
-            });
+                Width = shape.Width/2,
+                UVXYMin = shape.XY1,
+                UVXYMax = shape.XY2,
+            };
+
+            shape.Radius /= 2*2;
+            
+            float theta = (float) Math.Atan2(normal.Y, normal.X);
+
+            for (int i = 0; i < pointsPerBend; i++) {
+                poly.XYs.Add(new (
+                    shape.XY1.X + shape.Radius * MathF.Cos(theta - i * MathF.PI / pointsPerBend),
+                    shape.XY1.Y + shape.Radius * MathF.Sin(theta - i * MathF.PI / pointsPerBend)
+                ));
+            }
+
+            theta -= MathF.PI;
+            
+            
+            
+            for (int i = 0; i < pointsPerBend; i++) {
+                poly.XYs.Add(new (
+                    shape.XY2.X + shape.Radius * MathF.Cos(theta - i * MathF.PI / pointsPerBend),
+                    shape.XY2.Y + shape.Radius * MathF.Sin(theta - i * MathF.PI / pointsPerBend)
+                ));
+            }
+            
+            poly.XYs.Add(new(shape.XY1.X + shape.Radius * MathF.Cos(theta + MathF.PI),
+                shape.XY1.Y + shape.Radius * MathF.Sin(theta + MathF.PI)));
+
+            Add(poly);
         }
 
         public IEnumerator GetEnumerator()
@@ -755,6 +801,8 @@ namespace OlympUI {
             public Vector2 XY1;
             public Vector2 XY2;
             public float Width;
+            public float Radius;
+            public int RadiusPoints;
         }
 
     }
