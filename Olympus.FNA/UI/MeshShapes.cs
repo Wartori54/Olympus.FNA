@@ -454,7 +454,7 @@ namespace OlympUI {
 
             shape.Radius /= 2*2;
             
-            float theta = (float) Math.Atan2(normal.Y, normal.X);
+            float theta = MathF.Atan2(normal.Y, normal.X);
 
             for (int i = 0; i < pointsPerBend; i++) {
                 poly.XYs.Add(new (
@@ -465,8 +465,6 @@ namespace OlympUI {
 
             theta -= MathF.PI;
             
-            
-            
             for (int i = 0; i < pointsPerBend; i++) {
                 poly.XYs.Add(new (
                     shape.XY2.X + shape.Radius * MathF.Cos(theta - i * MathF.PI / pointsPerBend),
@@ -474,10 +472,41 @@ namespace OlympUI {
                 ));
             }
             
-            poly.XYs.Add(new(shape.XY1.X + shape.Radius * MathF.Cos(theta + MathF.PI),
-                shape.XY1.Y + shape.Radius * MathF.Sin(theta + MathF.PI)));
+            poly.XYs.Add(poly.XYs[0]);
 
             Add(poly);
+        }
+
+        public void Add(Arc shape) {
+            if (MathF.Abs(shape.AngleStart - shape.AngleEnd) > 2 * MathF.PI) {
+                shape.AngleEnd = shape.AngleStart + 2 * MathF.PI;
+            } else if (shape.AngleStart > shape.AngleEnd) {
+                (shape.AngleEnd, shape.AngleStart) = (shape.AngleStart, shape.AngleEnd);
+            }
+            
+            Poly poly = new() {
+                Color = shape.Color,
+                Width = shape.Width,
+                UVXYMin = shape.XY - new Vector2(shape.RadiusX, shape.RadiusY),
+                UVXYMax = shape.XY + new Vector2(shape.RadiusX, shape.RadiusY),
+            };
+
+            const float error = 0.33f;
+            if (shape.RadiusPoints == 0)
+                shape.RadiusPoints = (int)MathF.Ceiling(MathF.PI / MathF.Acos(1f - error / (shape.Radius < error ? 1f : shape.Radius)));
+            // https://stackoverflow.com/questions/11774038/how-to-render-a-circle-with-as-few-vertices-as-possible
+
+            float angleStep = 2 * MathF.PI / shape.RadiusPoints;
+
+            for (float theta = shape.AngleStart; theta < shape.AngleEnd+angleStep; theta += angleStep) {
+                poly.XYs.Add(new (
+                    shape.XY.X + shape.RadiusX * MathF.Cos(theta),
+                    shape.XY.Y + shape.RadiusY * MathF.Sin(theta)
+                ));
+            }
+            
+            Add(poly);
+            
         }
 
         public IEnumerator GetEnumerator()
@@ -803,6 +832,26 @@ namespace OlympUI {
             public float Width;
             public float Radius;
             public int RadiusPoints;
+        }
+        
+        public struct Arc {
+            public static float DefaultWidth = 8f;
+            public Color Color;
+            public Vector2 XY;
+            public float Width;
+
+            public float Radius {
+                get => RadiusX + RadiusY / 2;
+                set {
+                    RadiusX = value;
+                    RadiusY = value;
+                }
+            }
+            public float RadiusX;
+            public float RadiusY;
+            public int RadiusPoints;
+            public float AngleStart;
+            public float AngleEnd;
         }
 
     }

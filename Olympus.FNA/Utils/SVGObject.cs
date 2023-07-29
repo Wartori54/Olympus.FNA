@@ -191,9 +191,9 @@ namespace Olympus.Utils {
     public class SVGCommand {
         public readonly SVGCommandType Type;
         public readonly bool Relative;
-        public readonly IEnumerable<float> Values;
+        public readonly IList<float> Values;
 
-        public SVGCommand(SVGCommandType type, bool relative, IEnumerable<float> values) {
+        public SVGCommand(SVGCommandType type, bool relative, IList<float> values) {
             Type = type;
             Values = values;
             Relative = relative;
