@@ -160,8 +160,9 @@ namespace Olympus.Utils {
 
     public class SVGPath {
         public readonly List<SVGCommand> Commands = new();
+        public readonly int RenderCommandCount;
         public static readonly Regex DElementParser = new("d\\=\"[A-Za-z0-9\\s\\,\\.\\-]+\"", RegexOptions.Compiled);
-        public static readonly Regex CommandParser = new("[A-Z,a-z]\\s?(\\-?\\d+\\.?\\d?\\s?\\,?)+", RegexOptions.Compiled);
+        public static readonly Regex CommandParser = new("[A-Za-z]\\s*(\\-?\\d+\\.?\\d?\\,?\\s*)+", RegexOptions.Compiled);
         
         public SVGPath(string pathElement) {
             // obtain the dElement
@@ -184,6 +185,9 @@ namespace Olympus.Utils {
                 }
                 Commands.Add(new SVGCommand(commandType.Value, relative, valuesList)); 
                 // - commandType.Value: above, dotnet wraps the type with Nullable<> so we have to access the value like this
+
+                if (Commands[^1].IsVisible())
+                    RenderCommandCount++;
             }
         }
 
@@ -218,6 +222,10 @@ namespace Olympus.Utils {
                 'Z' or 'z' => (SVGCommandType.ClosePath, command == 'z'),
                 _ => (null, false)
             };
+        }
+
+        public bool IsVisible() {
+            return Type is not (SVGCommandType.MoveTo or SVGCommandType.ClosePath);
         }
             
     }

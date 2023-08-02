@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="vector" width="300" height="300" baseProfile="full" version="1.1" style="background: #888;"
+    timescale="1.0">
+    <g stroke="#fff" stroke-width="12" stroke-linecap="round" fill="none">
+        <path
+            name="- top"
+            range="0.0,0.8"
+            d="M75.0,120.0 L165.0,120.0 M195.0,120.0 L225.0,120.0"/>
+        <path
+            name="- bottom"
+            range="0.0,0.3"
+            d="M75.0,180.0 L105.0,180.0 M135.0,180.0 L225.0,180.0"/>
+        <path
+            name="| right"
+            range="0.0,0.8"
+            d="M180.0,75.0 L180.0,165.0 M180.0,195.0 L180.0,225.0"/>
+        <path
+            name="O"
+            range="0.0,0.5"
+            d="M120.0,195.0 A15,15 0 0,1 120.0,225.0 A15,15 0 0,1 120.0,195.0"/>
+        <path
+            name="| left"
+            range="0.4,0.8"
+            d="M120.0,195.0 L120.0,135.0"/>
+        <path
+            name="U"
+            range="0.4,1.0"
+            d="M135.0,75.0 L135.0,90.0 A15,-15 0 0,1 120,105.0 A15,15 0 0,1 105.0,90.0 L105.0,75.0"/>
+    </g>
+</svg>

@@ -498,15 +498,55 @@ namespace OlympUI {
 
             float angleStep = 2 * MathF.PI / shape.RadiusPoints;
 
-            for (float theta = shape.AngleStart; theta < shape.AngleEnd+angleStep; theta += angleStep) {
+            for (float theta = shape.AngleStart; theta <= shape.AngleEnd; theta += angleStep) {
                 poly.XYs.Add(new (
                     shape.XY.X + shape.RadiusX * MathF.Cos(theta),
                     shape.XY.Y + shape.RadiusY * MathF.Sin(theta)
                 ));
             }
             
-            Add(poly);
+            poly.XYs.Add(new ( // finally do one extra to actually reach to the AngleEnd
+                shape.XY.X + shape.RadiusX * MathF.Cos(shape.AngleEnd),
+                shape.XY.Y + shape.RadiusY * MathF.Sin(shape.AngleEnd)
+            ));
             
+            Add(poly);
+
+            if (!shape.RoundedCap) return;
+
+            float capStep = 2 * MathF.PI / AutoPoints;
+            
+            Poly capStart = new() {
+                Color = shape.Color,
+                Width = shape.Width / 2,
+                UVXYMin = poly.XYs[0] - new Vector2(shape.Width / 2, shape.Width / 2),
+                UVXYMax = poly.XYs[0] + new Vector2(shape.Width / 2, shape.Width / 2),
+            };
+
+            for (float theta = shape.AngleStart + MathF.PI/4; theta >= shape.AngleStart - MathF.PI - MathF.PI/4; theta -= capStep) {
+                capStart.XYs.Add(new (
+                    poly.XYs[0].X + shape.Width/4 * MathF.Cos(theta),
+                    poly.XYs[0].Y + shape.Width/4 * MathF.Sin(theta)
+                ));
+            }
+            
+            Add(capStart);
+            
+            Poly capEnd = new() {
+                Color = shape.Color,
+                Width = shape.Width / 2,
+                UVXYMin = poly.XYs[^1] - new Vector2(shape.Width / 2, shape.Width / 2),
+                UVXYMax = poly.XYs[^1] + new Vector2(shape.Width / 2, shape.Width / 2),
+            };
+
+            for (float theta = shape.AngleEnd + MathF.PI + MathF.PI/4; theta >= shape.AngleEnd - MathF.PI/4; theta -= capStep) {
+                capEnd.XYs.Add(new (
+                    poly.XYs[^1].X + shape.Width/4 * MathF.Cos(theta),
+                    poly.XYs[^1].Y + shape.Width/4 * MathF.Sin(theta)
+                ));
+            }
+            
+            Add(capEnd);
         }
 
         public IEnumerator GetEnumerator()
@@ -852,6 +892,7 @@ namespace OlympUI {
             public int RadiusPoints;
             public float AngleStart;
             public float AngleEnd;
+            public bool RoundedCap;
         }
 
     }

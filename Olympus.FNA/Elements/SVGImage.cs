@@ -4,6 +4,7 @@ using Olympus.Utils;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace Olympus {
@@ -67,6 +68,8 @@ namespace Olympus {
             Style.Apply(StyleKeys.Normal);
             
             Progress = ProgressCb.Invoke();
+            if (Progress > 1) 
+                Progress = 1;
             if (Math.Abs(PrevProgress - Progress) > 0.005f) {
                 InvalidatePaint();
             }
@@ -88,47 +91,56 @@ namespace Olympus {
                 MeshShapes<MiniVertex> shapes = Mesh.Shapes;
                 shapes.Clear();
                 
-                // shapes.Add(new MeshShapes.Rect() {
-                //     Color = color,
-                //     Size = new(wh.X * Progress, wh.Y),
-                // });
-                //
                 foreach (SVGGroup group in data.Groups) {
-                    Vector2 strokeWidthVec = new(group.StrokeWidth/2f*0f, group.StrokeWidth/2f*0f);
                     foreach (SVGPath path in group.Paths) {
-                        Vector2 CurrPos = new(0, 0);
+                        Vector2 currPos = new(0, 0);
+                        float commandsToDraw = path.RenderCommandCount * Progress;
                         foreach (SVGCommand cmd in path.Commands) {
+                            float fraction;
+                            if (cmd.IsVisible()) {
+                                fraction = MathF.Min(commandsToDraw, 1f);
+                            } else {
+                                fraction = 1f;
+                            }
+
+                            if (commandsToDraw < 0) break;
+                            if (cmd.IsVisible())
+                                commandsToDraw--;
                             switch (cmd.Type) {
                                 case SVGCommand.SVGCommandType.MoveTo:
-                                    CurrPos = (cmd.Relative ? CurrPos : Vector2.Zero) +
+                                    currPos = (cmd.Relative ? currPos : Vector2.Zero) +
                                               new Vector2(cmd.Values[0], cmd.Values[1]);
                                     break;
                                 case SVGCommand.SVGCommandType.LineTo:
+                                    Vector2 endPos = new(cmd.Values[0], cmd.Values[1]);
+                                    endPos += (currPos - endPos) * (1f - fraction);
                                     shapes.Add(new MeshShapes.Line() {
-                                        XY1 = CurrPos - strokeWidthVec,
-                                        XY2 = (cmd.Relative ? CurrPos : Vector2.Zero) +
-                                              new Vector2(cmd.Values[0], cmd.Values[1]) +
-                                              strokeWidthVec,
+                                        XY1 = currPos,
+                                        XY2 = (cmd.Relative ? currPos : Vector2.Zero) +
+                                              endPos,
                                         Radius = group.StrokeWidth,
                                         Color = color,
                                     });
-                                    CurrPos = (cmd.Relative ? CurrPos : Vector2.Zero) +
+                                    currPos = (cmd.Relative ? currPos : Vector2.Zero) +
                                               new Vector2(cmd.Values[0], cmd.Values[1]);
                                     break;
                                 case SVGCommand.SVGCommandType.CubicCurve:
-                                    throw new NotImplementedException("Please use Arc where possible (or implement it yourself)");
+                                    throw new NotImplementedException(
+                                        "Please use Arc where possible (or implement it yourself)");
                                 case SVGCommand.SVGCommandType.QuadraticCurve:
-                                    throw new NotImplementedException("Please use Arc where possible (or implement it yourself)");
+                                    throw new NotImplementedException(
+                                        "Please use Arc where possible (or implement it yourself)");
                                 case SVGCommand.SVGCommandType.ArcCurve:
                                     float rx = MathF.Abs(cmd.Values[0]);
                                     float ry = MathF.Abs(cmd.Values[1]);
-                                    float rot = cmd.Values[2] * 2 * MathF.PI/360;
+                                    float rot = cmd.Values[2] * 2 * MathF.PI / 360;
                                     int largeArcFlag = (int) cmd.Values[3];
                                     int sweepFlag = (int) cmd.Values[4];
                                     float finalX = cmd.Values[5];
                                     float finalY = cmd.Values[6];
 
-                                    if (CurrPos.X == finalX && CurrPos.Y == finalY) { // if points are equal, skip rendering
+                                    if (currPos.X == finalX && currPos.Y == finalY) {
+                                        // if points are equal, skip rendering
                                         break;
                                     }
 
@@ -136,81 +148,88 @@ namespace Olympus {
                                     if (rx == 0 || ry == 0) {
                                         break;
                                     }
-                                    
+
                                     // The following is based from https://www.w3.org/TR/SVG/implnote.html#ArcConversionEndpointToCenter
                                     // And partially copied from https://github.com/MadLittleMods/svg-curve-lib/blob/50b7761814384ba2497bb63cfa5417cb6cd85a5f/src/c%2B%2B/SVGCurveLib.cpp#L70
-                                    float dx = (CurrPos.X-finalX)/2;
-                                    float dy = (CurrPos.Y-finalY)/2;
+                                    float dx = (currPos.X - finalX) / 2;
+                                    float dy = (currPos.Y - finalY) / 2;
                                     Vector2 transformedPoint = new(
-                                        MathF.Cos(rot)*dx + MathF.Sin(rot)*dy,
-                                        -MathF.Sin(rot)*dx + MathF.Cos(rot)*dy
+                                        MathF.Cos(rot) * dx + MathF.Sin(rot) * dy,
+                                        -MathF.Sin(rot) * dx + MathF.Cos(rot) * dy
                                     );
-                                    
-                                    float radiiCheck = MathF.Pow(transformedPoint.X, 2)/MathF.Pow(rx, 2) 
-                                                        + MathF.Pow(transformedPoint.Y, 2)/MathF.Pow(ry, 2);
-                                    if(radiiCheck > 1) {
-                                        rx = MathF.Sqrt(radiiCheck)*rx;
-                                        ry = MathF.Sqrt(radiiCheck)*ry;
+
+                                    float radiiCheck = MathF.Pow(transformedPoint.X, 2) / MathF.Pow(rx, 2)
+                                                       + MathF.Pow(transformedPoint.Y, 2) / MathF.Pow(ry, 2);
+                                    if (radiiCheck > 1) {
+                                        rx = MathF.Sqrt(radiiCheck) * rx;
+                                        ry = MathF.Sqrt(radiiCheck) * ry;
                                     }
-                                    
-                                    float cSquareNumerator = MathF.Pow(rx, 2) * MathF.Pow(ry, 2) 
-                                        - MathF.Pow(rx, 2) * MathF.Pow(transformedPoint.Y, 2) 
-                                        - MathF.Pow(ry, 2) * MathF.Pow(transformedPoint.X, 2);
+
+                                    float cSquareNumerator = MathF.Pow(rx, 2) * MathF.Pow(ry, 2)
+                                                             - MathF.Pow(rx, 2) * MathF.Pow(transformedPoint.Y, 2)
+                                                             - MathF.Pow(ry, 2) * MathF.Pow(transformedPoint.X, 2);
                                     float cSquareRootDenom = MathF.Pow(rx, 2)
-                                        * MathF.Pow(transformedPoint.Y, 2) 
-                                        + MathF.Pow(ry, 2)*MathF.Pow(transformedPoint.X, 2);
-                                    float cRadicand = cSquareNumerator/cSquareRootDenom;
-                                    
+                                                             * MathF.Pow(transformedPoint.Y, 2)
+                                                             + MathF.Pow(ry, 2) * MathF.Pow(transformedPoint.X, 2);
+                                    float cRadicand = cSquareNumerator / cSquareRootDenom;
+
                                     // Make sure this never drops below zero because of precision
                                     cRadicand = cRadicand < 0 ? 0 : cRadicand;
-                                    
+
                                     float cCoef = (largeArcFlag != sweepFlag ? 1 : -1) * MathF.Sqrt(cRadicand);
-                                    Vector2 transformedCenter = new (
-                                        cCoef*((rx*transformedPoint.Y)/ry),
-                                        cCoef*(-(ry*transformedPoint.X)/rx)
+                                    Vector2 transformedCenter = new(
+                                        cCoef * ((rx * transformedPoint.Y) / ry),
+                                        cCoef * (-(ry * transformedPoint.X) / rx)
                                     );
-	
+
                                     Vector2 center = new(
-                                        MathF.Cos(rot)*transformedCenter.X - MathF.Sin(rot)*transformedCenter.Y + ((CurrPos.X+finalX)/2),
-                                        MathF.Sin(rot)*transformedCenter.X + MathF.Cos(rot)*transformedCenter.Y + ((CurrPos.Y+finalY)/2)
+                                        MathF.Cos(rot) * transformedCenter.X - MathF.Sin(rot) * transformedCenter.Y +
+                                        ((currPos.X + finalX) / 2),
+                                        MathF.Sin(rot) * transformedCenter.X + MathF.Cos(rot) * transformedCenter.Y +
+                                        ((currPos.Y + finalY) / 2)
                                     );
-                                    
+
                                     // Now find the angles
                                     float AngleBetween(Vector2 a, Vector2 b) {
                                         float numerator = a.X * b.X + a.Y * b.Y;
                                         float denominator = MathF.Sqrt(
                                             (MathF.Pow(a.X, 2) + MathF.Pow(a.Y, 2)) *
-                                            (MathF.Pow(b.X, 2) + MathF.Pow(b.Y, 2)) 
+                                            (MathF.Pow(b.X, 2) + MathF.Pow(b.Y, 2))
                                         );
                                         float sign = a.X * b.Y - b.X * a.Y < 0 ? -1f : 1f;
                                         return sign * MathF.Acos(numerator / denominator);
                                     }
 
-                                    float startAngle = AngleBetween(new Vector2(1f,0f),
+                                    float startAngle = AngleBetween(new Vector2(1f, 0f),
                                         new Vector2(
-                                            (transformedPoint.X - transformedCenter.X)/rx,
-                                            (transformedPoint.Y - transformedCenter.Y)/ry));
-                                    
-                                    float endAngle = AngleBetween(new Vector2(1f,0f),
-                                        new Vector2(
-                                            (-transformedPoint.X - transformedCenter.X)/rx,
-                                            (-transformedPoint.Y - transformedCenter.Y)/ry));
+                                            (transformedPoint.X - transformedCenter.X) / rx,
+                                            (transformedPoint.Y - transformedCenter.Y) / ry));
 
-                                    if (MathF.Abs(startAngle - endAngle) > 2 * MathF.PI) { // what
+                                    float increment = AngleBetween(
+                                        new Vector2(
+                                            (transformedPoint.X - transformedCenter.X) / rx,
+                                            (transformedPoint.Y - transformedCenter.Y) / ry),
+                                        new Vector2(
+                                            (-transformedPoint.X - transformedCenter.X) / rx,
+                                            (-transformedPoint.Y - transformedCenter.Y) / ry)
+                                    );
+
+                                    if (sweepFlag == 0 && increment > 0) {
+                                        increment -= 2 * MathF.PI;
+                                    } else if (sweepFlag == 1 && increment < 0) {
+                                        increment += 2 * MathF.PI;
+                                    }
+
+                                    float endAngle = startAngle + increment;
+
+                                    if (MathF.Abs(startAngle - endAngle) > 2 * MathF.PI) {
+                                        // what
                                         throw new ArithmeticException(
                                             "startAngle or endAngle were miscalculated: abs(startAngle-endAngle)>2*PI");
                                     }
 
-                                    if (endAngle < startAngle) {
-                                        (startAngle, endAngle) = (endAngle, startAngle);
-                                    }
+                                    endAngle -= (endAngle - startAngle) * (1f - fraction);
 
-                                    if (largeArcFlag == 0 && MathF.Abs(startAngle - endAngle) > MathF.PI 
-                                        || largeArcFlag == 1 && MathF.Abs(startAngle - endAngle) < MathF.PI) {
-                                        startAngle += 2 * MathF.PI;
-                                        (startAngle, endAngle) = (endAngle, startAngle);
-                                    }
-                                    
                                     shapes.Add(new MeshShapes.Arc() {
                                         RadiusX = rx,
                                         RadiusY = ry,
@@ -219,13 +238,14 @@ namespace Olympus {
                                         AngleEnd = endAngle,
                                         Color = color,
                                         Width = group.StrokeWidth,
+                                        RoundedCap = group.StrokeLineCap == SVGStrokeLineCap.Round,
                                     });
-                                    CurrPos = new(finalX, finalY);
+                                    currPos = new(finalX, finalY);
                                     break;
                                 case SVGCommand.SVGCommandType.ClosePath:
                                     break;
                                 default:
-                                    throw new ArgumentOutOfRangeException(cmd.ToString(),"Unknown svg command type");
+                                    throw new ArgumentOutOfRangeException(cmd.ToString(), "Unknown svg command type");
                             }
                         }
                     }
