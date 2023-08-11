@@ -78,8 +78,13 @@ namespace Olympus {
 
             if (UIInput.Pressed(Keys.F3) && Scener.Front != null) {
                 Type sceneType = Scener.Front.GetType();
-                Scener.PopFront();
-                Scener.Push(Scener.Regenerate(sceneType));
+                try {
+                    Scener.PopFront();
+                    Scener.Push(Scener.Regenerate(sceneType));
+                } catch (Exception ex) {
+                    Console.WriteLine($"Failed to reload scene: {sceneType.Name}");
+                    Console.WriteLine(ex);
+                }
             }
 
             if (UIInput.Pressed(Keys.F5)) {

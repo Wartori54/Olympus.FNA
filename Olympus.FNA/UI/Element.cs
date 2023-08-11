@@ -48,7 +48,7 @@ namespace OlympUI {
         }
 
         private LayoutHandlers _Layout;
-        public LayoutHandlers Layout {
+        public virtual LayoutHandlers Layout {
             get => _Layout;
             set {
                 if (value != _Layout)
@@ -179,6 +179,8 @@ namespace OlympUI {
 
         private readonly uint _UniqueID;
         private readonly int _RandID;
+        
+        public uint UniqueID => _UniqueID;
 
         private readonly string _IDFallback;
         private string? _ID;
@@ -972,7 +974,7 @@ namespace OlympUI {
                 e.ForceReflow = LayoutForce.None;
             Repainting = true;
 
-            _Layout.Invoke(e);
+            Layout.Invoke(e);
         }
 
         #endregion

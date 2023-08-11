@@ -51,15 +51,23 @@ namespace Olympus {
         protected Style.Entry StyleColor = new(new ColorFader());
         private readonly Func<float> ProgressCb;
         private float Progress = 0f;
+        private float TargetProgress = 0f;
+        
+        
 
-        public SVGImage(string path, Func<float> progressCb) {
+        public SVGImage(string path, Func<float> progressCb) : this( 
+            new SVGObject(Encoding.Default.GetString(OlympUI.Assets.OpenData(path) 
+                            ?? throw new FileNotFoundException($"Couldn't find asset: {path}"))), 
+            progressCb)
+        {}
+
+        public SVGImage(SVGObject data, Func<float> progressCb) {
             ProgressCb = progressCb;
             Cached = false;
             Mesh = new BasicMesh(UI.Game) {
                 Texture = OlympUI.Assets.White,
             };
-            data = new SVGObject(Encoding.Default.GetString(OlympUI.Assets.OpenData(path) 
-                                                            ?? throw new FileNotFoundException($"Couldn't find asset: {path}")));
+            this.data = data;
             
             WH = new Point(data.Width, data.Height);
         }
@@ -67,7 +75,12 @@ namespace Olympus {
         public override void Update(float dt) {
             Style.Apply(StyleKeys.Normal);
             
-            Progress = ProgressCb.Invoke();
+            TargetProgress = ProgressCb.Invoke();
+            if (MathF.Abs(TargetProgress - PrevProgress) < 0.005) {
+                Progress = TargetProgress;
+            } else {
+                Progress += (TargetProgress - Progress) / 50;
+            }
             if (Progress > 1) 
                 Progress = 1;
             if (Math.Abs(PrevProgress - Progress) > 0.005f) {

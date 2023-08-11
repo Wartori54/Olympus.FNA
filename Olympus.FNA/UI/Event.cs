@@ -391,6 +391,12 @@ namespace OlympUI {
             List<Action<LayoutEvent>> list = GetHandlers(args.Pass, args.Subpass);
             list.Add(args.Handler);
         }
+        
+        public void AddUnique((LayoutPass Pass, LayoutSubpass Subpass, Action<LayoutEvent> Handler) args) {
+            List<Action<LayoutEvent>> list = GetHandlers(args.Pass, args.Subpass);
+            if (!list.Contains(args.Handler))
+                list.Add(args.Handler);
+        }
 
         public void Remove<T>(LayoutPass pass, LayoutSubpass subpass, Action<LayoutEvent> handler) {
             List<Action<LayoutEvent>> list = GetHandlers(pass, subpass);

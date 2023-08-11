@@ -3,8 +3,10 @@ using Microsoft.Xna.Framework.Graphics;
 using OlympUI;
 using Olympus.Utils;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace Olympus; 
 
@@ -218,7 +220,8 @@ public class EverestSimpleInstallScene : Scene {
 #if DEBUG
                 new Button("Open WorkingOnItScene", b => {
                     Scener.PopFront();
-                    Scener.Push<WorkingOnItScene>();
+                    Task<IAsyncEnumerable<EverestInstaller.Status>> job = new(WorkingOnItScene.DummyJob);
+                    Scener.Set<WorkingOnItScene>(job);
                 })
 #endif
             }
