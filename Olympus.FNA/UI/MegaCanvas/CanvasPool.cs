@@ -78,7 +78,7 @@ namespace OlympUI.MegaCanvas {
 
         public RenderTarget2DRegion? Get(int width, int height) {
             if (width < Manager.MinSize || height < Manager.MinSize ||
-                width > Manager.MaxSize || height > Manager.MaxSize)
+                width > Manager.MaxSize || height > Manager.MaxSize) // TODO: This causes a crash when window is too big
                 return null;
 
             RenderTarget2D? rt = null;

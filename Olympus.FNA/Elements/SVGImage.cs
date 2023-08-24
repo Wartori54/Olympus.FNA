@@ -45,23 +45,28 @@ namespace Olympus {
         private Color PrevColor;
         private Point PrevWH;
         private float PrevProgress;
+        private float PrevStartProgress;
 
         public bool? Enabled;
 
         protected Style.Entry StyleColor = new(new ColorFader());
-        private readonly Func<float> ProgressCb;
+        private readonly Func<SVGImage, float, (float, float)> ProgressCb;
+
+        public float RealProgress => TargetProgress;
         private float Progress = 0f;
         private float TargetProgress = 0f;
         
-        
+        public float RealStartProgress => TargetStartProgress;
+        private float StartProgress = 0f;
+        private float TargetStartProgress = 0f;
 
-        public SVGImage(string path, Func<float> progressCb) : this( 
+        public SVGImage(string path, Func<SVGImage, float, (float, float)> progressCb) : this( 
             new SVGObject(Encoding.Default.GetString(OlympUI.Assets.OpenData(path) 
                             ?? throw new FileNotFoundException($"Couldn't find asset: {path}"))), 
             progressCb)
         {}
 
-        public SVGImage(SVGObject data, Func<float> progressCb) {
+        public SVGImage(SVGObject data, Func<SVGImage, float, (float, float)> progressCb) {
             ProgressCb = progressCb;
             Cached = false;
             Mesh = new BasicMesh(UI.Game) {
@@ -75,15 +80,29 @@ namespace Olympus {
         public override void Update(float dt) {
             Style.Apply(StyleKeys.Normal);
             
-            TargetProgress = ProgressCb.Invoke();
-            if (MathF.Abs(TargetProgress - PrevProgress) < 0.005) {
+            // Please, someone with bigger brain than me, deduplicate this crap code - wartori
+            (TargetStartProgress, TargetProgress) = ProgressCb.Invoke(this, dt);
+            if (MathF.Abs(TargetProgress - Progress) < 0.005) {
+                Progress = TargetProgress;
+            } else if (MathF.Abs(TargetProgress - Progress) > 0.5) {
                 Progress = TargetProgress;
             } else {
-                Progress += (TargetProgress - Progress) / 50;
+                Progress += (TargetProgress - Progress)/10;
             }
             if (Progress > 1) 
                 Progress = 1;
-            if (Math.Abs(PrevProgress - Progress) > 0.005f) {
+            
+            if (MathF.Abs(TargetStartProgress - StartProgress) < 0.005) {
+                StartProgress = TargetStartProgress;
+            } else if (MathF.Abs(TargetStartProgress - StartProgress) > 0.5) {
+                StartProgress = TargetStartProgress;
+            } else {
+                StartProgress += (TargetStartProgress - StartProgress)/10;
+            }
+            if (StartProgress > 1) 
+                StartProgress = 1;
+            
+            if (Math.Abs(PrevProgress - Progress) > 0.005f || Math.Abs(PrevStartProgress - StartProgress) > 0.005f) {
                 InvalidatePaint();
             }
             
@@ -97,9 +116,12 @@ namespace Olympus {
             Point wh = WH;
             
             if (color != PrevColor ||
-                Math.Abs(Progress - PrevProgress) > 0.005) {
+                Math.Abs(Progress - PrevProgress) > 0.005 ||
+                Math.Abs(StartProgress - PrevStartProgress) > 0.005 ||
+                wh != PrevWH) {
                 PrevColor = color;
                 PrevProgress = Progress;
+                PrevStartProgress = StartProgress;
                 
                 MeshShapes<MiniVertex> shapes = Mesh.Shapes;
                 shapes.Clear();
@@ -107,31 +129,57 @@ namespace Olympus {
                 foreach (SVGGroup group in data.Groups) {
                     foreach (SVGPath path in group.Paths) {
                         Vector2 currPos = new(0, 0);
-                        float commandsToDraw = path.RenderCommandCount * Progress;
-                        foreach (SVGCommand cmd in path.Commands) {
-                            float fraction;
+                        
+                        float commandsToDraw = MathF.Abs(path.RenderCommandCount * Progress);
+                        float commandsToSkip = MathF.Abs(path.RenderCommandCount * StartProgress);
+                        if (commandsToDraw < commandsToSkip) {
+                            commandsToDraw += path.RenderCommandCount;
+                        }
+                        for (int i = 0; i < MathF.Max(path.Commands.Count, MathF.Ceiling(commandsToDraw)); i++) {
+                            SVGCommand cmd = path.Commands[i%path.Commands.Count];
+                            bool skipIt = false;
+                            // note about the following two float values:
+                            // `fraction` specifies how much has to be drawn starting from the beginning
+                            // `fractionStart` specifies how much has to be skipped and then draw until `fraction`
+                            float fraction = 1f;
+                            float fractionStart = 0f;
+
                             if (cmd.IsVisible()) {
-                                fraction = MathF.Min(commandsToDraw, 1f);
+                                if (MathF.Ceiling(commandsToDraw) < i || MathF.Floor(commandsToSkip) > i) {
+                                    skipIt = true;
+                                }
+
+                                fraction = MathF.Max(MathF.Min(commandsToDraw - i, 1f), 0f);
+                                fractionStart = MathF.Min(MathF.Max(commandsToSkip - i, 0f), 1f);
                             } else {
                                 fraction = 1f;
+                                fractionStart = 0f;
+                                commandsToDraw++; // delay stuff so it doesnt desync with `i`
+                                commandsToSkip++;
                             }
 
-                            if (commandsToDraw < 0) break;
-                            if (cmd.IsVisible())
-                                commandsToDraw--;
+                            Vector2 scaleFactor = new((float) W/data.Width); // use W since H/data.Height should yield the same value
                             switch (cmd.Type) {
                                 case SVGCommand.SVGCommandType.MoveTo:
                                     currPos = (cmd.Relative ? currPos : Vector2.Zero) +
                                               new Vector2(cmd.Values[0], cmd.Values[1]);
                                     break;
                                 case SVGCommand.SVGCommandType.LineTo:
+                                    if (skipIt) {
+                                        currPos = (cmd.Relative ? currPos : Vector2.Zero) +
+                                                  new Vector2(cmd.Values[0], cmd.Values[1]);
+                                        break;
+                                    }
+
                                     Vector2 endPos = new(cmd.Values[0], cmd.Values[1]);
+                                    Vector2 startPos = new(currPos.X, currPos.Y);
+                                    startPos += (endPos - currPos) * fractionStart;
                                     endPos += (currPos - endPos) * (1f - fraction);
                                     shapes.Add(new MeshShapes.Line() {
-                                        XY1 = currPos,
-                                        XY2 = (cmd.Relative ? currPos : Vector2.Zero) +
-                                              endPos,
-                                        Radius = group.StrokeWidth,
+                                        XY1 = startPos * scaleFactor,
+                                        XY2 = ((cmd.Relative ? currPos : Vector2.Zero) +
+                                              endPos)*scaleFactor,
+                                        Radius = group.StrokeWidth * scaleFactor.X,
                                         Color = color,
                                     });
                                     currPos = (cmd.Relative ? currPos : Vector2.Zero) +
@@ -144,6 +192,9 @@ namespace Olympus {
                                     throw new NotImplementedException(
                                         "Please use Arc where possible (or implement it yourself)");
                                 case SVGCommand.SVGCommandType.ArcCurve:
+                                    if (skipIt) {
+                                        currPos = new Vector2(cmd.Values[5], cmd.Values[6]);
+                                    }
                                     float rx = MathF.Abs(cmd.Values[0]);
                                     float ry = MathF.Abs(cmd.Values[1]);
                                     float rot = cmd.Values[2] * 2 * MathF.PI / 360;
@@ -241,19 +292,21 @@ namespace Olympus {
                                             "startAngle or endAngle were miscalculated: abs(startAngle-endAngle)>2*PI");
                                     }
 
+                                    startAngle += (endAngle - startAngle) * fractionStart;
+
                                     endAngle -= (endAngle - startAngle) * (1f - fraction);
 
                                     shapes.Add(new MeshShapes.Arc() {
-                                        RadiusX = rx,
-                                        RadiusY = ry,
-                                        XY = center,
+                                        RadiusX = rx*scaleFactor.X,
+                                        RadiusY = ry*scaleFactor.Y,
+                                        XY = center*scaleFactor,
                                         AngleStart = startAngle,
                                         AngleEnd = endAngle,
                                         Color = color,
-                                        Width = group.StrokeWidth,
+                                        Width = group.StrokeWidth*scaleFactor.X,
                                         RoundedCap = group.StrokeLineCap == SVGStrokeLineCap.Round,
                                     });
-                                    currPos = new(finalX, finalY);
+                                    currPos = new Vector2(finalX, finalY);
                                     break;
                                 case SVGCommand.SVGCommandType.ClosePath:
                                     break;

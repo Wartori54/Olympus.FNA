@@ -62,27 +62,40 @@ namespace Olympus {
                     new Canvas() {
                         Init = RegisterRefresh<Canvas>(async canvas => {
                             int count = 5;
-                            string path = "installshapes/download.svg";
+                            string path = "installshapes/download_rot.svg";
                             SVGObject obj = new SVGObject(Encoding.Default.GetString(OlympUI.Assets.OpenData(path)
                                 ?? throw new FileNotFoundException($"Couldn't find asset: {path}")));
-                            for (int i = 0; i < count; i++) {
-                                SVGImage img = new(obj, () => 1);
+                            Point imgTargetSize = new(100, 100);
+                            await UI.Run(() => {
+                                for (int i = 0; i < count; i++) {
+                                    SVGImage img = new(obj, (img, dt) => {
+                                        float p = img.RealProgress + 0.1f * dt;
+                                        if (p > 1) {
+                                            p = 0;
+                                        }
+                                        return ((p+0.5f)%1, p);
+                                    });
 
-                                int iCaptured = i;
-                                canvas.Content.Add((img, (dt, size, img) => {
-                                    Vector2 pos = img.XY;
-                                    const float speed = 2;
-                                    if (pos.Y > size.Y+img.H/4f) {
-                                        pos.Y = -img.H*5/4f;
-                                    }
+                                    int iCaptured = i;
+                                    canvas.Content.Add((img, (dt, size, el) => {
+                                        SVGImage img = (SVGImage) el;
+                                        Vector2 pos = img.XY;
+                                        const float speed = 000;
+                                        if (pos.Y > size.Y + img.H / 4f) {
+                                            pos.Y = -img.H * 5 / 4f;
+                                        }
 
-                                    if (size.X / count < img.W) {
-                                        ((SVGImage) img).AutoW = size.X / count;
-                                    }
-                                    return (new Vector2(size.X/(float)count*iCaptured, pos.Y+speed), new Point(-1, -1));
-                                }));
-                                
-                            }
+                                        img.AutoW = imgTargetSize.X;
+                                        if (size.X / count < img.W) {
+                                            img.AutoW = size.X / count;
+                                        }
+
+                                        return (new Vector2(size.X / (float) count * iCaptured, pos.Y + speed*dt),
+                                            new Point(-1, -1));
+                                    }));
+
+                                }
+                            });
 
                         }),
                         Content = {
