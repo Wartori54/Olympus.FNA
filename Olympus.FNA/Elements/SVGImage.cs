@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore.Scaffolding.Metadata;
 using Microsoft.Xna.Framework;
 using OlympUI;
 using Olympus.Utils;
@@ -9,6 +10,11 @@ using System.Text;
 
 namespace Olympus {
     public partial class SVGImage : Element {
+        public static readonly SVGObject DONE = new SVGObject(Encoding.Default.GetString(OlympUI.Assets.OpenData("installshapes/done.svg") 
+                            ?? throw new FileNotFoundException($"Couldn't find asset: installshapes/done.svg")));
+        
+        public static readonly SVGObject ERROR = new SVGObject(Encoding.Default.GetString(OlympUI.Assets.OpenData("installshapes/error.svg") 
+                                    ?? throw new FileNotFoundException($"Couldn't find asset: installshapes/error.svg")));
 
         public static readonly new Style DefaultStyle = new() {
             {
@@ -52,13 +58,14 @@ namespace Olympus {
         protected Style.Entry StyleColor = new(new ColorFader());
         private readonly Func<SVGImage, float, (float, float)> ProgressCb;
 
+        public const int WHInit = -1;
         public float RealProgress => TargetProgress;
-        private float Progress = 0f;
-        private float TargetProgress = 0f;
+        private float Progress = WHInit;
+        private float TargetProgress = WHInit;
         
         public float RealStartProgress => TargetStartProgress;
-        private float StartProgress = 0f;
-        private float TargetStartProgress = 0f;
+        private float StartProgress = WHInit;
+        private float TargetStartProgress = WHInit;
 
         public SVGImage(string path, Func<SVGImage, float, (float, float)> progressCb) : this( 
             new SVGObject(Encoding.Default.GetString(OlympUI.Assets.OpenData(path) 
@@ -82,25 +89,25 @@ namespace Olympus {
             
             // Please, someone with bigger brain than me, deduplicate this crap code - wartori
             (TargetStartProgress, TargetProgress) = ProgressCb.Invoke(this, dt);
-            if (MathF.Abs(TargetProgress - Progress) < 0.005) {
-                Progress = TargetProgress;
-            } else if (MathF.Abs(TargetProgress - Progress) > 0.5) {
+            if (MathF.Abs(TargetProgress - Progress) < 0.005 || MathF.Abs(TargetProgress - Progress) > 0.5 || Progress == WHInit) {
                 Progress = TargetProgress;
             } else {
                 Progress += (TargetProgress - Progress)/10;
             }
             if (Progress > 1) 
                 Progress = 1;
+            else if (Progress < 0)
+                Progress = 0f;
             
-            if (MathF.Abs(TargetStartProgress - StartProgress) < 0.005) {
-                StartProgress = TargetStartProgress;
-            } else if (MathF.Abs(TargetStartProgress - StartProgress) > 0.5) {
+            if (MathF.Abs(TargetStartProgress - StartProgress) < 0.005 || MathF.Abs(TargetStartProgress - StartProgress) > 0.5 || StartProgress == WHInit) {
                 StartProgress = TargetStartProgress;
             } else {
                 StartProgress += (TargetStartProgress - StartProgress)/10;
             }
             if (StartProgress > 1) 
                 StartProgress = 1;
+            else if (StartProgress < 0)
+                StartProgress = 0;
             
             if (Math.Abs(PrevProgress - Progress) > 0.005f || Math.Abs(PrevStartProgress - StartProgress) > 0.005f) {
                 InvalidatePaint();
@@ -122,10 +129,13 @@ namespace Olympus {
                 PrevColor = color;
                 PrevProgress = Progress;
                 PrevStartProgress = StartProgress;
+                PrevWH = wh;
                 
                 MeshShapes<MiniVertex> shapes = Mesh.Shapes;
-                shapes.Clear();
+                shapes.Clear(); // BIG TODO HERE: dont re-render cmds that didn't get changed, cache them instead
                 
+                Vector2 scaleFactor = new(MathF.Min((float) AutoW/data.Width, (float) AutoH/data.Height));
+                Vector2 offset = new(W/2f-data.Width*scaleFactor.X/2f,H/2f-data.Height*scaleFactor.Y/2f);
                 foreach (SVGGroup group in data.Groups) {
                     foreach (SVGPath path in group.Paths) {
                         Vector2 currPos = new(0, 0);
@@ -145,7 +155,7 @@ namespace Olympus {
                             float fractionStart = 0f;
 
                             if (cmd.IsVisible()) {
-                                if (MathF.Ceiling(commandsToDraw) < i || MathF.Floor(commandsToSkip) > i) {
+                                if (MathF.Floor(commandsToDraw) < i || MathF.Floor(commandsToSkip) > i) {
                                     skipIt = true;
                                 }
 
@@ -158,7 +168,7 @@ namespace Olympus {
                                 commandsToSkip++;
                             }
 
-                            Vector2 scaleFactor = new((float) W/data.Width); // use W since H/data.Height should yield the same value
+                            
                             switch (cmd.Type) {
                                 case SVGCommand.SVGCommandType.MoveTo:
                                     currPos = (cmd.Relative ? currPos : Vector2.Zero) +
@@ -176,9 +186,9 @@ namespace Olympus {
                                     startPos += (endPos - currPos) * fractionStart;
                                     endPos += (currPos - endPos) * (1f - fraction);
                                     shapes.Add(new MeshShapes.Line() {
-                                        XY1 = startPos * scaleFactor,
+                                        XY1 = startPos * scaleFactor + offset,
                                         XY2 = ((cmd.Relative ? currPos : Vector2.Zero) +
-                                              endPos)*scaleFactor,
+                                              endPos)*scaleFactor + offset,
                                         Radius = group.StrokeWidth * scaleFactor.X,
                                         Color = color,
                                     });
@@ -194,6 +204,7 @@ namespace Olympus {
                                 case SVGCommand.SVGCommandType.ArcCurve:
                                     if (skipIt) {
                                         currPos = new Vector2(cmd.Values[5], cmd.Values[6]);
+                                        break;
                                     }
                                     float rx = MathF.Abs(cmd.Values[0]);
                                     float ry = MathF.Abs(cmd.Values[1]);
@@ -295,11 +306,12 @@ namespace Olympus {
                                     startAngle += (endAngle - startAngle) * fractionStart;
 
                                     endAngle -= (endAngle - startAngle) * (1f - fraction);
+                                    if (startAngle == endAngle) break;
 
                                     shapes.Add(new MeshShapes.Arc() {
                                         RadiusX = rx*scaleFactor.X,
                                         RadiusY = ry*scaleFactor.Y,
-                                        XY = center*scaleFactor,
+                                        XY = center*scaleFactor + offset,
                                         AngleStart = startAngle,
                                         AngleEnd = endAngle,
                                         Color = color,

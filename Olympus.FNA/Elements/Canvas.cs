@@ -50,7 +50,7 @@ namespace Olympus {
                         foreach (Element? element in args.NewItems) {
                             if (element == null) continue;
                             ChildrenUpdates.Add(element.UniqueID,
-                                (_, _, _) => throw new InvalidOperationException("Canvas action not generated yet"));
+                                (_, _) => throw new InvalidOperationException("Canvas action not generated yet"));
                             element.Layout.Add(CanvasLayout(this));
                         }
 
@@ -62,7 +62,7 @@ namespace Olympus {
                         ChildrenUpdates.Clear();
                         foreach (Element element in collection) {
                             ChildrenUpdates.Add(element.UniqueID,
-                                (_, _, _) => throw new InvalidOperationException("Canvas action not generated yet"));
+                                (_, _) => throw new InvalidOperationException("Canvas action not generated yet"));
                             element.Layout.AddUnique(CanvasLayout(this));
                         }
 
@@ -107,6 +107,8 @@ namespace Olympus {
                     }
                     case NotifyCollectionChangedAction.Reset: {
                         if (sender is not ObservableCollection<(Element, CanvasUpdateFunc)> collection) return;
+                        
+                        Children.Clear();
                         ChildrenUpdates.Clear();
                         foreach ((Element element, CanvasUpdateFunc func) in collection) {
                             Children.Add(element);
@@ -116,6 +118,7 @@ namespace Olympus {
                         break;
                     }
                     default:
+                        // If you're annoyed about this, just implement it :)
                         throw new InvalidOperationException("The " + args.Action +
                                                             " is unsupported on Canvas children");
                 }
@@ -133,6 +136,10 @@ namespace Olympus {
             base.Update(dt);
         }
 
+        public Vector2 GetSize(Point absoluteSize) {
+            return new Vector2(absoluteSize.X /(float) W, absoluteSize.Y /(float) H);
+        }
+
         private static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) CanvasLayout(Canvas canvas)
         => (LayoutPass.Force, LayoutSubpass.Force, 
                 e => {
@@ -141,18 +148,18 @@ namespace Olympus {
                     if (!canvas.ChildrenUpdates.TryGetValue(e.Element.UniqueID, out CanvasUpdateFunc? func)) {
                         return;
                     }
-                    var data = func.Invoke(canvas.LastDt, canvas.WH, e.Element);
+                    var data = func.Invoke(canvas.LastDt, e.Element);
                     if (data.Item1 != new Vector2(-1, -1)) {
-                        e.Element.XY = data.Item1;
+                        e.Element.XY = new Vector2(data.Item1.X * canvas.W, data.Item1.Y * canvas.H);
                         e.Element.RealXY = e.Element.XY + e.Element.Parent.XY;
                     }
 
-                    if (data.Item2 != new Point(-1, -1))
-                        e.Element.WH = data.Item2;
+                    if (data.Item2 != new Vector2(-1, -1))
+                        e.Element.WH = new Point((int) (data.Item2.X * canvas.W), (int) (data.Item2.Y * canvas.H));
                 }
             );
         
-        public delegate (Vector2, Point) CanvasUpdateFunc(float dt, Point size, Element el); 
+        public delegate (Vector2, Vector2) CanvasUpdateFunc(float dt, Element el); 
     }
     
     

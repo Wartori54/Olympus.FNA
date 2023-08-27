@@ -220,8 +220,8 @@ public class EverestSimpleInstallScene : Scene {
 #if DEBUG
                 new Button("Open WorkingOnItScene", b => {
                     Scener.PopFront();
-                    Task<IAsyncEnumerable<EverestInstaller.Status>> job = new(WorkingOnItScene.DummyJob);
-                    Scener.Set<WorkingOnItScene>(job);
+                    WorkingOnItScene.Job job = WorkingOnItScene.GetDummyJob();
+                    Scener.Set<WorkingOnItScene>(job, "download_rot");
                 })
 #endif
             }

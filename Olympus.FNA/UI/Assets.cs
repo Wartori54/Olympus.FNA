@@ -68,6 +68,10 @@ namespace OlympUI {
 
         public static readonly Reloadable<DynamicSpriteFont, NullMeta> FontMono = GetFont(16, "fonts/Perfect DOS VGA 437");
 
+        public static readonly Reloadable<DynamicSpriteFont, NullMeta> FontMonoSpace = GetFont(20,
+            "fonts/SourceCodePro-Regular" // Only one because it's intended for logs
+        );
+
         public static readonly Reloadable<DynamicSpriteFont, NullMeta> FontMonoOutlined =
             Get($"Font 'fonts/Perfect DOS VGA 437' Size '16' Outlined", default(NullMeta), () => {
                 FontSystem font = new(new() {

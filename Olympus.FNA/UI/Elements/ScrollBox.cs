@@ -1,5 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using System;
+using System.Collections.Specialized;
 
 namespace OlympUI {
     public partial class ScrollBox : Group {
@@ -17,6 +18,17 @@ namespace OlympUI {
 
         public int Wiggle = 4;
 
+        private bool bottomSticky = false; 
+        public bool BottomSticky {
+            get => bottomSticky;
+            set {
+                stuckBottom = value;
+                bottomSticky = value;
+            }
+        }
+
+        private bool stuckBottom;
+
         public Vector2 ScrollDXY;
         private Vector2 ScrollDXYPrev;
         private Vector2 ScrollDXYMax;
@@ -31,6 +43,7 @@ namespace OlympUI {
             Content = new NullElement();
             ScrollHandleX = new(ScrollAxis.X);
             ScrollHandleY = new(ScrollAxis.Y);
+            stuckBottom = true;
         }
 
         public override void Update(float dt) {
@@ -50,6 +63,9 @@ namespace OlympUI {
                 if (ScrollDXY != ScrollDXYPrev) {
                     ScrollDXYMax = ScrollDXY * 0.1f;
                     ScrollDXYTime = 0f;
+                    if (stuckBottom && ScrollDXY.Y < ScrollDXYPrev.Y) {
+                        stuckBottom = false;
+                    }
                 }
                 ScrollDXYTime += dt * 4f;
                 if (ScrollDXYTime > 1f)
@@ -63,6 +79,9 @@ namespace OlympUI {
 
                 ForceScroll(ScrollDXY.ToPoint());
             }
+            
+            if (stuckBottom)
+                ForceScroll(new Point(0, int.MaxValue));
 
             Element content = Content;
             Vector2 origXY = content.XY;
@@ -119,6 +138,7 @@ namespace OlympUI {
                 xy.Y = 0;
             } else if (wh.Y < xy.Y + boxWH.Y) {
                 xy.Y = wh.Y - boxWH.Y;
+                stuckBottom = true;
             }
 
             content.XY = (-xy).Round();
