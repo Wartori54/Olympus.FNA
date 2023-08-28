@@ -148,7 +148,7 @@ namespace Olympus {
                                     };
                                     float animFloat = 0f;
                                     UI.Run(() => {
-                                        locked = !currJob?.Done ?? false;
+                                        locked = !currJob?.Done ?? true;
                                         panel.Clear();
                                         panel.Add(new Group() {
                                             Layout = {
@@ -159,11 +159,11 @@ namespace Olympus {
                                                 new SVGImage(currJob?.Icon ?? SVGImage.ERROR,
                                                     (image, dt) => {
                                                         progressLabel.Text = MathF.Round(currJob?.Progress*100 ?? 0) + "%"; // ik its kinda jank, but it works
-                                                        if (currJob?.Done ?? true) {
+                                                        if (currJob?.Done ?? false) {
                                                             animFloat += (1 - animFloat) / 20;
                                                             return (0, animFloat);
                                                         }
-                                                        return (0, currJob?.Progress ?? 1f);
+                                                        return (0, currJob?.Progress ?? 0f);
                                                     }) {
                                                     WH = new (250, 250),
                                                 },
@@ -173,11 +173,14 @@ namespace Olympus {
                                         Task.Run(async () => {
                                                 if (currJob == null) return;
                                                 await foreach (string status in currJob.Logs.Reader.ReadAllAsync()) {
-                                                    logLabel.Text = status;
                                                     UI.Run(() => {
+                                                        logLabel.Text = status;
                                                         accLogLabel.Children.Add(new Label(status) {
                                                             Style = { OlympUI.Assets.FontMonoSpace, }
                                                         });
+                                                        if (accLogLabel.Children.Count > 100) {
+                                                            accLogLabel.Children.RemoveAt(0);
+                                                        }
                                                     });
                                                 }
                                             }
@@ -282,7 +285,16 @@ namespace Olympus {
             currJob = job;
 
             Task.Run(async () => {
-                await currJob.StartRoutine();
+                Console.WriteLine("Starting job");
+                try {
+                    await currJob.StartRoutine();
+                } catch (Exception ex) {
+                    Console.WriteLine("Job exception:");
+                    Console.WriteLine(ex);
+                    
+                }
+
+                Console.WriteLine("Finished job");
                 CentralPanelRefresh?.Invoke();
             });
             logLabel.Text = "";
@@ -325,7 +337,14 @@ namespace Olympus {
             public readonly Channel<string> Logs = Channel.CreateBounded<string>(1024);
             public bool Done { get; private set; }
             public float Progress { get; private set; }
-            
+
+
+            public Job(Func<IAsyncEnumerable<EverestInstaller.Status>> routine, string icon) 
+                : this(routine, new SVGObject(
+                    Encoding.Default.GetString(OlympUI.Assets.OpenData($"installshapes/{icon}.svg") 
+                        ?? throw new FileNotFoundException($"Couldn't find asset: installshapes/{icon}.svg"))))
+            {}
+
             public Job(Func<IAsyncEnumerable<EverestInstaller.Status>> routine, SVGObject icon) {
                 Routine = routine;
                 Icon = icon;

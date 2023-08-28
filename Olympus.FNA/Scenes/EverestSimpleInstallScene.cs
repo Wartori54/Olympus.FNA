@@ -82,13 +82,13 @@ public class EverestSimpleInstallScene : Scene {
                 new UpdateButton("download", "Update", async b => {
                     if (Config.Instance.Installation == null) return;
                     EverestInstaller.EverestVersion? version = GetLatest();
-                    if (version != null)
-                        await foreach (var status in 
-                                       EverestInstaller.InstallVersion(version, // Only returns null when no installation is selected
-                                           Config.Instance.Installation)) {
-                            Console.WriteLine(status.Text + " | " + status.Progress + " | " + status.CurrentStage);
-                        }
-                    Refresh();
+                    if (version == null) return;
+                    Scener.PopFront();
+
+                    WorkingOnItScene.Job job = new WorkingOnItScene.Job(() => 
+                        EverestInstaller.InstallVersion(version, Config.Instance.Installation), 
+                        "monomod2");
+                    Scener.Set<WorkingOnItScene>(job, "monomod2");
                 }) {
                     Init = RegisterRefresh<UpdateButton>(async el => {
                         if (Config.Instance.Installation == null) {

@@ -181,11 +181,12 @@ namespace Olympus {
 
                                 if (Config.Instance.Installation == null) return; // TODO: make it impossible to happen
 
-                                await foreach (var status in 
-                                               EverestInstaller.InstallVersion(((VersionEntry) boxEntry).EverestVersion,
-                                                   Config.Instance.Installation)) {
-                                    Console.WriteLine(status.Text + " | " + status.Progress + " | " + status.CurrentStage);
-                                }
+                                Scener.PopFront();
+                                
+                                WorkingOnItScene.Job job = new WorkingOnItScene.Job(() => 
+                                    EverestInstaller.InstallVersion(((VersionEntry) boxEntry).EverestVersion, Config.Instance.Installation), 
+                                    "monomod2");
+                                Scener.Set<WorkingOnItScene>(job, "monomod2");
                             }) {
                                 ID = "installButton",
                                 Layout = {
@@ -194,8 +195,12 @@ namespace Olympus {
                             },
                             new Button("Uninstall", async button => {
                                 if (Config.Instance.Installation == null) return;
-                                await foreach (EverestInstaller.Status status in EverestInstaller.UninstallEverest(Config.Instance.Installation))
-                                    Console.WriteLine(status.Text + " | " + status.Progress + " | " + status.CurrentStage);
+                                Scener.PopFront();
+                                                                
+                                WorkingOnItScene.Job job = new WorkingOnItScene.Job(() => 
+                                    EverestInstaller.UninstallEverest(Config.Instance.Installation), 
+                                    "backup"); // TODO: Maybe custom icon?
+                                Scener.Set<WorkingOnItScene>(job, "backup");
                             }) {
                                 Layout = {
                                     Layouts.Fill(0.2f, 0f, 8),
