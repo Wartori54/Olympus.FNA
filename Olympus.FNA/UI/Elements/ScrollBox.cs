@@ -43,7 +43,7 @@ namespace OlympUI {
             Content = new NullElement();
             ScrollHandleX = new(ScrollAxis.X);
             ScrollHandleY = new(ScrollAxis.Y);
-            stuckBottom = true;
+            stuckBottom = BottomSticky;
         }
 
         public override void Update(float dt) {
@@ -63,7 +63,7 @@ namespace OlympUI {
                 if (ScrollDXY != ScrollDXYPrev) {
                     ScrollDXYMax = ScrollDXY * 0.1f;
                     ScrollDXYTime = 0f;
-                    if (stuckBottom && ScrollDXY.Y < ScrollDXYPrev.Y) {
+                    if (BottomSticky && stuckBottom && ScrollDXY.Y < ScrollDXYPrev.Y) {
                         stuckBottom = false;
                     }
                 }
@@ -138,7 +138,8 @@ namespace OlympUI {
                 xy.Y = 0;
             } else if (wh.Y < xy.Y + boxWH.Y) {
                 xy.Y = wh.Y - boxWH.Y;
-                stuckBottom = true;
+                if (BottomSticky)
+                    stuckBottom = true;
             }
 
             content.XY = (-xy).Round();
