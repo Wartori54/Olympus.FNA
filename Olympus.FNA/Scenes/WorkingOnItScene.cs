@@ -14,7 +14,9 @@ using Point = Microsoft.Xna.Framework.Point;
 namespace Olympus {
 
     public class WorkingOnItScene : Scene {
-        public override bool Locked => true;
+        public override bool Locked => locked;
+        private bool locked = true;
+        public override bool Alert => true;
 
         private const float SpeedX = -0.05f;
         private const float SpeedY = 0.05f;
@@ -93,6 +95,7 @@ namespace Olympus {
                             SVGObject obj = new SVGObject(Encoding.Default.GetString(OlympUI.Assets.OpenData(path)
                                 ?? throw new FileNotFoundException($"Couldn't find asset: {path}")));
                             await UI.Run(() => {
+                                
                                 canvas.Content.Clear();
                                 for (int i = -1; i < countX + 1; i++) {
                                     for (int j = -1; j < countY + 1; j++) {
@@ -145,6 +148,7 @@ namespace Olympus {
                                     };
                                     float animFloat = 0f;
                                     UI.Run(() => {
+                                        locked = !currJob?.Done ?? false;
                                         panel.Clear();
                                         panel.Add(new Group() {
                                             Layout = {
