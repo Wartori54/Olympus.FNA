@@ -276,8 +276,8 @@ namespace Olympus.NativeImpls {
             default;
         public override ClientSideDecorationMode ClientSideDecoration =>
             EnvFlags.UserCSD ??
-            ExtendedBorderedWindow ? ClientSideDecorationMode.Full :
-            ClientSideDecorationMode.Title;
+            (ExtendedBorderedWindow ? ClientSideDecorationMode.Full :
+            ClientSideDecorationMode.Title);
 
         public override bool IsMultiThreadInit => true;
 
