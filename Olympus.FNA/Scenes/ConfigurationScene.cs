@@ -1,4 +1,5 @@
-﻿using OlympUI;
+﻿using Microsoft.Xna.Framework;
+using OlympUI;
 using Olympus.NativeImpls;
 using System;
 using System.IO;
@@ -49,6 +50,16 @@ namespace Olympus {
                                         new Label("TODO"),
                                         new Label("TODO"),
                                         new Label("TODO"),
+                                        new Button("Switch between theme", b => {
+                                            foreach (IGameComponent? component in App.Components) {
+                                                if (component is not MainComponent mainComponent) continue;
+                                                UI.Run(() => {
+                                                    mainComponent.Native.DarkMode = !mainComponent.Native.DarkMode;
+                                                });
+                                                break;
+
+                                            }
+                                        }),
                                     }
                                 },
                             }
