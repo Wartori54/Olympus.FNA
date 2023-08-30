@@ -172,6 +172,7 @@ namespace Olympus {
                                         });
                                         Task.Run(async () => {
                                                 if (currJob == null) return;
+                                                // NOTE: This crashes when currJob becomes null, and its fine
                                                 await foreach (string status in currJob.Logs.Reader.ReadAllAsync()) {
                                                     UI.Run(() => {
                                                         logLabel.Text = status;
@@ -286,13 +287,7 @@ namespace Olympus {
 
             Task.Run(async () => {
                 Console.WriteLine("Starting job");
-                try {
                     await currJob.StartRoutine();
-                } catch (Exception ex) {
-                    Console.WriteLine("Job exception:");
-                    Console.WriteLine(ex);
-                    
-                }
 
                 Console.WriteLine("Finished job");
                 CentralPanelRefresh?.Invoke();
@@ -328,7 +323,22 @@ namespace Olympus {
             return new Job(DummyJob, new SVGObject(Encoding.Default.GetString(OlympUI.Assets.OpenData("installshapes/monomod2.svg") 
                             ?? throw new FileNotFoundException($"Couldn't find asset: installshapes/monomod2.svg"))));
         }
+        public static Job GetCrashyJob() {
+            async IAsyncEnumerable<EverestInstaller.Status> CrashyJob() {
+                await Task.Delay(1000);
+                for (int i = 0; i < 50; i++) {
+                    yield return new EverestInstaller.Status($"step {i}", i / 50f,
+                        EverestInstaller.Status.Stage.InProgress);
+                    await Task.Delay(100);
+                }
 
+                yield return new EverestInstaller.Status($"step {69696969}", 1f, EverestInstaller.Status.Stage.Success);
+                throw new ApplicationException("Dummy exception");
+            }
+            
+            return new Job(CrashyJob, new SVGObject(Encoding.Default.GetString(OlympUI.Assets.OpenData("installshapes/monomod2.svg") 
+                            ?? throw new FileNotFoundException($"Couldn't find asset: installshapes/monomod2.svg"))));
+        }
         public class Job {
             public readonly Func<IAsyncEnumerable<EverestInstaller.Status>> Routine;
             public SVGObject Icon { get; private set; }
@@ -353,11 +363,12 @@ namespace Olympus {
             public async Task StartRoutine() {
                 if (started) throw new InvalidOperationException("Job was started multiple times");
                 started = true;
-                await foreach (EverestInstaller.Status status in Routine.Invoke()) {
-                    await Logs.Writer.WriteAsync(status.Text);
-                    Console.WriteLine(status.Text);
-                    Progress = status.Progress == -1 ? Progress : status.Progress;
-                    if (status.CurrentStage != EverestInstaller.Status.Stage.InProgress) {
+                try {
+                    await foreach (EverestInstaller.Status status in Routine.Invoke()) {
+                        await Logs.Writer.WriteAsync(status.Text);
+                        Console.WriteLine(status.Text);
+                        Progress = status.Progress == -1 ? Progress : status.Progress;
+                        if (status.CurrentStage == EverestInstaller.Status.Stage.InProgress) continue;
                         Done = true;
                         if (status.CurrentStage == EverestInstaller.Status.Stage.Success) {
                             Icon = SVGImage.DONE;
@@ -365,6 +376,12 @@ namespace Olympus {
                             Icon = SVGImage.ERROR;
                         }
                     }
+                } catch (Exception ex) {
+                    Done = true;
+                    Icon = SVGImage.ERROR;
+                    Console.WriteLine(ex);
+                    await Logs.Writer.WriteAsync(ex.ToString());
+                    await Logs.Writer.WriteAsync("The Task did not succeed, press Expand to see what happened.");
                 }
             }
 

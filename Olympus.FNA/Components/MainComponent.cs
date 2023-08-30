@@ -62,7 +62,7 @@ namespace Olympus {
             if (UIInput.Pressed(Keys.Escape) && !(Scener.Front?.Locked ?? false)) {
                 Scener.PopFront();
             }
-
+#if DEBUG
             if (UIInput.Pressed(Keys.F1)) {
                 DebugLabel.Visible = !DebugLabel.Visible;
                 UI.Root.Repainting = true;
@@ -132,6 +132,7 @@ namespace Olympus {
                 UI.GlobalDrawDebug = !UI.GlobalDrawDebug;
                 UI.GlobalRepaintID++;
             }
+#endif
 
             if (Skin.Current != (Skin.Current = SkinForce ?? (Native.DarkMode ? SkinDark : SkinLight))) {
                 UI.GlobalRepaintID++;

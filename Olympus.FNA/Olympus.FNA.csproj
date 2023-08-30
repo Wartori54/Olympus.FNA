@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks Condition="'$(TargetFrameworks)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">net7.0;net7.0-windows</TargetFrameworks>
+    <TargetFrameworks Condition="'$(TargetFrameworks)' == '' And $(RuntimeIdentifier.StartsWith('win'))">net7.0-windows</TargetFrameworks>
     <TargetFrameworks Condition="'$(TargetFrameworks)' == ''">net7.0</TargetFrameworks>
     <DefineConstants>HIGHER_VERSIONS</DefineConstants>
     <RootNamespace>Olympus</RootNamespace>
@@ -11,7 +11,7 @@
     <CopyContent Condition="'$(CopyContent)' == '' And '$(Configuration)' == 'Release'">true</CopyContent>
     <CopyContent Condition="'$(CopyContent)' == ''">false</CopyContent>
     <DefineConstants Condition="!$(CopyContent)">DEBUG_CONTENT;$(DefineConstants)</DefineConstants>
-    <TargetIsWindows Condition="'$(TargetIsWindows)' == '' And $(TargetFramework.Contains('-windows'))">true</TargetIsWindows>
+    <TargetIsWindows Condition="'$(TargetIsWindows)' == '' And $(TargetFrameworks.Contains('-windows'))">true</TargetIsWindows>
     <TargetIsWindows Condition="'$(TargetIsWindows)' == ''">false</TargetIsWindows>
     <DefineConstants Condition="$(TargetIsWindows)">WINDOWS;$(DefineConstants)</DefineConstants>
     <UseWindowsForms>$(TargetIsWindows)</UseWindowsForms>
@@ -29,9 +29,13 @@
   </ItemGroup>
 
   <PropertyGroup>
+    <PlatformLibs Condition="'$(PlatformLibs)' == '' And $(RuntimeIdentifier.StartsWith('win'))">windows</PlatformLibs>
+    <PlatformLibs Condition="'$(PlatformLibs)' == '' And $(RuntimeIdentifier.StartsWith('linux'))">linux</PlatformLibs>
+    <PlatformLibs Condition="'$(PlatformLibs)' == '' And $(RuntimeIdentifier.StartsWith('osx'))">macOS</PlatformLibs>
+    <!-- if RuntimeIdentifier is empty default to host os -->
     <PlatformLibs Condition="'$(PlatformLibs)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">windows</PlatformLibs>
     <PlatformLibs Condition="'$(PlatformLibs)' == '' And $([MSBuild]::IsOSPlatform('Linux'))">linux</PlatformLibs>
-    <PlatformLibs Condition="'$(PlatformLibs)' == '' And $([MSBuild]::IsOSPlatform('macOS'))">macOS</PlatformLibs>
+    <PlatformLibs Condition="'$(PlatformLibs)' == '' And $([MSBuild]::IsOSPlatform('macOS'))">macOS</PlatformLibs> 
   </PropertyGroup>
 
   <ItemGroup>
