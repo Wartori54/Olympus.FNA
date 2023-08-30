@@ -336,11 +336,11 @@ namespace Olympus {
 
             try {
                 string fileName;
-                if (File.Exists(Path.Combine(root, "Celeste.exe")))
-                    fileName = "Celeste.exe";
-                else // Safe to assume Celeste.dll exists since it was already checked
+                if (File.Exists(Path.Combine(root, "Celeste.dll"))) // always default to Celeste.dll because its guarantied to work
                     fileName = "Celeste.dll";
-                
+                else 
+                    fileName = "Celeste.exe";
+
 
                 using ModuleDefinition game = ModuleDefinition.ReadModule(Path.Combine(root, fileName));
                 

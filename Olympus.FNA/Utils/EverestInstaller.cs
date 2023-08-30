@@ -357,30 +357,31 @@ namespace Olympus.Utils {
                 DirectoryCleaning(parentDir);
             }
 
-            ZipArchive zip = new ZipArchive(File.OpenRead(everestCache));
-
-            i = 0;
-            string zipPrefix = "main/";
-            foreach (ZipArchiveEntry entry in zip.Entries) {
-                string name = entry.FullName;
-                if (string.IsNullOrEmpty(name) || name.EndsWith("/"))
-                    continue;
-
-                if (!string.IsNullOrEmpty(zipPrefix)) {
-                    if (!name.StartsWith(zipPrefix))
+            using (ZipArchive zip = new ZipArchive(File.OpenRead(everestCache))) {
+                i = 0;
+                string zipPrefix = "main/";
+                foreach (ZipArchiveEntry entry in zip.Entries) {
+                    string name = entry.FullName;
+                    if (string.IsNullOrEmpty(name) || name.EndsWith("/"))
                         continue;
-                    name = name.Substring(zipPrefix.Length);
-                }
 
-                if (!celesteFiles.Contains(name) && File.Exists(Path.Combine(install.Root, name))) {
-                    File.Delete(Path.Combine(install.Root, name));
-                    yield return new Status($"Deleting file {name} ({i}/{zip.Entries.Count})",
-                        0.75f + 0.125f * ((float) i / zip.Entries.Count), Status.Stage.InProgress);
-                    DirectoryCleaning(name);
+                    if (!string.IsNullOrEmpty(zipPrefix)) {
+                        if (!name.StartsWith(zipPrefix))
+                            continue;
+                        name = name.Substring(zipPrefix.Length);
+                    }
+
+                    if (!celesteFiles.Contains(name) && File.Exists(Path.Combine(install.Root, name))) {
+                        File.Delete(Path.Combine(install.Root, name));
+                        yield return new Status($"Deleting file {name} ({i}/{zip.Entries.Count})",
+                            0.75f + 0.125f * ((float) i / zip.Entries.Count), Status.Stage.InProgress);
+                        DirectoryCleaning(name);
+                    }
+
+                    i++;
                 }
-                i++;
             }
-            
+
             // Finally check for caches, and delete final files
             string cacheTarget = Path.Combine(Config.GetCacheDir(), "uninstallData",
                 ModList.ModDataBase.ValidateName(install.Root) + ModVersion.Minor + ".yaml");
@@ -503,7 +504,7 @@ namespace Olympus.Utils {
         }
         
         private static IEnumerable<Status> UnpackTo(string targetFile, string outDir, string zipPrefix = "") {
-            ZipArchive zip = new(File.OpenRead(targetFile));
+            using ZipArchive zip = new(File.OpenRead(targetFile));
             
             int count = zip.Entries.Count(entry => entry.FullName.StartsWith(zipPrefix));
             int i = 0;
