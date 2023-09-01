@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
@@ -20,8 +21,11 @@ namespace OlympUI {
         public static readonly Dictionary<(Type From, Type To), IConverter> Converters = new();
 
         private readonly Dictionary<Key, Entry> Map = new(KeyEqualityComparer.Instance);
+        private readonly Dictionary<Key, uint> EnumeratorCache = new(KeyEqualityComparer.Instance);
 
         private Style? Parent;
+
+        private List<Style> ParentStack = new();
 
         public Type? Type;
         public Element? Element;
@@ -160,8 +164,10 @@ namespace OlympUI {
         public void Add(Key key, object? value)
             => GetEntry(key).Value = value;
 
-        public void Clear()
-            => Map.Clear();
+        public void Clear() {
+            Map.Clear();
+            EnumeratorCache.Clear();
+        }
 
 #if OLYMPUS_STYLE_NOEXPR
         public bool TryGetCurrent<T>([NotNullWhen(true)] out T? value)
@@ -227,11 +233,16 @@ namespace OlympUI {
 
         public void Apply(Key key) {
             if (Element is not null) {
-                // FIXME: Cache style parent stack!
-                Stack<Style> stack = new();
-                for (Style? parent = Parent; parent is not null; parent = parent.Parent)
-                    stack.Push(parent);
-                foreach (Style parent in stack) {
+                if (ParentStack.Count == 0) {
+                    for (Style? parent = Parent; parent is not null; parent = parent.Parent)
+                        ParentStack.Insert(0, parent);
+                }
+
+                for (int i = 0; i < ParentStack.Count; i++) {
+                    Style parent = ParentStack[i];
+                    if (parent.Parent != null && i - 1 > 0 && parent.Parent != ParentStack[i - 1]) {
+                        throw new InvalidOperationException("Somehow Parent stack for this style got modified");
+                    }
                     Entry entry = parent.GetEntry(key);
                     if (entry.Value is Style value)
                         Apply(value);
@@ -287,18 +298,37 @@ namespace OlympUI {
 
         IEnumerator IEnumerable.GetEnumerator()
             => GetEnumerator();
+
+        private uint getEnumIdCall;
         public IEnumerator<Entry> GetEnumerator() {
-            HashSet<Key> returned = new(KeyEqualityComparer.Instance);
+            // FIXME: Enumerator Cache-ing?
+            getEnumIdCall++; // This will overflow and its fine
 
             foreach (KeyValuePair<Key, Entry> kvp in Map)
-                if (!kvp.Value.IsUnset && returned.Add(kvp.Key))
-                    yield return kvp.Value;
+                if (!kvp.Value.IsUnset)
+                    if (EnumeratorCache.TryGetValue(kvp.Key, out uint v)) {
+                        if (v != getEnumIdCall) {
+                            EnumeratorCache[kvp.Key] = getEnumIdCall;
+                            yield return kvp.Value;
+                        }
+                    } else {
+                        EnumeratorCache.Add(kvp.Key, getEnumIdCall);
+                        yield return kvp.Value;
+                    }
 
             if (Element is not null) {
                 for (Style? parent = Parent; parent is not null; parent = parent.Parent)
                     foreach (KeyValuePair<Key, Entry> kvp in parent.Map)
-                        if (!kvp.Value.IsUnset && returned.Add(kvp.Key))
-                            yield return kvp.Value;
+                        if (!kvp.Value.IsUnset)
+                            if (EnumeratorCache.TryGetValue(kvp.Key, out uint v)) {
+                                if (v != getEnumIdCall) {
+                                    EnumeratorCache[kvp.Key] = getEnumIdCall;
+                                    yield return kvp.Value;
+                                }
+                            } else {
+                                EnumeratorCache.Add(kvp.Key, getEnumIdCall);
+                                yield return kvp.Value;
+                            }
             }
         }
 
@@ -325,7 +355,8 @@ namespace OlympUI {
                         return;
                     }
 
-                    if (_ValueAsFader is IFader faderOld) {
+                    if (_ValueAsFader != null) {
+                        IFader faderOld = _ValueAsFader;
                         if (value is IFader faderOther) {
                             faderOld.Deserialize(faderOther.GetSerializedDuration(), faderOther.GetSerializedValue());
                         } else {
@@ -337,7 +368,8 @@ namespace OlympUI {
                         return;
                     }
 
-                    if (_SkinnedFader is Skin.FaderStub faderStub) {
+                    if (_SkinnedFader != null) {
+                        Skin.FaderStub faderStub = _SkinnedFader;
                         _SkinnedFader = null;
                         _SkinnedFaderPending = null;
                         value = Fader.Create(value.GetType(), faderStub.Fade, value);
