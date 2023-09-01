@@ -859,7 +859,6 @@ namespace Olympus {
                                             $"Press to Cancel | {(int) Math.Floor(100D * (position / (double) length))}% @ {speed} KiB/s";
                                     });
                                     bool exists = b.Data.TryGet("cancel", out bool cancel);
-                                    Console.WriteLine(exists);
                                     if (exists) {
                                         return !cancel;
                                     }

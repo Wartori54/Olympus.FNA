@@ -239,7 +239,7 @@ namespace Olympus.Utils {
 
         public class ModDataBase {
 
-            private const string DBName = "mod_search_database.yaml";
+            private static readonly string DBPath = Path.Join(Config.GetCacheDir(), "mod_search_database.yaml");
 
             private static readonly string ModCachePath = Path.Join(Config.GetCacheDir(), "ModCaches");
 
@@ -286,8 +286,8 @@ namespace Olympus.Utils {
                 Console.WriteLine("Populating DB, redownload: {0}", invalidateModDataBase);
                 string yamlData = "";
                 if (!invalidateModDataBase) {
-                    if (File.Exists(Path.Join(Config.GetDefaultDir(), DBName)))
-                        yamlData = File.ReadAllText(Path.Join(Config.GetDefaultDir(), DBName));
+                    if (File.Exists(DBPath))
+                        yamlData = File.ReadAllText(DBPath);
                     else
                         InvalidateModDatabase();
                 }
@@ -295,7 +295,7 @@ namespace Olympus.Utils {
                     Console.WriteLine("Redownloading DB");
                     yamlData = UrlManager.Urls.ModDataBase.TryHttpGetDataString();
                     
-                    File.WriteAllText(Path.Join(Config.GetDefaultDir(), DBName), yamlData);
+                    File.WriteAllText(DBPath, yamlData);
                     Console.WriteLine("Saved DB");
                 }
                 List<ModDBInfo> listDB = YamlHelper.Deserializer.Deserialize<List<ModDBInfo>>(yamlData);
