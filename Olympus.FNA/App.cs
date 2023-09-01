@@ -68,6 +68,8 @@ namespace Olympus {
 
         public float BackgroundOpacityTime = 0f;
 
+        public static readonly TimeSpan UpdateDelaySpan = TimeSpan.FromMilliseconds(1000f/60f); // Target 60ups (updates per second)
+
         // Note: Even though VSync can result in a higher FPS, it can cause Windows to start dropping *displayed* frames...
 #if DEBUG && false
         public bool VSync = false; // FIXME: DON'T SHIP WITH VSYNC OFF!
@@ -194,6 +196,12 @@ namespace Olympus {
 
 
         protected override void Update(GameTime gameTime) {
+            // If we skipped drawing the last frame wait an arbitrary amount to not spam call Update and max cpu usage
+            // IsFixedTimeStep is bad in this case since we don't care about sleeping precisely, only an arbitrary amount
+            if (UI.GlobalUpdateID != UI.GlobalDrawID) {
+                Thread.Sleep(UpdateDelaySpan);
+            }
+            
             Resizing = false;
             if (ManualUpdate) {
                 ManualUpdate = false;
@@ -210,7 +218,6 @@ namespace Olympus {
                 DrawCount++;
             }
 
-            IsFixedTimeStep = !Native.IsActive;
 
             if (EnvFlags.IsFullscreen) {
                 DisplayMode dm = Graphics.GraphicsDevice.Adapter.CurrentDisplayMode;
