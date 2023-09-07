@@ -93,13 +93,22 @@ namespace Olympus {
                 NativeImpl.Native = new NativeSDL2();
 #endif
             } else if (PlatformHelper.Is(Platform.Linux)) {
+#if WINDOWS
+                Console.WriteLine("Olympus compiled with Windows dependencies and running on linux");
+#endif
                 NativeImpl.Native = new NativeLinux();
             } else {
                 NativeImpl.Native = new NativeSDL2();
             }
 
-            using (NativeImpl.Native)
-                NativeImpl.Native.Run();
+            try {
+                using (NativeImpl.Native)
+                    NativeImpl.Native.Run();
+            } catch (Exception ex) { // Native.Run() can be mulithreaded, force the exit to make sure no hanging threads stay alive
+                Console.WriteLine("Exception on init! ");
+                Console.Error.WriteLine(ex);
+                Environment.Exit(-1);
+            }
         }
 
 

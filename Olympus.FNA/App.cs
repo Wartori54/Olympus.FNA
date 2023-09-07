@@ -272,6 +272,7 @@ namespace Olympus {
             TimeSpan dtSpan = gameTime.ElapsedGameTime;
             if (dtSpan.Ticks == 0) {
                 // User resized the window and FNA doesn't keep track of elapsed time.
+                // Apparently not under linux?
                 dtSpan = new(GlobalWatch.ElapsedTicks - CountingFramesWatchLast);
                 gameTime = new(gameTime.TotalGameTime, dtSpan, gameTime.IsRunningSlowly);
                 Resizing = true;

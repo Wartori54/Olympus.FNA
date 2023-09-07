@@ -214,6 +214,23 @@ namespace OlympUI {
             }
         }
 
+        public static string? GetPath(string fileTarget) {
+            string pathFull;
+            
+            #if DEBUG_CONTENT
+            pathFull = System.IO.Path.Combine(PathDebug, fileTarget);
+            if (File.Exists(pathFull))
+                return pathFull;
+            #endif
+            
+            pathFull = System.IO.Path.Combine(Path, fileTarget);
+            if (File.Exists(pathFull))
+                return pathFull;
+
+            Console.WriteLine($"Couldn't find content file: {fileTarget}");
+            return null;
+        }
+
         public static byte[]? OpenData(string path, params string[] exts) {
             foreach (string ext in exts)
                 if (OpenData($"{path}.{ext}") is byte[] data)
