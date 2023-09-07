@@ -113,8 +113,10 @@ namespace Olympus {
 
                 object? other = JsonHelper.Serializer.Deserialize<Config>(jtr);
 
-                if (other is null)
-                    throw new Exception("Loading config returned null");
+                if (other is null) {
+                    Console.WriteLine("Loading config returned null, discarding current file");
+                    return;
+                }
                 if (other != this)
                     throw new Exception("Loading config created new instance");
 

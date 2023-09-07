@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using Mono.Cecil;
 using MonoMod.Cil;
+using System.Net.Http.Headers;
 
 namespace Olympus {
     public abstract class Finder {
@@ -334,12 +335,16 @@ namespace Olympus {
                 }
             }
 
+            string fileName = "";
+            Retry:
             try {
-                string fileName;
-                if (File.Exists(Path.Combine(root, "Celeste.dll"))) // always default to Celeste.dll because its guarantied to work
-                    fileName = "Celeste.dll";
-                else 
-                    fileName = "Celeste.exe";
+                if (fileName == "") {
+                    if (File.Exists(Path.Combine(root,
+                            "Celeste.dll"))) // always default to Celeste.dll because its likely-er
+                        fileName = "Celeste.dll";
+                    else
+                        fileName = "Celeste.exe";
+                }
 
 
                 using ModuleDefinition game = ModuleDefinition.ReadModule(Path.Combine(root, fileName));
@@ -441,6 +446,10 @@ namespace Olympus {
                 return VersionLast = (true, $"Celeste {version}-{framework}", version, framework, null, null);
 
             } catch (Exception e) {
+                if (fileName == "Celeste.dll") { // the dll was borked, may be vanilla with residual files
+                    fileName = "Celeste.exe";
+                    goto Retry;
+                }
                 Console.WriteLine($"Failed to scan installation of type \"{Type}\" at \"{root}\":\n{e}");
                 return VersionLast = (false, "?", null, null, null, null);
             }

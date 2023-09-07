@@ -107,6 +107,7 @@
     </Compile>
   </ItemGroup>
 
+
   <Target Name="EffectBuild" AfterTargets="PreBuildEvent" Condition="$([MSBuild]::IsOSPlatform('Windows')) And '$(IsImplicitlyTriggeredBuild)' != 'true'">
     <PropertyGroup>
       <EffectSourceDir>$(ProjectDir)ContentSrc\effects\</EffectSourceDir>

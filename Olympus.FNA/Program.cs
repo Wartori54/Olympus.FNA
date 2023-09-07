@@ -43,7 +43,6 @@ namespace Olympus {
             }
 
             bool help = false;
-            bool helpExit = false;
             bool console = false;
             OptionSet options = new() {
                 { "h|help", "Show this message and exit.", v => help = v is not null },
@@ -65,14 +64,12 @@ namespace Olympus {
             } catch (OptionException e) {
                 Console.Write("Olympus CLI error: ");
                 Console.WriteLine(e.Message);
-                Console.WriteLine();
-                helpExit = true;
+                help = true;
             }
 
             if (help) {
                 options.WriteOptionDescriptions(Console.Out);
-                if (helpExit)
-                    return;
+                return;
             }
 
             if (PlatformHelper.Is(Platform.Windows) && console) {
