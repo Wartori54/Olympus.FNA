@@ -41,8 +41,14 @@ namespace Olympus {
 
 
         private Rectangle PrevClientBounds = new();
+        
+        
 
-        private uint DrawCount = 0;
+        // Int representing the following states:
+        // 0 -> draw has never been called
+        // 1 -> draw has been called
+        // 2 -> an update was called after the first draw
+        private uint DrawState = 0;
 
 
         public int FPS;
@@ -210,12 +216,12 @@ namespace Olympus {
                 gameTime = new();
             }
 
-            if (DrawCount == 1) {
+            if (DrawState == 1) {
                 // This MUST happen immediately after the first update + draw + present!
                 // Otherwise we risk flickering.
                 Native.PrepareLate();
                 // We can update multiple times before a draw.
-                DrawCount++;
+                DrawState = 2;
             }
 
 
@@ -406,19 +412,21 @@ namespace Olympus {
 
             base.Draw(gameTime);
             Native.EndDrawDirect(dt);
+            
 
-            DrawCount++;
-
-            if (DrawCount == 1) {
+            if (DrawState == 0) {
                 // This needs to happen *after* the first draw, otherwise shader warmup delays the first draw even further.
                 Get<SplashComponent>().Locks.Remove(this);
                 Components.Add(new ShaderWarmupComponent(this));
+                
+                // This was the first draw
+                DrawState = 1;
             }
         }
 
         public void ForceRedraw() {
             ForceBeginDraw = true;
-            if (DrawCount > 0 && BeginDraw()) {
+            if (DrawState > 0 && BeginDraw()) {
                 Draw(new GameTime());
                 EndDraw();
             }

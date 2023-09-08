@@ -34,6 +34,7 @@ namespace Olympus.NativeImpls {
         public override Point SplashSize => _SplashSize;
 
         protected readonly object redrawSync = new();
+        protected readonly object redrawLoopLock = new();
         protected SDL.SDL_SysWMinfo SDL_info;
         
         // TODO: Make NativeWin32 and NativeLinux inherit NativeSplashable
@@ -83,7 +84,11 @@ namespace Olympus.NativeImpls {
                 SDL.SDL_GetWindowWMInfo(app.Window.Handle, ref SDL_info);
                 SDL.SDL_SetWindowSize(App.Window.Handle, 800, 600);
                 
-                SplashThread = new Thread(SplashRoutine) {
+                SplashThread = new Thread(() => {
+                    lock (redrawLoopLock) {
+                        SplashRoutine();
+                    }
+                }) {
                     Name = $"{App.Name} Linux Splash thread",
                     IsBackground = true,
                 };
@@ -110,7 +115,6 @@ namespace Olympus.NativeImpls {
                     Console.WriteLine("Game.Run() #1 done");
                 }
 
-                // Thread.Sleep(2000);
                 wrappedGDM.CanCreateDevice = true;
                 lock (redrawSync) { // Bad things happen if we present and create a device at the same time
                     // XNA - and thus in turn FNA - love to re-center the window on device changes.
@@ -126,9 +130,9 @@ namespace Olympus.NativeImpls {
                         WindowPosition = FixWindowPositionDisplayDrag(pos);
                 }
 
-                Thread.Sleep(1000);
                 
                 Initialized = true;
+
                 
                 Console.WriteLine("Game.Run() #2 - running main loop on main thread");
                 Game.Run();
@@ -149,6 +153,11 @@ namespace Olympus.NativeImpls {
         public override void PrepareLate() {
             Ready = true;
             SplashThread = null;
+            // Use a lock to make sure the thread has exited before continuing
+            lock (redrawLoopLock) {
+                Console.WriteLine("Redraw thread exited!");
+            }
+            
             // We really dont want to mess with fna, disable this just in case
             SDL.SDL_SetHint( SDL.SDL_HINT_RENDER_SCALE_QUALITY, "0" );
             
@@ -260,7 +269,7 @@ namespace Olympus.NativeImpls {
                         default:
                             break;
                     }
-    
+                
                 }
 
                 lock (redrawSync) {
@@ -321,6 +330,7 @@ namespace Olympus.NativeImpls {
                     SDL.SDL_RenderPresent(renderer);
                 }
             }
+            Console.WriteLine("Exiting redraw loop");
         }
         
         /* Used for stack allocated string marshaling. */
