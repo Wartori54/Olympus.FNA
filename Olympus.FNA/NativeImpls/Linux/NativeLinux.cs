@@ -14,6 +14,8 @@ namespace Olympus.NativeImpls {
 
         protected bool Initialized = false;
 
+        private bool hasThreadInit = false;
+
         protected Thread? SplashThread;
 
         public Point _SplashSize;
@@ -85,6 +87,7 @@ namespace Olympus.NativeImpls {
                 SDL.SDL_SetWindowSize(App.Window.Handle, App.Graphics.PreferredBackBufferWidth, App.Graphics.PreferredBackBufferHeight);
                 SDL.SDL_SetWindowPosition(App.Window.Handle, SDL.SDL_WINDOWPOS_CENTERED, SDL.SDL_WINDOWPOS_CENTERED);
                 
+                
                 SplashThread = new Thread(() => {
                     lock (redrawLoopLock) {
                         SplashRoutine();
@@ -94,7 +97,13 @@ namespace Olympus.NativeImpls {
                     IsBackground = true,
                 };
                 SplashThread.Start();
+
+                while (!hasThreadInit) {
+                    Thread.Sleep(1);
+                }
                 
+                PollEvents();
+
                 GraphicsDeviceManager gdm = (GraphicsDeviceManager) App.Services.GetService(typeof(IGraphicsDeviceManager))!;
                 
                 WrappedGraphicsDeviceManager wrappedGDM = new(gdm);
@@ -104,6 +113,7 @@ namespace Olympus.NativeImpls {
                 App.Services.AddService(typeof(IGraphicsDeviceManager), wrappedGDM);
                 App.Services.AddService(typeof(IGraphicsDeviceService), wrappedGDM);
 
+                PollEvents();
                 wrappedGDM.CanCreateDevice = false;
 
                 if (!string.IsNullOrEmpty(forceDriver) && FNAHooks.FNA3DDriver != forceDriver)
@@ -116,6 +126,7 @@ namespace Olympus.NativeImpls {
                     Console.WriteLine("Game.Run() #1 done");
                 }
 
+                PollEvents();
                 wrappedGDM.CanCreateDevice = true;
                 lock (redrawSync) { // Bad things happen if we present and create a device at the same time
                     
@@ -132,6 +143,7 @@ namespace Olympus.NativeImpls {
                         WindowPosition = FixWindowPositionDisplayDrag(pos);
                 }
 
+                PollEvents();
                 
                 Initialized = true;
 
@@ -254,18 +266,9 @@ namespace Olympus.NativeImpls {
             _SplashSize = new Point(Math.Max(mountainSize.X, wheelSize.X), Math.Max(mountainSize.Y, wheelSize.Y));
             
             SDL.SDL_ShowWindow(App.Window.Handle); // Show window late so it doesnt flash hopefully
+            hasThreadInit = true;
             
             while (SplashThread != null) {
-                while (SDL.SDL_PollEvent(out SDL.SDL_Event sdl_ev) != 0) {
-                    switch (sdl_ev.type) {
-                        case SDL.SDL_EventType.SDL_QUIT:
-                            Console.WriteLine("Exiting early...");
-                            Environment.Exit(0);
-                            break;
-                    }
-                
-                }
-
                 lock (redrawSync) {
                     SDL.SDL_GetWindowSize(App.Window.Handle, out winW, out winH);
 
@@ -325,6 +328,20 @@ namespace Olympus.NativeImpls {
                 }
             }
             Console.WriteLine("Exiting redraw loop");
+        }
+
+        private void PollEvents() {
+            // We really shouldn't poll events while rendering...
+            lock (redrawSync) {
+                while (SDL.SDL_PollEvent(out SDL.SDL_Event sdl_ev) != 0) {
+                    switch (sdl_ev.type) {
+                        case SDL.SDL_EventType.SDL_QUIT:
+                            Console.WriteLine("Exiting early...");
+                            Environment.Exit(0);
+                            break;
+                    }
+                }
+            }
         }
         
         /* Used for stack allocated string marshaling. */
