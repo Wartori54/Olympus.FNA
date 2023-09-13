@@ -13,7 +13,6 @@ namespace Olympus.NativeImpls {
     public partial class NativeLinux : NativeImpl {
 
         protected bool Initialized = false;
-        protected bool Ready = false;
 
         protected Thread? SplashThread;
 
@@ -78,11 +77,13 @@ namespace Olympus.NativeImpls {
 
             using (App app = App = new()) {
 
-                SDL.SDL_SetWindowMinimumSize(App.Window.Handle, 800, 600);
                 SDL_info = new();
+                // This call is required for SDL_GetWindowWMInfo to populate anything
                 SDL.SDL_VERSION(out SDL_info.version);
                 SDL.SDL_GetWindowWMInfo(app.Window.Handle, ref SDL_info);
-                SDL.SDL_SetWindowSize(App.Window.Handle, 800, 600);
+                // Adhere to what app said, and center it, always
+                SDL.SDL_SetWindowSize(App.Window.Handle, App.Graphics.PreferredBackBufferWidth, App.Graphics.PreferredBackBufferHeight);
+                SDL.SDL_SetWindowPosition(App.Window.Handle, SDL.SDL_WINDOWPOS_CENTERED, SDL.SDL_WINDOWPOS_CENTERED);
                 
                 SplashThread = new Thread(() => {
                     lock (redrawLoopLock) {
@@ -117,6 +118,7 @@ namespace Olympus.NativeImpls {
 
                 wrappedGDM.CanCreateDevice = true;
                 lock (redrawSync) { // Bad things happen if we present and create a device at the same time
+                    
                     // XNA - and thus in turn FNA - love to re-center the window on device changes.
                     Point pos = WindowPosition;
                     FNAHooks.ApplyWindowChangesWithoutRestore = true;
@@ -151,7 +153,6 @@ namespace Olympus.NativeImpls {
         }
 
         public override void PrepareLate() {
-            Ready = true;
             SplashThread = null;
             // Use a lock to make sure the thread has exited before continuing
             lock (redrawLoopLock) {
@@ -229,11 +230,6 @@ namespace Olympus.NativeImpls {
         }
 
 
-        private Stopwatch timer = new Stopwatch();
-
-        private const int sleepDefault = 1000/60;
-        private int currSleep = default;
-
         private void SplashRoutine() {
             SDL.SDL_SetHint( SDL.SDL_HINT_RENDER_SCALE_QUALITY, "1" );
             SDL.SDL_GetWindowSize(App.Window.Handle, out int winW, out int winH);
@@ -265,8 +261,6 @@ namespace Olympus.NativeImpls {
                         case SDL.SDL_EventType.SDL_QUIT:
                             Console.WriteLine("Exiting early...");
                             Environment.Exit(0);
-                            break;
-                        default:
                             break;
                     }
                 
