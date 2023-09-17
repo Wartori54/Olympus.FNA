@@ -40,7 +40,7 @@ namespace Olympus {
             try {
                 dataCompressed = await Client.GetByteArrayAsync(url);
             } catch (Exception e) {
-                Console.WriteLine($"Failed to download texture data \"{url}\":\n{e}");
+                AppLogger.Log.Error($"Failed to download texture data \"{url}\":\n{e}");
                 return (null, null, 0, 0);
             }
 

@@ -363,7 +363,7 @@ namespace OlympUI {
                 }
             }
 
-            size = Math.Max(1, tail - pos - barPadding * 2);
+            size = Math.Max(25, tail - pos - barPadding * 2);
 
             if (size + 1 + barPadding * 2 + box.Wiggle < contentSize) {
                 IsNeeded = true;
@@ -423,7 +423,7 @@ namespace OlympUI {
                 }
             }
 
-            size = Math.Max(1, tail - pos - barPadding * 2);
+            size = Math.Max(25, tail - pos - barPadding * 2);
 
             if (size + 1 + barPadding * 2 + box.Wiggle < contentSize) {
                 IsNeeded = true;

@@ -209,7 +209,7 @@ namespace Olympus {
 
             if (!result.IsOk) {
                 if (result.IsError) {
-                    Console.WriteLine("Error while choosing file: " + result.ErrorMessage);
+                    AppLogger.Log.Error("Error while choosing file: " + result.ErrorMessage);
                 }
                 return;
             }
@@ -217,7 +217,7 @@ namespace Olympus {
             Installation newInstall = new("manual", "Manual installation", result.Path);
 
             if (!newInstall.FixPath()) { // Ignore for now
-                Console.WriteLine("Bad path: " + newInstall.Root);
+                AppLogger.Log.Warning("Bad path: " + newInstall.Root);
                 return; // TODO: Give user a warning for invalid installation
             }
             

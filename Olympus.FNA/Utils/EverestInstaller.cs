@@ -526,7 +526,7 @@ namespace Olympus.Utils {
                 i++;
 
                 string to = Path.Combine(outDir, name);
-                Console.Out.WriteLine($"{name} -> {to}");
+                AppLogger.Log.Debug($"{name} -> {to}");
 
                 if (File.Exists(to))
                     File.Delete(to);

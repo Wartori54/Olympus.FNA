@@ -136,7 +136,7 @@ namespace Olympus.NativeImpls {
             }
 
             protected override void WndProc(ref Message m) {
-                // Console.WriteLine($"{Handle}, {(WindowsMessage) m.Msg}: {m.WParam}, {m.LParam}");
+                // AppLogger.Log.LogLine($"{Handle}, {(WindowsMessage) m.Msg}: {m.WParam}, {m.LParam}");
 
                 switch ((WindowsMessage) m.Msg) {
                     case WindowsMessage.WM_NCCALCSIZE:

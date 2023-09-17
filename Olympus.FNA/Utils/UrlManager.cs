@@ -105,10 +105,10 @@ namespace Olympus.Utils {
 
                         urlString = AddFlags(urlString, urlEntry.Flags, withFlags);
 
-                        Console.WriteLine($"Downloading content from {urlString}");
+                        AppLogger.Log.Information($"Downloading content from {urlString}");
                         return Task.Run(async () => await wc.GetStringAsync(urlString)).Result;
                     } catch (Exception e) when (e is HttpRequestException or TaskCanceledException) {
-                        Console.WriteLine($"Url entry {urlEntry.Url} failed!");
+                        AppLogger.Log.Error($"Url entry {urlEntry.Url} failed!");
                     }
                 }
 
@@ -134,10 +134,10 @@ namespace Olympus.Utils {
 
                         urlString = AddFlags(urlString, urlEntry.Flags, withFlags);
 
-                        Console.WriteLine($"Downloading content from {urlString}");
+                        AppLogger.Log.Information($"Downloading content from {urlString}");
                         return wc.GetStreamAsync(urlString);
                     } catch (Exception e) when (e is HttpRequestException or TaskCanceledException) {
-                        Console.WriteLine($"Url entry {urlEntry.Url} failed!");
+                        AppLogger.Log.Error($"Url entry {urlEntry.Url} failed!");
                     }
                 }
 
@@ -163,7 +163,7 @@ namespace Olympus.Utils {
                 wc.Timeout = TimeSpan.FromMilliseconds(10000); // 10s timeout
                 
                 string urlString = urlEntry.Url;
-                Console.WriteLine($"Obtaining url from {urlString}");
+                AppLogger.Log.Information($"Obtaining url from {urlString}");
                 // The following wrapper makes it possible to call async method from a sync context
                 // Note that calling the get accessor on Result forcibly waits until the task is done
                 urlString = Task.Run(async () => await wc.GetStringAsync(urlString)).Result
@@ -176,7 +176,7 @@ namespace Olympus.Utils {
                 string originalUrl = urlString;
                 foreach (string flag in flags) {
                     if (!flagDict.TryGetValue(flag, out string? temp)) {
-                        Console.WriteLine($"Unknown flag ({flag}) for url: {originalUrl}, skipping...");
+                        AppLogger.Log.Warning($"Unknown flag ({flag}) for url: {originalUrl}, skipping...");
                         continue;
                     }
                     urlString += temp;

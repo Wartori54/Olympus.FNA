@@ -105,7 +105,7 @@ namespace Olympus {
             if (Locks.Count == 0) {
                 if (!Ready) {
                     Ready = true;
-                    Console.WriteLine($"Total time until ready: {App.GlobalWatch.Elapsed}");
+                    AppLogger.Log.Information($"Total time until ready: {App.GlobalWatch.Elapsed}");
                 }
 
                 TimeLeft -= dt * 3f;

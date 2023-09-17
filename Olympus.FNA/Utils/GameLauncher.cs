@@ -38,13 +38,13 @@ namespace Olympus.Utils {
                 if (ModVersion == null || ModVersion.Minor == 0 || ModVersion.Minor >= (1550 + 700)) {
                     try {
                         File.WriteAllText(Path.Combine(install.Root, "nextLaunchIsVanilla.txt"), "This file was created by Olympus and will be deleted automatically.");
-                        Console.Error.WriteLine("nextLaunchIsVanilla.txt created");
+                        AppLogger.Log.Information("nextLaunchIsVanilla.txt created");
                     } catch (Exception e) {
-                        Console.Error.WriteLine($"Failed to create nextLaunchIsVanilla.txt: {e}");
+                        AppLogger.Log.Error($"Failed to create nextLaunchIsVanilla.txt: {e}");
                         return LaunchResult.IOError;
                     }
                 } else {
-                    Console.WriteLine("Unsupported version: " + ModVersion.Minor + ", loading Everest");
+                    AppLogger.Log.Warning("Unsupported version: " + ModVersion.Minor + ", loading Everest");
                 }
             }
 

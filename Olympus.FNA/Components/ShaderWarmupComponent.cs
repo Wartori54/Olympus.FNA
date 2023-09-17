@@ -89,7 +89,7 @@ namespace Olympus {
 
                 object? key = Keys![KeyIndex++];
 
-                Console.WriteLine($"Shader warmup: {cache.Name} {key}");
+                AppLogger.Log.Information($"Shader warmup: {cache.Name} {key}");
 
                 GraphicsDevice gd = GraphicsDevice;
                 MiniEffect effect = cache.GetEffect(() => gd, key).Value;
@@ -111,7 +111,7 @@ namespace Olympus {
                 return;
 
             Timer.Stop();
-            Console.WriteLine($"Shaders warmed up in: {Timer.Elapsed}");
+            AppLogger.Log.Information($"Shaders warmed up in: {Timer.Elapsed}");
 
             Done = true;
             App.Components.Remove(this);

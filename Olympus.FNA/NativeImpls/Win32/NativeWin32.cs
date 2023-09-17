@@ -306,7 +306,7 @@ namespace Olympus.NativeImpls {
         public NativeWin32() {
             App app = App = new();
 
-            Console.WriteLine($"Total time until new NativeWin32(): {app.GlobalWatch.Elapsed}");
+            AppLogger.Log.Information($"Total time until new NativeWin32(): {app.GlobalWatch.Elapsed}");
             InitStopwatch.Start();
 
             FNAHooks.FNA3DDeviceUpdated += OnFNA3DDeviceUpdated;
@@ -432,7 +432,7 @@ namespace Olympus.NativeImpls {
                 }
             }
 
-            Console.WriteLine("Game.Run() #2 - running main loop on main thread");
+            AppLogger.Log.Information("Game.Run() #2 - running main loop on main thread");
             Game.Run();
         }
 
@@ -447,14 +447,14 @@ namespace Olympus.NativeImpls {
                 throw new Exception(ToString());
             }
 
-            Console.WriteLine($"Total time until PrepareEarly: {App.GlobalWatch.Elapsed}");
+            AppLogger.Log.Information($"Total time until PrepareEarly: {App.GlobalWatch.Elapsed}");
             InitStopwatch.Stop();
         }
 
         public override void PrepareLate() {
             Ready = true;
 
-            Console.WriteLine($"Total time until PrepareLate: {App.GlobalWatch.Elapsed}");
+            AppLogger.Log.Information($"Total time until PrepareLate: {App.GlobalWatch.Elapsed}");
 
             if (SplashCanvas is not null) {
                 DeleteDC(SplashCanvasHDC);
@@ -507,7 +507,7 @@ namespace Olympus.NativeImpls {
 
         public override void BeginDrawRT(float dt) {
             if (InitPaint >= -3)
-                Console.WriteLine($"Total time until BeginDrawRT: {App.GlobalWatch.Elapsed}");
+                AppLogger.Log.Information($"Total time until BeginDrawRT: {App.GlobalWatch.Elapsed}");
 
             Viewport vp = new(0, 0, App.Width, App.Height) {
                 MinDepth = 0f,
@@ -569,7 +569,7 @@ namespace Olympus.NativeImpls {
 
             if (InitPaint >= -3) {
                 InitPaint--;
-                Console.WriteLine($"Total time until EndDrawBB: {App.GlobalWatch.Elapsed}");
+                AppLogger.Log.Information($"Total time until EndDrawBB: {App.GlobalWatch.Elapsed}");
             }
         }
 
@@ -960,7 +960,7 @@ namespace Olympus.NativeImpls {
             if (hwnd != HWnd)
                 return CallWindowProc(WndProcPrevPtr, hwnd, msg, wParam, lParam);
 
-            // Console.WriteLine($"{hwnd}, {msg}: {wParam}, {lParam}");
+            // AppLogger.Log.Information($"{hwnd}, {msg}: {wParam}, {lParam}");
 
             IntPtr rv;
             HitTestValues hit;
@@ -1171,12 +1171,12 @@ namespace Olympus.NativeImpls {
                                     // Start initializing everything on a separate thread so that the splash can continue splashing.
                                     InitThread = new(() => {
                                         try {
-                                            Console.WriteLine("Game.Run() #1 - initializing on separate thread");
+                                            AppLogger.Log.Information("Game.Run() #1 - initializing on separate thread");
                                             Game.Run();
                                         } catch (Exception ex) when (ex.Message == ToString()) {
-                                            Console.WriteLine("Game.Run() #1 done");
+                                            AppLogger.Log.Information("Game.Run() #1 done");
                                         } catch (Exception ex) {
-                                            Console.Error.WriteLine(ex);
+                                            AppLogger.Log.Error(ex, ex.Message);
                                             PostMessage(HWnd, (int) WindowsMessage.WM_QUIT, NULL, NULL);
                                             throw;
                                         }

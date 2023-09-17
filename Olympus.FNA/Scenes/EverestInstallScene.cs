@@ -67,7 +67,6 @@ namespace Olympus {
                                         if (ct.IsCancellationRequested) return;
 
                                         await UI.Run(() => {
-                                            Console.WriteLine("Added loading screen");
                                             // Add loading screen
                                             el.Content.Clear();
                                             el.Children.Add(

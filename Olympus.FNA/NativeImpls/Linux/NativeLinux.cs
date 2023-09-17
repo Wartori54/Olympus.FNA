@@ -120,10 +120,10 @@ namespace Olympus.NativeImpls {
                     throw new Exception($"Tried to force FNA3D to use {forceDriver} but got {FNAHooks.FNA3DDriver}.");
 
                 try {
-                    Console.WriteLine("Game.Run() #1 - initializing the game engine");
+                    AppLogger.Log.Information("Game.Run() #1 - initializing the game engine");
                     Game.Run();
                 } catch (Exception ex) when (ex.Message == ToString()) {
-                    Console.WriteLine("Game.Run() #1 done");
+                    AppLogger.Log.Information("Game.Run() #1 done");
                 }
 
                 PollEvents();
@@ -148,7 +148,7 @@ namespace Olympus.NativeImpls {
                 Initialized = true;
 
                 
-                Console.WriteLine("Game.Run() #2 - running main loop on main thread");
+                AppLogger.Log.Information("Game.Run() #2 - running main loop on main thread");
                 Game.Run();
             }
         }
@@ -161,20 +161,20 @@ namespace Olympus.NativeImpls {
                 throw new Exception(ToString());
             }
 
-            Console.WriteLine($"Total time until PrepareEarly: {App.GlobalWatch.Elapsed}");
+            AppLogger.Log.Information($"Total time until PrepareEarly: {App.GlobalWatch.Elapsed}");
         }
 
         public override void PrepareLate() {
             SplashThread = null;
             // Use a lock to make sure the thread has exited before continuing
             lock (redrawLoopLock) {
-                Console.WriteLine("Redraw thread exited!");
+                AppLogger.Log.Information("Redraw thread exited!");
             }
             
             // We really dont want to mess with fna, disable this just in case
             SDL.SDL_SetHint( SDL.SDL_HINT_RENDER_SCALE_QUALITY, "0" );
             
-            Console.WriteLine($"Total time until PrepareLate: {App.GlobalWatch.Elapsed}");
+            AppLogger.Log.Information($"Total time until PrepareLate: {App.GlobalWatch.Elapsed}");
             
             // Do other late init stuff.
             
@@ -270,6 +270,7 @@ namespace Olympus.NativeImpls {
             
             while (SplashThread != null) {
                 lock (redrawSync) {
+                    // TODO: On tiling WMs the rendering is offset (the instant resize doesn't register on time?)
                     SDL.SDL_GetWindowSize(App.Window.Handle, out winW, out winH);
 
                     SDL.SDL_SetRenderDrawColor(renderer, SplashColorBG.R, SplashColorBG.G, SplashColorBG.B,
@@ -327,7 +328,7 @@ namespace Olympus.NativeImpls {
                     SDL.SDL_RenderPresent(renderer);
                 }
             }
-            Console.WriteLine("Exiting redraw loop");
+            AppLogger.Log.Information("Exiting redraw loop");
         }
 
         private void PollEvents() {
@@ -336,7 +337,7 @@ namespace Olympus.NativeImpls {
                 while (SDL.SDL_PollEvent(out SDL.SDL_Event sdl_ev) != 0) {
                     switch (sdl_ev.type) {
                         case SDL.SDL_EventType.SDL_QUIT:
-                            Console.WriteLine("Exiting early...");
+                            AppLogger.Log.Information("Exiting early...");
                             Environment.Exit(0);
                             break;
                     }

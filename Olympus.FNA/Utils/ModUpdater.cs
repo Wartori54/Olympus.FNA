@@ -40,7 +40,7 @@ namespace Olympus.Utils {
                 if (mod.DbUpdateInfo == null) {
                     mod.DbUpdateInfo = ModList.DataBase.QueryUpdateInfo(mod);
                     if (mod.DbUpdateInfo == null) {
-                        Console.WriteLine($"Cannot obtain update info for mod {mod.Name}({mod.Path})");
+                        AppLogger.Log.Warning($"Cannot obtain update info for mod {mod.Name}({mod.Path})");
                         return;
                     }
                 }
@@ -48,21 +48,21 @@ namespace Olympus.Utils {
                 string zipPath = Path.Combine(Path.GetDirectoryName(mod.Path)!, $"modupdate-{mod.GetHashCode()}.zip");
                 
                 // download it...
-                Console.WriteLine($"Downloading to {zipPath}");
+                AppLogger.Log.Information($"Downloading to {zipPath}");
                 bool success = false;
                 bool finished = false;
                 List<string> sources = new() { mod.DbUpdateInfo.URL, mod.DbUpdateInfo.MirrorURL };
                 foreach (string url in sources) {
                     try {
-                        Console.WriteLine($"Trying {url}");
+                        AppLogger.Log.Information($"Trying {url}");
                         bool b = await DownloadFileWithProgress(url, zipPath,
                             tickCallback);
                         finished = b;
                         success = true;
                         break;
                     } catch (Exception e) {
-                        Console.WriteLine("Download failed");
-                        Console.WriteLine(e);
+                        AppLogger.Log.Error("Download failed");
+                        AppLogger.Log.Error(e, e.Message);
                         finishCallback.Invoke(false, false);
                         await Task.Delay(3000);
                     } 
@@ -73,10 +73,10 @@ namespace Olympus.Utils {
                 if (!success || !finished) {
                     if (!success)
                         // update failed
-                        Console.WriteLine($"Updating {mod.Name} failed");
+                        AppLogger.Log.Error($"Updating {mod.Name} failed");
                     else {
                         // update canceled
-                        Console.WriteLine($"Updating {mod.Name} was canceled");
+                        AppLogger.Log.Warning($"Updating {mod.Name} was canceled");
                     }
 
                     // try to delete mod-update.zip if it still exists.
@@ -130,7 +130,7 @@ namespace Olympus.Utils {
             await using Stream input = await response.Content.ReadAsStreamAsync();
             await using FileStream output = File.OpenWrite(destPath);
             if (length == 0) 
-                Console.WriteLine("Cannot determine file length!");
+                AppLogger.Log.Warning("Cannot determine file length!");
 
             progressCallback(0, length, 0);
 
@@ -173,7 +173,7 @@ namespace Olympus.Utils {
             string actualHash = CalculateChecksum(filePath);
             
             string expectedHash = update.xxHash[0];
-            Console.WriteLine($"Verifying checksum: actual hash is {actualHash}, expected hash is {expectedHash}");
+            AppLogger.Log.Information($"Verifying checksum: actual hash is {actualHash}, expected hash is {expectedHash}");
             if (expectedHash != actualHash) {
                 throw new IOException($"Checksum error: expected {expectedHash}, got {actualHash}");
             }
@@ -187,10 +187,10 @@ namespace Olympus.Utils {
         /// <param name="zipPath">The path to the zip the update has been downloaded to</param>
         private static void InstallModUpdate(ModList.ModInfo mod, string zipPath) {
             // delete the old zip, and move the new one.
-            Console.WriteLine($"Deleting mod .zip: {mod.Path}");
+            AppLogger.Log.Information($"Deleting mod .zip: {mod.Path}");
             File.Delete(mod.Path);
 
-            Console.WriteLine($"Moving {zipPath} to {mod.Path}");
+            AppLogger.Log.Information($"Moving {zipPath} to {mod.Path}");
             File.Move(zipPath, mod.Path);
         }
 
@@ -202,10 +202,10 @@ namespace Olympus.Utils {
         private static void TryDelete(string path) {
             if (!File.Exists(path)) return;
             try {
-                Console.WriteLine($"Deleting file {path}");
+                AppLogger.Log.Information($"Deleting file {path}");
                 File.Delete(path);
             } catch (Exception) {
-                Console.WriteLine($"Removing {path} failed");
+                AppLogger.Log.Warning($"Removing {path} failed");
             }
         }
 

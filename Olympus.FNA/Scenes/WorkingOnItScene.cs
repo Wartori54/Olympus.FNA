@@ -286,10 +286,10 @@ namespace Olympus {
             currJob = job;
 
             Task.Run(async () => {
-                Console.WriteLine("Starting job");
-                    await currJob.StartRoutine();
+                AppLogger.Log.Information("Starting job");
+                await currJob.StartRoutine();
 
-                Console.WriteLine("Finished job");
+                AppLogger.Log.Information("Finished job");
                 CentralPanelRefresh?.Invoke();
             });
             logLabel.Text = "";
@@ -366,7 +366,7 @@ namespace Olympus {
                 try {
                     await foreach (EverestInstaller.Status status in Routine.Invoke()) {
                         await Logs.Writer.WriteAsync(status.Text);
-                        Console.WriteLine(status.Text);
+                        AppLogger.Log.Debug(status.Text);
                         Progress = status.Progress == -1 ? Progress : status.Progress;
                         if (status.CurrentStage == EverestInstaller.Status.Stage.InProgress) continue;
                         Done = true;
@@ -379,7 +379,7 @@ namespace Olympus {
                 } catch (Exception ex) {
                     Done = true;
                     Icon = SVGImage.ERROR;
-                    Console.WriteLine(ex);
+                    AppLogger.Log.Error(ex, ex.Message);
                     await Logs.Writer.WriteAsync(ex.ToString());
                     await Logs.Writer.WriteAsync("The Task did not succeed, press Expand to see what happened.");
                 }

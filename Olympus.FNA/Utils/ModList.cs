@@ -58,8 +58,8 @@ namespace Olympus.Utils {
                         info.IsUpdaterBlacklisted = updaterBlacklist.Contains(Path.GetFileName(file));
                         zipMods.Add(info);
                     } catch (InvalidDataException e) {
-                        Console.WriteLine($"Zip: {file} is corrupted or unreadable");
-                        Console.WriteLine(e);
+                        AppLogger.Log.Error($"Zip: {file} is corrupted or unreadable");
+                        AppLogger.Log.Error(e, e.Message);
                     }
                 } else if (file.EndsWith(".bin") && !onlyUpdatable) { // quick reminder that bins and dir cannot be updated
                     // bin
@@ -79,7 +79,7 @@ namespace Olympus.Utils {
                     if (DataBase.RawUpdateDataBase.TryGetValue(zipMod.Name, out ModDBUpdateInfo? updateInfo))
                         zipMod.NewVersion = updateInfo._VersionString;
                 } else {
-                    Console.WriteLine("ModDBInfo: Mod {0} did not appear on the mod data base", zipMod.Name);
+                    AppLogger.Log.Warning("ModDBInfo: Mod {0} did not appear on the mod data base", zipMod.Name);
                 }
                 mods.Add(zipMod);   
             }
@@ -157,7 +157,7 @@ namespace Olympus.Utils {
 
         public static void BlackListUpdate(ModInfo mod) {
             if (Config.Instance.Installation == null) {
-                Console.WriteLine("BlackListUpdate called before setting an install");
+                AppLogger.Log.Warning("BlackListUpdate called before setting an install");
                 return;
             }
 
@@ -283,7 +283,7 @@ namespace Olympus.Utils {
             
             // Downloads and loads the yaml containing everything in gamebanana
             private void DownloadModDataBase() {
-                Console.WriteLine("Populating DB, redownload: {0}", invalidateModDataBase);
+                AppLogger.Log.Information("Populating DB, redownload: {0}", invalidateModDataBase);
                 string yamlData = "";
                 if (!invalidateModDataBase) {
                     if (File.Exists(DBPath))
@@ -292,14 +292,14 @@ namespace Olympus.Utils {
                         InvalidateModDatabase();
                 }
                 if (invalidateModDataBase) {
-                    Console.WriteLine("Redownloading DB");
+                    AppLogger.Log.Information("Redownloading DB");
                     yamlData = UrlManager.Urls.ModDataBase.TryHttpGetDataString();
                     
                     File.WriteAllText(DBPath, yamlData);
-                    Console.WriteLine("Saved DB");
+                    AppLogger.Log.Information("Saved DB");
                 }
                 List<ModDBInfo> listDB = YamlHelper.Deserializer.Deserialize<List<ModDBInfo>>(yamlData);
-                Console.WriteLine("Deserialized db");
+                AppLogger.Log.Information("Deserialized db");
                 rawDataBase.Clear();
                 
                 // We are forced to copy (i think)
@@ -312,19 +312,19 @@ namespace Olympus.Utils {
 
             // Download the everest_update.yaml, downloaded on each boot
             private void DownloadUpdateDataBase() {
-                Console.WriteLine("Downloading UpdateDB");
+                AppLogger.Log.Information("Downloading UpdateDB");
                 string yamlData = UrlManager.Urls.ModUpdateDataBase.TryHttpGetDataString();
                 
                 rawUpdateDataBase = YamlHelper.Deserializer.Deserialize<Dictionary<string, ModDBUpdateInfo>>(yamlData);
                 foreach (string name in rawUpdateDataBase.Keys) {
                     rawUpdateDataBase[name].Name = name;
                 }
-                Console.WriteLine("Deserialized updaterDB");
+                AppLogger.Log.Information("Deserialized updaterDB");
             }
 
             // Returns the corresponding ModDBInfo for every ModInfo
             public Dictionary<ModInfo, ModDBInfo> QueryModDBInfoForMods(List<ModInfo> targetMods, bool cacheMods) {
-                Console.WriteLine("Querying Db");
+                AppLogger.Log.Information("Querying Db");
                 Dictionary<ModInfo, ModDBInfo> filteredMods = new(targetMods.Count);
                 
                 // Method explanation: We need to map ModInfo to ModDBInfo but unluckily theres no way to do that directly (as of now)
@@ -344,7 +344,7 @@ namespace Olympus.Utils {
                         continue;
                     }
                     if (!mappedMods.TryAdd(mod.Name, mod)) // TODO: check hashes to determinate if they're the same version
-                        Console.WriteLine($"Mod {mod.Name} from {mod.Path} is duplicate, skipping");
+                        AppLogger.Log.Warning($"Mod {mod.Name} from {mod.Path} is duplicate, skipping");
                 }
 
                 foreach (KeyValuePair<string, ModInfo> entry in mappedMods) {
@@ -353,7 +353,7 @@ namespace Olympus.Utils {
                         if (RawDataBase.TryGetValue(GBId, out ModDBInfo? dBInfo)) {
                             if (cacheMods) {
                                 string validName = ValidateName(entry.Key);
-                                Console.WriteLine("Caching mod: {0}", entry.Key);
+                                AppLogger.Log.Information("Caching mod: {0}", entry.Key);
                                 if (!Directory.Exists(ModCachePath))
                                     Directory.CreateDirectory(ModCachePath);
                                 
@@ -370,10 +370,10 @@ namespace Olympus.Utils {
                             }
                             filteredMods.Add(entry.Value, dBInfo);
                         } else {
-                            Console.WriteLine("Mod {0} has match in updateDB but not in searchDB", entry.Key);
+                            AppLogger.Log.Warning("Mod {0} has match in updateDB but not in searchDB", entry.Key);
                         }
                     } else {
-                        Console.WriteLine("Mod {0} not found in DB", entry.Key);
+                        AppLogger.Log.Warning("Mod {0} not found in DB", entry.Key);
                     }
                 }
 
@@ -383,7 +383,7 @@ namespace Olympus.Utils {
             private ModDBInfo? QueryFromCache(ModInfo mod) {
                 string filePath = Path.Join(ModCachePath, ValidateName(mod.Name) + ".yaml");
                 if (!File.Exists(filePath)) return null;
-                Console.Write("Queriyng from cache {0}... ", mod.Name);
+                AppLogger.Log.Information("Queriyng from cache {0}... ", mod.Name);
                 // Read cache
                 ModDBInfo readData;
                 using (StreamReader file = File.OpenText(filePath))
@@ -398,13 +398,12 @@ namespace Olympus.Utils {
                     CachedHashes.Add(mod, realHash);
                 }
                 if (!readData.Hash.Equals(realHash)) { // It has been updated
-                    Console.WriteLine("cache outdated");
+                    AppLogger.Log.Warning("Cache outdated!");
                     this.InvalidateModDatabase(); // The mod was modified (thus probably updated)
                     // so we need to update the DB
                     File.Delete(filePath); // Delete it so it can be re-cached from new DB
                     return null;
                 }
-                Console.WriteLine("success!");
                 return readData;
             }
 

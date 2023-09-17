@@ -15,6 +15,8 @@ namespace Olympus {
     public class Program {
 
         public static void Main(string[] args) {
+            AppLogger.Create();
+            AppLogger.Log.Information("Created logger!");
             CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
             CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
@@ -22,7 +24,7 @@ namespace Olympus {
             try {
                 ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
             } catch (NotSupportedException) {
-                Console.WriteLine("TLS 1.3 NOT SUPPORTED! CONTINUE AT YOUR OWN RISK!");
+                AppLogger.Log.Error("TLS 1.3 NOT SUPPORTED! CONTINUE AT YOUR OWN RISK!");
                 ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
             }
 
@@ -62,8 +64,7 @@ namespace Olympus {
                 // parse the command line
                 extra = options.Parse(args);
             } catch (OptionException e) {
-                Console.Write("Olympus CLI error: ");
-                Console.WriteLine(e.Message);
+                AppLogger.Log.Error("Olympus CLI error: {Error}", e.Message);
                 help = true;
             }
 
@@ -89,12 +90,12 @@ namespace Olympus {
 #if WINDOWS
                 NativeImpl.Native = new NativeWin32();
 #else
-                Console.WriteLine("Olympus compiled without Windows dependencies, using NativeSDL2");
+                AppLogger.Log.Warning("Olympus compiled without Windows dependencies, using NativeSDL2");
                 NativeImpl.Native = new NativeSDL2();
 #endif
             } else if (PlatformHelper.Is(Platform.Linux)) {
 #if WINDOWS
-                Console.WriteLine("Olympus compiled with Windows dependencies and running on linux");
+                AppLogger.Log.LogLine("Olympus compiled with Windows dependencies and running on linux");
 #endif
                 NativeImpl.Native = new NativeLinux();
             } else {
@@ -105,8 +106,8 @@ namespace Olympus {
                 using (NativeImpl.Native)
                     NativeImpl.Native.Run();
             } catch (Exception ex) { // Native.Run() can be mulithreaded, force the exit to make sure no hanging threads stay alive
-                Console.WriteLine("Exception on init! ");
-                Console.Error.WriteLine(ex);
+                AppLogger.Log.Error("Exception on init! ");
+                AppLogger.Log.Error(ex, ex.Message);
                 Environment.Exit(-1);
             }
         }

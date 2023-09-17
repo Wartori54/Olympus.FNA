@@ -84,8 +84,8 @@ namespace Olympus {
                                     try {
                                         mods = await App.WebAPI.GetFeaturedEntries();
                                     } catch (Exception e) {
-                                        Console.WriteLine("Failed downloading featured entries:");
-                                        Console.WriteLine(e);
+                                        AppLogger.Log.Error("Failed downloading featured entries:");
+                                        AppLogger.Log.Error(e, e.Message);
                                         await UI.Run(() => {
                                             el.DisposeChildren();
                                             el.Add(new Group() {
@@ -547,8 +547,8 @@ namespace Olympus {
                                                             el.Children = GenerateModListPanels(everestVersion, installedMods);
                                                         });
                                                     } catch (Exception e) {
-                                                        Console.WriteLine("refreshModList crashed with exception {0}", e);
-                                                        Console.WriteLine("Stacktrace: {0}", e.StackTrace);
+                                                        AppLogger.Log.Error("refreshModList crashed with exception {0}", e);
+                                                        AppLogger.Log.Error("Stacktrace: {0}", e.StackTrace);
                                                     }
                                                     
                                                 }); 
@@ -657,14 +657,14 @@ namespace Olympus {
         
         private static string GetInstallationName() {
             if (Config.Instance.Installation != null) return Config.Instance.Installation.Name;
-            // Console.WriteLine("GetInstallationName called before config was loaded!");
+            // AppLogger.Log.LogLine("GetInstallationName called before config was loaded!");
             return "No install selected";
 
         }
 
         private static string GetInstallationInfo() {
             if (Config.Instance.Installation == null) {
-                // Console.WriteLine("GetInstallationInfo called before config was loaded!");
+                // AppLogger.Log.LogLine("GetInstallationInfo called before config was loaded!");
                 return "No install selected";
             }
             (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
@@ -699,13 +699,13 @@ namespace Olympus {
         // Returns a the mods installed, to be ran async
         private (Version? everestVersion, List<ModList.ModInfo> installedMods) GenerateModList() {
             if (Config.Instance.Installation == null) {
-                Console.WriteLine("GenerateModList called before config was loaded!");
+                AppLogger.Log.Error("GenerateModList called before config was loaded!");
                 return new ValueTuple<Version?, List<ModList.ModInfo>>(); // shouldn't ever happen
             }
             (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
             = Config.Instance.Installation.ScanVersion(false);
 
-            Console.WriteLine("Gathering Mod List");
+            AppLogger.Log.Information("Gathering Mod List");
             List<ModList.ModInfo> installedMods = ModList.GatherModList(true, false, false, false);
 
             return (ModVersion, installedMods);
@@ -714,10 +714,10 @@ namespace Olympus {
         // Builds the panel list from the installed mods, to be run on thread UI
         private static ObservableCollection<Element> GenerateModListPanels(Version? everestVersion, List<ModList.ModInfo> mods) {
             if (Config.Instance.Installation == null) {
-                 Console.WriteLine("GenerateModList called before config was loaded!");
+                 AppLogger.Log.Error("GenerateModList called before config was loaded!");
                  return new ObservableCollection<Element>(); // shouldn't ever happen
             }
-            Console.WriteLine("Generating mod panels");
+            AppLogger.Log.Information("Generating mod panels");
             EverestInstaller.EverestVersion? everestUpdate = null;
             EverestInstaller.EverestBranch? branch = EverestInstaller.DeduceBranch(Config.Instance.Installation);
             if (branch != null) {
@@ -830,14 +830,14 @@ namespace Olympus {
                             new Button("update", b => {
                                 Group? parent = b.Parent as Group; // Should never be null
                                 if (parent == null) {
-                                    Console.WriteLine("ModPanel button parent was null!!!!");
+                                    AppLogger.Log.Error("ModPanel button parent was null!!!!");
                                     b.Text = "Error!";
                                     return;
                                 }
 
                                 ModPanel? panelParent = parent.Parent as ModPanel;
                                 if (panelParent == null) {
-                                    Console.WriteLine("ModPanel button parent was null!!!!");
+                                    AppLogger.Log.Error("ModPanel button parent was null!!!!");
                                     b.Text = "Error!";
                                     return;
                                 }

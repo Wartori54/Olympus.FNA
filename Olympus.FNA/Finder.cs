@@ -109,13 +109,13 @@ namespace Olympus {
                 if (!Refreshing.IsCompleted)
                     return Refreshing;
                 return Refreshing = Task.Run(async () => {
-                    Console.WriteLine("Refreshing install list");
+                    AppLogger.Log.Information("Refreshing install list");
                     HashSet<string> added = new();
                     List<Installation> installs = new();
                     Updated?.Invoke(FinderUpdateState.Start, installs, InstallManagerScene.InstallList.Found);
                     await foreach (Installation install in FindAll()) {
                         if (added.Add(install.Root)) {
-                            Console.WriteLine($"Found install: {install.Type} - {install.Root}");
+                            AppLogger.Log.Information($"Found install: {install.Type} - {install.Root}");
                             installs.Add(install);
                             Updated?.Invoke(FinderUpdateState.Add, installs, InstallManagerScene.InstallList.Found);
                         }
@@ -450,7 +450,7 @@ namespace Olympus {
                     fileName = "Celeste.exe";
                     goto Retry;
                 }
-                Console.WriteLine($"Failed to scan installation of type \"{Type}\" at \"{root}\":\n{e}");
+                AppLogger.Log.Warning($"Failed to scan installation of type \"{Type}\" at \"{root}\":\n{e}");
                 return VersionLast = (false, "?", null, null, null, null);
             }
         }
