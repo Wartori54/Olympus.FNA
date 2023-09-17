@@ -79,7 +79,8 @@ namespace Olympus.Utils {
                     if (DataBase.RawUpdateDataBase.TryGetValue(zipMod.Name, out ModDBUpdateInfo? updateInfo))
                         zipMod.NewVersion = updateInfo._VersionString;
                 } else {
-                    AppLogger.Log.Warning("ModDBInfo: Mod {0} did not appear on the mod data base", zipMod.Name);
+                    // Don't log since it has been already warned
+                    // AppLogger.Log.Warning("ModDBInfo: Mod {0} did not appear on the mod data base", zipMod.Name);
                 }
                 mods.Add(zipMod);   
             }
@@ -187,7 +188,19 @@ namespace Olympus.Utils {
             public bool IsBlacklisted;
             public bool IsUpdaterBlacklisted;
 
-            public string Name = "";
+            [YamlIgnore]
+            public string Name {
+                get {
+                    if (name == "") {
+                        return System.IO.Path.GetFileName(Path);
+                    }
+
+                    return name;
+                }
+            }
+
+            [YamlMember(Alias = "Name")]
+            public string name = "";
             public string Version = "";
             [YamlIgnore] // For updates
             public string? NewVersion = null;
@@ -207,7 +220,7 @@ namespace Olympus.Utils {
                     List<EverestModuleMetadata> yaml = YamlHelper.Deserializer.Deserialize<List<EverestModuleMetadata>>(reader);
                     if (yaml != null && yaml.Count <= 0) return;
                     
-                    Name = yaml[0].Name;
+                    name = yaml[0].Name;
                     Version = yaml[0].Version;
                     DLL = yaml[0].DLL;
                     if (yaml[0].Dependencies.Capacity != 0)

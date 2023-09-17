@@ -44,7 +44,8 @@ namespace Olympus.Utils {
                         return LaunchResult.IOError;
                     }
                 } else {
-                    AppLogger.Log.Warning("Unsupported version: " + ModVersion.Minor + ", loading Everest");
+                    game.StartInfo.Arguments = "--vanilla";
+                    AppLogger.Log.Information("Old version: " + ModVersion.Minor + ", loading using '--vanilla' argument");
                 }
             }
 
