@@ -8,27 +8,29 @@ using YamlDotNet.Serialization;
 
 namespace Olympus.Utils {
 
-    public static class UrlManager {
+    public class UrlManager {
+        private readonly Dictionary<string, DataBaseUrlEntry> urls = new();
+        private readonly string urlsYamlPath;
         
-        private static readonly string UrlsYamlPath = Path.Combine("metadata","urls.yaml");
-        
-        private static DataBaseUrls? urls;
-        
-        public static DataBaseUrls Urls { 
-            get {
-                if (urls != null) return urls;
-                
-                // retrieve the url
-                using (Stream? stream = OlympUI.Assets.OpenStream(UrlsYamlPath)) {
-                    if (stream == null) {
-                        throw new FileNotFoundException("Couldn't query DB urls, {0} file not found", UrlsYamlPath);
-                    }
-                    using (StreamReader reader = new(stream))
-                        urls = YamlHelper.Deserializer.Deserialize<DataBaseUrls>(reader);
+        public UrlManager(string urlsYamlPath) {
+            this.urlsYamlPath = urlsYamlPath;
+            List<DataBaseUrlEntry> readUrls;
+            using (Stream? stream = OlympUI.Assets.OpenStream(urlsYamlPath)) {
+                if (stream == null) {
+                    throw new FileNotFoundException("Couldn't query urls, {0} file not found", urlsYamlPath);
                 }
-                return urls;
+                using (StreamReader reader = new(stream))
+                    readUrls = YamlHelper.Deserializer.Deserialize<List<DataBaseUrlEntry>>(reader);
+            }
+
+            foreach (DataBaseUrlEntry url in readUrls) {
+                if (!urls.TryAdd(url.Tag, url)) {
+                    AppLogger.Log.Error($"File {urlsYamlPath} contains multiple urls with same tag: {url.Tag}");
+                }
             }
         }
+
+
 
         /// <summary>
         /// Saves a stream to a file, calling a callback in the meantime
@@ -37,7 +39,8 @@ namespace Olympus.Utils {
         /// <param name="stream">The data</param>
         /// <param name="length">The total bytes of data</param>
         /// <param name="progressCallback">The callback for the progress update</param>
-        public static async Task<bool> Stream2FileWithProgress(string outputFile, Task<Stream> stream, int length, Func<int, int, int, bool> progressCallback) {
+        public static async Task<bool> Stream2FileWithProgress(string outputFile, Task<Stream> stream, int length, 
+                Func<int, int, int, bool> progressCallback) {
             if (File.Exists(outputFile))
                 File.Delete(outputFile);
             await using FileStream output = File.OpenWrite(outputFile);
@@ -75,124 +78,74 @@ namespace Olympus.Utils {
 
             return true;
         }
-        
-        
-        public class DataBaseUrls {
-            public DataBaseUrlList ModDataBase = new();
-            public DataBaseUrlList ModUpdateDataBase = new();
-            public DataBaseUrlList EverestVersions = new();
+
+        private object TryHttpGetData(string tag, ICollection<string>? withFlags, Func<string, HttpClient, Func<Task<object>?>> task) {
+            withFlags ??= new List<string>();
+            
+            using HttpClient wc = new();
+            wc.Timeout = TimeSpan.FromMilliseconds(10000); // 10s timeout
+            if (!urls.TryGetValue(tag, out DataBaseUrlEntry? urlEntry)) {
+                throw new InvalidOperationException(
+                    $"Tried to obtain tag non-existent tag: {tag} from file {urlsYamlPath}");
+            }
+            
+            string urlString = urlEntry.Url;
+
+            urlString = AddFlags(urlString, urlEntry.Flags, withFlags);
+
+            AppLogger.Log.Information($"Downloading content from {urlString}");
+            return Task.Run(task(urlString, wc)).Result;
         }
         
-        public class DataBaseUrlList {
-            public List<DataBaseUrlEntry> UrlList = new();
             
-            /// <summary>
-            /// Tries all urls from this list until success, throws HttpRequestException otherwise
-            /// </summary>
-            /// <returns>The data from the url as a string</returns>
-            public string TryHttpGetDataString(ICollection<string>? withFlags = null) {
-                withFlags ??= new List<string>();
+        /// <summary>
+        /// Fetches data from a url tag as string
+        /// </summary>
+        /// <returns>The data from the url as a string</returns>
+        public string TryHttpGetDataString(string tag, ICollection<string>? withFlags = null) {
+            return (string) TryHttpGetData(tag, withFlags, (urlString, wc) => async () => await wc.GetStringAsync(urlString));
+        }
+        
+         /// <summary>
+        /// Tries all urls from this list until success, throws HttpRequestException otherwise
+        /// </summary>
+        /// <returns>The data from the url as a async stream</returns>
+        public Stream TryHttpGetDataStream(string tag, ICollection<string>? withFlags = null) {
+            return (Stream) TryHttpGetData(tag, withFlags, (urlString, wc) => async () => await wc.GetStreamAsync(urlString));
+        }
 
-                ValidateData();
-                
-                using HttpClient wc = new();
-                wc.Timeout = TimeSpan.FromMilliseconds(10000); // 10s timeout
-                foreach (DataBaseUrlEntry urlEntry in UrlList) {
-                    try {
-                        string urlString = urlEntry.Url;
-                        if (urlEntry.ProvidesUrl)
-                            urlString = GetUrlFromUrl(urlEntry);
-
-                        urlString = AddFlags(urlString, urlEntry.Flags, withFlags);
-
-                        AppLogger.Log.Information($"Downloading content from {urlString}");
-                        return Task.Run(async () => await wc.GetStringAsync(urlString)).Result;
-                    } catch (Exception e) when (e is HttpRequestException or TaskCanceledException) {
-                        AppLogger.Log.Error($"Url entry {urlEntry.Url} failed!");
-                    }
-                }
-
-                throw new HttpRequestException("No url was able to successfully query the data");
-            }
+        private static string GetUrlFromUrl(DataBaseUrlEntry urlEntry) {
+            using HttpClient wc = new();
+            wc.Timeout = TimeSpan.FromMilliseconds(10000); // 10s timeout
             
-             /// <summary>
-            /// Tries all urls from this list until success, throws HttpRequestException otherwise
-            /// </summary>
-            /// <returns>The data from the url as a async stream</returns>
-            public Task<Stream> TryHttpGetDataStream(ICollection<string>? withFlags = null) {
-                withFlags ??= new List<string>();
+            string urlString = urlEntry.Url;
+            AppLogger.Log.Information($"Obtaining url from {urlString}");
+            // The following wrapper makes it possible to call async method from a sync context
+            // Note that calling the get accessor on Result forcibly waits until the task is done
+            urlString = Task.Run(async () => await wc.GetStringAsync(urlString)).Result
+                .TrimEnd(Environment.NewLine.ToCharArray()); // remove newline at the end
 
-                ValidateData();
+            return urlString;
+        }
 
-                using HttpClient wc = new();
-                wc.Timeout = TimeSpan.FromMilliseconds(10000); // 10s timeout
-                foreach (DataBaseUrlEntry urlEntry in UrlList) {
-                    try {
-                        string urlString = urlEntry.Url;
-                        if (urlEntry.ProvidesUrl)
-                            urlString = GetUrlFromUrl(urlEntry);
-
-                        urlString = AddFlags(urlString, urlEntry.Flags, withFlags);
-
-                        AppLogger.Log.Information($"Downloading content from {urlString}");
-                        return wc.GetStreamAsync(urlString);
-                    } catch (Exception e) when (e is HttpRequestException or TaskCanceledException) {
-                        AppLogger.Log.Error($"Url entry {urlEntry.Url} failed!");
-                    }
+        private static string AddFlags(string urlString, IReadOnlyDictionary<string, string?> flagDict, ICollection<string> flags) {
+            string originalUrl = urlString;
+            foreach (string flag in flags) {
+                if (!flagDict.TryGetValue(flag, out string? temp)) {
+                    AppLogger.Log.Warning($"Unknown flag ({flag}) for url: {originalUrl}, skipping...");
+                    continue;
                 }
-
-                throw new HttpRequestException("No url was able to successfully query the data");
-            }
-            
-            private void ValidateData() {
-                if (UrlList.Count == 0)
-                    throw new FormatException($"Couldn't read urls from {UrlsYamlPath}");
-                // make sure the preferred url is on front, because yamldotnet doesn't ensure it
-                if (UrlList[0].Preferred) return;
-                for (int i = 0; i < UrlList.Count; i++) {
-                    if (!UrlList[i].Preferred) continue;
-                        
-                    DataBaseUrlEntry entry = UrlList[i];
-                    UrlList.RemoveAt(i);
-                    UrlList.Insert(0, entry);
-                }
+                urlString += temp;
             }
 
-            private static string GetUrlFromUrl(DataBaseUrlEntry urlEntry) {
-                using HttpClient wc = new();
-                wc.Timeout = TimeSpan.FromMilliseconds(10000); // 10s timeout
-                
-                string urlString = urlEntry.Url;
-                AppLogger.Log.Information($"Obtaining url from {urlString}");
-                // The following wrapper makes it possible to call async method from a sync context
-                // Note that calling the get accessor on Result forcibly waits until the task is done
-                urlString = Task.Run(async () => await wc.GetStringAsync(urlString)).Result
-                    .TrimEnd(Environment.NewLine.ToCharArray()); // remove newline at the end
-
-                return urlString;
-            }
-
-            private static string AddFlags(string urlString, IReadOnlyDictionary<string, string?> flagDict, ICollection<string> flags) {
-                string originalUrl = urlString;
-                foreach (string flag in flags) {
-                    if (!flagDict.TryGetValue(flag, out string? temp)) {
-                        AppLogger.Log.Warning($"Unknown flag ({flag}) for url: {originalUrl}, skipping...");
-                        continue;
-                    }
-                    urlString += temp;
-                }
-
-                return urlString;
-            }
+            return urlString;
         }
 
         public class DataBaseUrlEntry {
+            [YamlMember(Alias = "tag", ApplyNamingConventions = false)]
+            public string Tag = "";
             [YamlMember(Alias = "url", ApplyNamingConventions = false)]
             public string Url = "";
-            [YamlMember(Alias = "provides_url", ApplyNamingConventions = false)]
-            public bool ProvidesUrl = false;
-            [YamlMember(Alias = "preferred", ApplyNamingConventions = false)]
-            public bool Preferred = false;
             [YamlMember(Alias = "flags", ApplyNamingConventions = false)]
             public Dictionary<string, string?> Flags = new ();
         }

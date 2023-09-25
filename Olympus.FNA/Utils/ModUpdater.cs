@@ -12,15 +12,13 @@ namespace Olympus.Utils {
     public static class ModUpdater {
         
         public static void UpdateAllMods(Installation install) { //TODO: add update all button and auto update mods
-            List<ModList.ModInfo> mods = ModList.GatherModList(install, true, true, true, false);
+            IEnumerable<ModAPI.IModFileInfo> mods = install.LocalInfoAPI.CreateAllModFileInfo();
 
             bool TickCallback(int progress, long lenght, int speed) {
                 return true;
             }
 
-            void FinishCallback(bool success, bool isDone) {
-                
-            }
+            void FinishCallback(bool success, bool isDone) { }
             
             foreach (var mod in mods) {
                 UpdateMod(mod, TickCallback, FinishCallback);
@@ -33,26 +31,28 @@ namespace Olympus.Utils {
         /// <param name="mod">The populated mod info</param>
         /// <param name="tickCallback">Callback for download progress, parameters: (pos, lenght, speed) -> abort</param>
         /// <param name="finishCallback">Callback to determine outcome, parameters: (success, isDone)</param>
-        public static void UpdateMod(ModList.ModInfo mod, Func<int, long, int, bool> tickCallback, Action<bool, bool> finishCallback) {
+        public static void UpdateMod(ModAPI.IModFileInfo mod, Func<int, long, int, bool> tickCallback, Action<bool, bool> finishCallback) {
             
             // The following is copied and adapted from Everest (OuiModUpdateList.cs:257)
             Task<Task> job = new(async () => {
-                if (mod.DbUpdateInfo == null) {
-                    mod.DbUpdateInfo = ModList.DataBase.QueryUpdateInfo(mod);
-                    if (mod.DbUpdateInfo == null) {
-                        AppLogger.Log.Warning($"Cannot obtain update info for mod {mod.Name}({mod.Path})");
-                        return;
-                    }
+                string path;
+                ModAPI.IModFileInfo remoteFileInfo;
+                if (mod.IsLocal) {
+                    path = mod.Path!;
+                    remoteFileInfo = App.Instance.APIManager.TryAll<ModAPI.IModFileInfo>(api => api.GetModFileInfoFromId(mod.Name)) 
+                                     ?? throw new ApplicationException($"Couldn't find update data for mod {mod.Name}");
+                } else {
+                    throw new InvalidOperationException("Tried to update RemoteFileInfo");
                 }
+                
                 // we will download the mod to Celeste_Directory/[update.GetHashCode()].zip at first.
-                string zipPath = Path.Combine(Path.GetDirectoryName(mod.Path)!, $"modupdate-{mod.GetHashCode()}.zip");
+                string zipPath = Path.Combine(Path.GetDirectoryName(path)!, $"modupdate-{mod.GetHashCode()}.zip");
                 
                 // download it...
                 AppLogger.Log.Information($"Downloading to {zipPath}");
                 bool success = false;
                 bool finished = false;
-                List<string> sources = new() { mod.DbUpdateInfo.URL, mod.DbUpdateInfo.MirrorURL };
-                foreach (string url in sources) {
+                foreach (string url in remoteFileInfo.DownloadUrl!) {
                     try {
                         AppLogger.Log.Information($"Trying {url}");
                         bool b = await DownloadFileWithProgress(url, zipPath,
@@ -69,7 +69,6 @@ namespace Olympus.Utils {
                 }
 
                 
-                finishCallback.Invoke(success, finished);
                 if (!success || !finished) {
                     if (!success)
                         // update failed
@@ -85,12 +84,13 @@ namespace Olympus.Utils {
                 }
 
                 // verify its checksum
-                VerifyChecksum(mod.DbUpdateInfo, zipPath);
+                VerifyChecksum(remoteFileInfo, zipPath);
 
                 // install it
                 InstallModUpdate(mod, zipPath);
 
                 // done!
+                finishCallback.Invoke(success, finished);
             });
 
             job.Start();
@@ -169,10 +169,11 @@ namespace Olympus.Utils {
         /// </summary>
         /// <param name="update">The mod info from the database</param>
         /// <param name="filePath">The path to the file to check</param>
-        private static void VerifyChecksum(ModList.ModDBUpdateInfo update, string filePath) {
+        private static void VerifyChecksum(ModAPI.IModFileInfo update, string filePath) {
             string actualHash = CalculateChecksum(filePath);
             
-            string expectedHash = update.xxHash[0];
+            if (update.IsLocal) AppLogger.Log.Error("Useless verify, local mod info provided");
+            string expectedHash = update.Hash;
             AppLogger.Log.Information($"Verifying checksum: actual hash is {actualHash}, expected hash is {expectedHash}");
             if (expectedHash != actualHash) {
                 throw new IOException($"Checksum error: expected {expectedHash}, got {actualHash}");
@@ -185,13 +186,14 @@ namespace Olympus.Utils {
         /// </summary>
         /// <param name="mod">The mod metadata from Everest for the installed mod</param>
         /// <param name="zipPath">The path to the zip the update has been downloaded to</param>
-        private static void InstallModUpdate(ModList.ModInfo mod, string zipPath) {
+        private static void InstallModUpdate(ModAPI.IModFileInfo mod, string zipPath) {
+            if (!mod.IsLocal) throw new InvalidOperationException("Cant install non local mod");
             // delete the old zip, and move the new one.
             AppLogger.Log.Information($"Deleting mod .zip: {mod.Path}");
-            File.Delete(mod.Path);
+            File.Delete(mod.Path!);
 
             AppLogger.Log.Information($"Moving {zipPath} to {mod.Path}");
-            File.Move(zipPath, mod.Path);
+            File.Move(zipPath, mod.Path!);
         }
 
         /// <summary>

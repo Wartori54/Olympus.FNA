@@ -219,6 +219,58 @@ namespace Olympus {
         End,
         Manual
     }
+    
+    public class Blacklist {
+        public HashSet<string> items;
+        private string filePath;
+
+        public Blacklist(string filePath) {
+            this.filePath = filePath;
+            Load();
+        }
+
+        private void Load() {
+            if (File.Exists(filePath)) {
+                items = new HashSet<string>(File.ReadAllLines(filePath).Select(l => 
+                    (l.StartsWith("#") ? "" : l).Trim()));
+            } else {
+                items = new HashSet<string>();
+            }
+        }
+
+        private void Save() {
+            string newContents = "";
+            if (File.Exists(filePath)) {
+                int i = 0;
+                foreach (string readLine in File.ReadLines(filePath)) {
+                    if (i >= 2) break;
+                    newContents += readLine + "\n";
+                    i++;
+                }
+            }
+
+            foreach (string item in items) {
+                newContents += item + "\n";
+            }
+            
+            File.WriteAllText(filePath, newContents);
+        }
+
+        public void Update(ModAPI.IModFileInfo modFileInfo, bool setBlacklist) {
+            if (!modFileInfo.IsLocal || modFileInfo.Path == null)
+                throw new InvalidOperationException("Cannot blacklist remote modFileInfo");
+            string name = Path.GetFileName(modFileInfo.Path);
+
+            if (items.Contains(name) == setBlacklist) return;
+            if (setBlacklist) {
+                items.Add(name);
+            } else {
+                items.Remove(name);
+            }
+
+            Save();
+        }
+    }
 
     public class Installation {
 
@@ -236,10 +288,33 @@ namespace Olympus {
         [NonSerialized]
         private (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) VersionLast;
 
+        [NonSerialized]
+        public readonly Blacklist MainBlacklist;
+        [NonSerialized]
+        public readonly Blacklist UpdateBlacklist;
+        [NonSerialized]
+        public readonly ModAPI.LocalInfoAPI LocalInfoAPI;
+        [NonSerialized]
+        private readonly FileSystemWatcher watcher;
+
         public Installation(string type, string name, string root) {
             Type = type;
             Name = name;
             Root = root;
+            MainBlacklist = new Blacklist(Path.Combine(Root, "Mods", "blacklist.txt"));
+            UpdateBlacklist = new Blacklist(Path.Combine(Root, "Mods", "updaterblacklist.txt"));
+            LocalInfoAPI = new ModAPI.LocalInfoAPI(this);
+            watcher = new FileSystemWatcher(Root);
+
+            void InvalidateAPICache(object _, FileSystemEventArgs? args) {
+                // TODO: only invalidate the affected mod
+                LocalInfoAPI.modFileInfoCache.Invalidate();
+            }
+
+            watcher.Changed += InvalidateAPICache;
+            watcher.Created += InvalidateAPICache;
+            watcher.Deleted += InvalidateAPICache;
+            watcher.Renamed += (sender, args) => { InvalidateAPICache(sender, null); };
         }
 
         public bool FixPath() {

@@ -1,0 +1,4 @@
+- url: https://maddie480.ovh/celeste/everest-versions
+  tag: everest_versions
+  flags:
+    includeCore: ?supportsNativeBuilds=true

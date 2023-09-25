@@ -18,13 +18,51 @@ using JsonException = Newtonsoft.Json.JsonException;
 namespace Olympus.Utils {
     public static class EverestInstaller {
 
+        // TODO: Create an api for this too, like IModApi
+        public static readonly UrlManager EverestVersionsUrl = new("metadata/everest_versions.yaml");
+
         private static readonly TimedCache<ICollection<EverestVersion>> everestVersionCache =
             new TimedCache<ICollection<EverestVersion>>(new(0, 5, 0),
                 o => {
-                    string jsonData = UrlManager.Urls.EverestVersions.TryHttpGetDataString(new List<string>{"includeCore"});
+                    string jsonData = EverestVersionsUrl.TryHttpGetDataString("everest_versions", new List<string>{"includeCore"});
                     List<EverestVersion>? versions = JsonConvert.DeserializeObject<List<EverestVersion>>(jsonData);
                     return versions ?? throw new JsonException("Couldn't parse json!");
                 }, null);
+        
+        
+        private static readonly Dictionary<char, char> ForbiddenChars = new() {
+                {'<', '\0'},
+                {'>', '\0'},
+                {':', '\0'},
+                {'\"', '\0'},
+                {'\\', '_'},
+                {'|', '\0'},
+                {'?', '\0'},
+                {'*', '\0'},
+                {'/', '_'},
+                {' ', '\0'}
+            };
+    
+        static EverestInstaller() { // Populate forbiddenChars
+            // add [0-32] ascii chars
+            for (int i = 0; i < 32; i++) {
+                ForbiddenChars.Add((char)i, '\0');
+            }
+        }
+        
+        // Modifies a name to be valid on all file systems
+        public static string ValidateName(string name) {
+            string res = "";
+            name = name.Trim();
+        
+            foreach (char c in name) {
+                char newC = ForbiddenChars.GetValueOrDefault(c, c);
+                if (newC != '\0')
+                    res += newC;
+            }
+        
+            return res.ToLower();
+        }
 
         public static ICollection<EverestVersion> QueryEverestVersions() {
             return everestVersionCache.Value;
@@ -77,7 +115,7 @@ namespace Olympus.Utils {
             if (everestVersion != null && 
                 File.Exists(Path.Combine(
                     Config.GetCacheDir(), "uninstallData",
-                    ModList.ModDataBase.ValidateName(install.Root) + everestVersion.Minor + ".yaml"))) {
+                    ValidateName(install.Root) + everestVersion.Minor + ".yaml"))) {
                 yield return new Status("Uninstalling current version...", 0f, Status.Stage.InProgress);
                 await foreach (Status status in UninstallEverest(install)) yield return status;
                 
@@ -154,7 +192,7 @@ namespace Olympus.Utils {
 
                 await using (FileStream file = File.Create(Path.Combine(
                                  installCacheDir,
-                                 ModList.ModDataBase.ValidateName(install.Root) + version.version + ".yaml")))
+                                 ValidateName(install.Root) + version.version + ".yaml")))
                 await using (TextWriter writer = new StreamWriter(file))
                     YamlHelper.Serializer.Serialize(writer, newFiles);
                 yield return new Status("Caches done!", 1f, Status.Stage.Success);
@@ -384,7 +422,7 @@ namespace Olympus.Utils {
 
             // Finally check for caches, and delete final files
             string cacheTarget = Path.Combine(Config.GetCacheDir(), "uninstallData",
-                ModList.ModDataBase.ValidateName(install.Root) + ModVersion.Minor + ".yaml");
+                ValidateName(install.Root) + ModVersion.Minor + ".yaml");
 
             if (File.Exists(cacheTarget)) {
                 yield return new Status("Cleaning residual files...", 0.875f, Status.Stage.InProgress);

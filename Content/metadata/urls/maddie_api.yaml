@@ -1,0 +1,6 @@
+- url: https://maddie480.ovh/celeste/mod_search_database.yaml
+  tag: search_database
+- url: https://maddie480.ovh/celeste/everest_update.yaml
+  tag: everest_update
+- url: https://maddie480.ovh/celeste/gamebanana-featured
+  tag: gamebanana-featured

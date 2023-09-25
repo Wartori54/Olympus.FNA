@@ -1,5 +1,4 @@
-﻿using FontStashSharp;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using OlympUI;
 using OlympUI.Animations;
@@ -9,8 +8,6 @@ using Olympus.Utils;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -541,10 +538,12 @@ namespace Olympus {
                                                                 }
                                                             };
                                                         });
-                                                        (Version? everestVersion, List<ModList.ModInfo> installedMods) = GenerateModList();
+                                                        (Version? everestVersion, IEnumerable<ModAPI.IModFileInfo> installedMods) = GenerateModList();
+                                                        ObservableCollection<Element> generateModListPanels = GenerateModListPanels(everestVersion, installedMods);
                                                         UI.Run(() => {
                                                             el.DisposeChildren();
-                                                            el.Children = GenerateModListPanels(everestVersion, installedMods);
+                                                            // Copying the children has to be done on UI thread
+                                                            el.Children = generateModListPanels;
                                                         });
                                                     } catch (Exception e) {
                                                         AppLogger.Log.Error("refreshModList crashed with exception {0}", e);
@@ -697,22 +696,22 @@ namespace Olympus {
         }
 
         // Returns a the mods installed, to be ran async
-        private (Version? everestVersion, List<ModList.ModInfo> installedMods) GenerateModList() {
+        private (Version? everestVersion, IEnumerable<ModAPI.IModFileInfo> installedMods) GenerateModList() {
             if (Config.Instance.Installation == null) {
                 AppLogger.Log.Error("GenerateModList called before config was loaded!");
-                return new ValueTuple<Version?, List<ModList.ModInfo>>(); // shouldn't ever happen
+                return new ValueTuple<Version?, List<ModAPI.LocalInfoAPI.LocalModFileInfo>>(); // shouldn't ever happen
             }
             (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
             = Config.Instance.Installation.ScanVersion(false);
 
             AppLogger.Log.Information("Gathering Mod List");
-            List<ModList.ModInfo> installedMods = ModList.GatherModList(true, false, false, false);
+            IEnumerable<ModAPI.IModFileInfo> installedMods = Config.Instance.Installation.LocalInfoAPI.CreateAllModFileInfo();
 
             return (ModVersion, installedMods);
         }
 
-        // Builds the panel list from the installed mods, to be run on thread UI
-        private static ObservableCollection<Element> GenerateModListPanels(Version? everestVersion, List<ModList.ModInfo> mods) {
+        // Builds the panel list from the installed mods, shouldn't be run on UI
+        private static ObservableCollection<Element> GenerateModListPanels(Version? everestVersion, IEnumerable<ModAPI.IModFileInfo> mods) {
             if (Config.Instance.Installation == null) {
                  AppLogger.Log.Error("GenerateModList called before config was loaded!");
                  return new ObservableCollection<Element>(); // shouldn't ever happen
@@ -773,20 +772,23 @@ namespace Olympus {
                 everestPanel,
             };
 
-            foreach (ModList.ModInfo mod in mods) {
+            foreach (ModAPI.IModFileInfo mod in mods) {
                 if (Config.Instance.Installation == null) continue;
-                ModPanel modPanel = new(mod) {
+                ModAPI.LocalInfoAPI.LocalModFileInfo localMod = (ModAPI.LocalInfoAPI.LocalModFileInfo) mod;
+                ModPanel modPanel = new(localMod) {
                     Layout = {
                         Layouts.Fill(1, 0),
                         Layouts.Column(),
                     },
                     Clip = false,
                     Children = {
-                        new HeaderSmall(mod.Name),
-                        new Label(mod.Description == "" ? "Description could not be loaded or empty" : mod.Description) {
+                        new HeaderSmall(localMod.Name),
+                        new Label("Loading...") {
+                            ID = "Description",
                             Wrap = true,
                         },
                         new Group() {
+                            ID = "Info",
                             Style = {
                                 { Group.StyleKeys.Spacing, 0 },
                             },
@@ -795,10 +797,13 @@ namespace Olympus {
                                 Layouts.Column()
                             },
                             Children = {
-                                new LabelSmall("Path: " + Path.GetRelativePath(Config.Instance.Installation.Root, mod.Path)),
-                                new LabelSmall("Installed Version: " + mod.Version),
-                                new LabelSmall(mod.NewVersion == null || mod.NewVersion.Equals(mod.Version) 
-                                    ? "Up to date" : "Update available: " + mod.NewVersion),
+                                new LabelSmall("Path: " + Path.GetRelativePath(Config.Instance.Installation.Root, mod.Path!)),
+                                new LabelSmall("Installed Version: " + mod.Version) {
+                                    ID = "VersionLabel"
+                                },
+                                new LabelSmall("Loading...") {
+                                    ID = "UpdateLabel",
+                                },
                                 new LabelSmall("") {
                                     Data = {
                                         {"subscribe_click",
@@ -815,19 +820,68 @@ namespace Olympus {
                     }
                 };
 
-                if (mod.NewVersion == null || mod.NewVersion.Equals(mod.Version)) {
-                    panels.Add(modPanel);
-                    continue;
+                // This is a bad idea, since it will overload the thread pool, effectively freezing all other tasks of the app
+                // Task.Run(() => FinishModPanels(modPanel));
+                
+                panels.Add(modPanel);
+            }
+
+            Task.Run(() => {
+                for (int i = 1; i < panels.Count; i++) {
+                    FinishModPanels((ModPanel)panels[i]);
+                }
+            });
+            
+            return panels;
+        }
+
+        private static void FinishModPanels(ModPanel panel) {
+            ModAPI.IModInfo? modInfo = null;
+            try {
+                modInfo = App.Instance.APIManager.TryAll<ModAPI.IModInfo>(api => api.GetModInfoFromFileInfo(panel.Mod));
+            } catch (Exception ex) {
+                AppLogger.Log.Error("Couldn't finish mod panels!");
+                AppLogger.Log.Error(ex, ex.Message);
+            }
+
+
+            ModAPI.IModFileInfo? remoteFileInfo = null;
+
+            if (modInfo != null) {
+                foreach (ModAPI.IModFileInfo file in modInfo.Files) {
+                    if (file.Name.Equals(panel.Mod.Name)) {
+                        remoteFileInfo = file;
+                        break;
+                    }
+                }
+            }
+
+            UI.Run(() => {
+                string? desc = modInfo?.Description;
+                if (desc == "") desc = null;
+                panel.GetChild<Label>("Description").Text = desc ?? "No description available";
+                panel.GetChild<Group>("Info").GetChild<LabelSmall>("VersionLabel").Text = "Installed Version: " + panel.Mod.Version;
+                if (remoteFileInfo == null || remoteFileInfo.Hash == panel.Mod.Hash) {
+
+                    panel.GetChild<Group>("Info").GetChild<LabelSmall>("UpdateLabel").Text = "Up to date!";
+                    return;
                 }
                 
-                modPanel.Children.Add( 
+                panel.GetChild<Group>("Info").GetChild<LabelSmall>("UpdateLabel").Text = "New version available: " + remoteFileInfo.Version;
+
+                Element? oldUpdateButton = panel.GetChild("UpdateButton");
+                if (oldUpdateButton != null)
+                    panel.Children.Remove(oldUpdateButton);
+
+                panel.Children.Add( 
                     new Group() {
+                        ID = "UpdateButton",
                         Layout = {
                             Layouts.Fill(1, 0),
                             Layouts.Column()
                         },
                         Children = {
-                            new Button("update", b => {
+                            new Button("Update", b => {
                                 Group? parent = b.Parent as Group; // Should never be null
                                 if (parent == null) {
                                     AppLogger.Log.Error("ModPanel button parent was null!!!!");
@@ -870,8 +924,16 @@ namespace Olympus {
                                             b.Text = success ? "Mod updated!" : "Mod update failed! Press to retry";
                                             b.Data.Add("updating", false);
                                             b.Data.Add("cancel", false);
-                                            if (success)
+                                            if (success) {
                                                 b.Enabled = false;
+                                                if (Config.Instance.Installation == null || panel.Mod.Path == null) return;
+                                                ModAPI.IModFileInfo? newModInfo =
+                                                    Config.Instance.Installation.LocalInfoAPI.CreateModFileInfo(
+                                                        panel.Mod.Path);
+                                                if (newModInfo == null) return;
+                                                panel.Mod = (ModAPI.LocalInfoAPI.LocalModFileInfo)newModInfo;
+                                                FinishModPanels(panel);
+                                            }
                                         } else if (!success) {
                                             b.Text = "Retrying in 3 seconds...";
                                         } else { // !isDone && success
@@ -882,20 +944,19 @@ namespace Olympus {
                                     });
                                 });
                             }) {
-                                Enabled = !mod.IsUpdaterBlacklisted,
+                                Enabled = !panel.Mod.IsUpdaterBlacklisted ?? true,
                                 Layout = {
-                                    Layouts.Fill(1, 0),
+                                    // Layouts.Fill(1, 0),
                                 },
                                 Data = {
                                     {"updating", false},
                                 }
                             }
                         },
-                    });
+                    }
+                );
 
-                panels.Add(modPanel);
-            }
-            return panels;
+            });
         }
 
         private partial class ModPanel : Panel {
@@ -928,7 +989,7 @@ namespace Olympus {
 
             private bool Disabled;
 
-            public readonly ModList.ModInfo Mod;
+            public ModAPI.LocalInfoAPI.LocalModFileInfo Mod;
 
             private List<Tuple<Element, Action<bool, Element>>> subscribedClicks = new();
 
@@ -952,10 +1013,10 @@ namespace Olympus {
                 }
             }
 
-            public ModPanel(ModList.ModInfo mod)
+            public ModPanel(ModAPI.LocalInfoAPI.LocalModFileInfo mod)
             : base() {
                 this.Mod = mod;
-                this.Disabled = this.Mod.IsBlacklisted;
+                this.Disabled = Mod.IsBlacklisted ?? false;
                 this.Children.CollectionChanged += (sender, args) => {
                     if (args.NewItems == null) return;
                     ParseChilds(args.NewItems.Cast<Element>());
@@ -976,8 +1037,7 @@ namespace Olympus {
                     return;
                 }
                 Disabled = !Disabled;
-                Mod.IsBlacklisted = Disabled;
-                ModList.BlackListUpdate(Mod);
+                Config.Instance.Installation?.MainBlacklist.Update(Mod, Disabled);
                 foreach (Tuple<Element, Action<bool, Element>> subbed in subscribedClicks) {
                     subbed.Item2.Invoke(this.Disabled, subbed.Item1);
                 }
