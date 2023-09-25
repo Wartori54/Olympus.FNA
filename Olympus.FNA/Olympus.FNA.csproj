@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And '$(RuntimeIdentifiers)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifier>
     <TargetFrameworks Condition="'$(TargetFrameworks)' == '' And $(RuntimeIdentifier.StartsWith('win'))">net7.0-windows</TargetFrameworks>
     <TargetFrameworks Condition="'$(TargetFrameworks)' == ''">net7.0</TargetFrameworks>
     <DefineConstants>HIGHER_VERSIONS</DefineConstants>
