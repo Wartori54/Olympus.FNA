@@ -32,6 +32,7 @@ public class AppLogger {
     }
 
     private AppLogger() {
+        if (!Directory.Exists(PathDir)) Directory.CreateDirectory(PathDir);
         // Keep 5 logs, counting the one we're going to create now
         while (Directory.GetFiles(PathDir).Length > 5-1) {
             DeleteOldest(PathDir);
