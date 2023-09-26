@@ -283,7 +283,10 @@ namespace Olympus {
                         AppLogger.Log.Error("Failed obtaining featured entries");
                     }
 
+                    List<RemoteModInfo> ret = new();
                     foreach (MaddieModInfo entry in entries) {
+                        // Tools cannot be featured
+                        if (entry.ModType == "Tool") continue;
                         List<MaddieModFileInfo> newFiles = new();
                         foreach (IModFileInfo file in entry.Files) {
                             string mmdl = file.DownloadUrl![0].Split('/')[^1];
@@ -297,10 +300,10 @@ namespace Olympus {
 
                         entry.DummyFiles = null;
                         entry.MaddieFiles = newFiles;
+                        ret.Add(entry);
                     }
 
-                    // forced copy :sadeline:
-                    return entries.Cast<RemoteModInfo>().ToList();
+                    return ret;
                 }, null);
                 searchDataBase = new(TimeSpan.FromMinutes(15), _ => {
                     AppLogger.Log.Information("Re-indexing mod search database");
@@ -422,57 +425,58 @@ namespace Olympus {
                 public override string Name => name;
             }
 
+            // I HECKING LOVE WHEN APIS PROVIDE THE SAME DATA IN TWO DIFFERENT FORMATS :))))))))))))))))
             public class MaddieModInfo : RemoteModInfo {
-                [JsonPropertyName("Name")]
+                [JsonProperty("Name")]
                 [YamlMember(Alias = "Name")]
                 public string name = "";
                 [Newtonsoft.Json.JsonIgnore]
                 [YamlIgnore]
                 public override string Name => name;
                 
-                [JsonPropertyName("Author")]
+                [JsonProperty("Author")]
                 [YamlMember(Alias = "Author")]
                 public string author = "";
                 [Newtonsoft.Json.JsonIgnore]
                 [YamlIgnore]
                 public override string Author => author;
                 
-                [JsonPropertyName("Description")]
+                [JsonProperty("Description")]
                 [YamlMember(Alias = "Description")]
                 public string description = "";
                 [Newtonsoft.Json.JsonIgnore]
                 [YamlIgnore]
                 public override string Description => description;
                 
-                [JsonPropertyName("CreatedDate")]
+                [JsonProperty("CreatedDate")]
                 [YamlMember(Alias = "CreatedDate")]
                 public int creationDateI;
                 [Newtonsoft.Json.JsonIgnore]
                 [YamlIgnore]
                 public override DateTime CreationDate => DateTimeOffset.FromUnixTimeSeconds(creationDateI).UtcDateTime;
                 
-                [JsonPropertyName("UpdatedDate")]
+                [JsonProperty("UpdatedDate")]
                 [YamlMember(Alias = "UpdatedDate")]
                 public int updatedDateI;
                 [Newtonsoft.Json.JsonIgnore]
                 [YamlIgnore]
                 public override DateTime LastModified => DateTimeOffset.FromUnixTimeSeconds(updatedDateI).UtcDateTime;
                 
-                [JsonPropertyName("Screenshots")]
+                [JsonProperty("Screenshots")]
                 [YamlMember(Alias = "Screenshots")]
                 public string[] screenshots = Array.Empty<string>();
                 [Newtonsoft.Json.JsonIgnore]
                 [YamlIgnore]
                 public override string[] Screenshots => screenshots;
                 
-                [JsonPropertyName("GameBananaType")]
+                [JsonProperty("GameBananaType")]
                 [YamlMember(Alias = "GameBananaType")]
                 public string modType = "";
                 [YamlIgnore]
                 [Newtonsoft.Json.JsonIgnore]
                 public override string ModType => modType;
                 
-                [JsonPropertyName("PageURL")]
+                [JsonProperty("PageURL")]
                 [YamlMember(Alias = "PageURL")]
                 public string pageURL = "";
                 [YamlIgnore]
@@ -481,7 +485,7 @@ namespace Olympus {
                 
                 public int GameBananaId;
                 
-                [JsonPropertyName("Files")]
+                [JsonProperty("Files")]
                 [YamlMember(Alias = "Files")] // Notice using dummy, it'll get fixed later
                 public List<MaddieModFileInfoDummy>? DummyFiles = new();
                 [YamlIgnore]

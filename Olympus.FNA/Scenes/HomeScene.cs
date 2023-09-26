@@ -11,6 +11,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using static Olympus.ModAPI;
 
 namespace Olympus {
     public class HomeScene : Scene {
@@ -77,9 +78,9 @@ namespace Olympus {
                                         });
                                     });
 
-                                    IWebAPI.IEntry[] mods;
+                                    List<RemoteModInfoAPI.RemoteModInfo> mods;
                                     try {
-                                        mods = await App.WebAPI.GetFeaturedEntries();
+                                        mods = App.APIManager.DefaultAPI().GetFeaturedEntries().ToList();
                                     } catch (Exception e) {
                                         AppLogger.Log.Error("Failed downloading featured entries:");
                                         AppLogger.Log.Error(e, e.Message);
@@ -108,7 +109,7 @@ namespace Olympus {
                                         return;
                                     }
 
-                                    if (mods.Length == 0) {
+                                    if (mods.Count == 0) {
                                         await UI.Run(() => {
                                             el.DisposeChildren();
                                             el.Add(new Group() {
@@ -134,7 +135,7 @@ namespace Olympus {
                                         return;
                                     }
 
-                                    int max = Math.Min(mods.Count(mod => mod.CanBeFeatured), 3);
+                                    int max = Math.Min(mods.Count, 3);
 
                                     HashSet<int> randomized = new(max);
                                     int[] randomMap = new int[max];
@@ -143,8 +144,8 @@ namespace Olympus {
                                     for (int i = 0; i < max; i++) {
                                         int modi;
                                         do {
-                                            modi = random.Next(mods.Length);
-                                        } while (!randomized.Add(modi) || !mods[modi].CanBeFeatured);
+                                            modi = random.Next(mods.Count);
+                                        } while (!randomized.Add(modi));
                                         randomMap[i] = modi;
                                     }
 
@@ -153,7 +154,7 @@ namespace Olympus {
                                     await UI.Run(() => {
                                         el.DisposeChildren();
                                         for (int i = 0; i < max; i++) {
-                                            IWebAPI.IEntry mod = mods[randomMap[i]];
+                                            RemoteModInfoAPI.RemoteModInfo mod = mods[randomMap[i]];
 
                                             panels[i] = el.Add(new Panel() {
                                                 ID = $"FeaturedMod:{i}",
@@ -199,7 +200,7 @@ namespace Olympus {
                                                                 ID = "Header",
                                                                 Wrap = true,
                                                             },
-                                                            new HeaderSmaller(mod.ShortDescription) {
+                                                            new HeaderSmaller(mod.Description) {
                                                                 ID = "Description",
                                                                 Wrap = true,
                                                             },
@@ -212,11 +213,11 @@ namespace Olympus {
 
                                     Task[] imageTasks = new Task[max];
                                     for (int i = 0; i < max; i++) {
-                                        IWebAPI.IEntry mod = mods[randomMap[i]];
+                                        RemoteModInfoAPI.RemoteModInfo mod = mods[randomMap[i]];
                                         Panel panel = panels[i];
 
                                         imageTasks[i] = Task.Run(async () => {
-                                            IReloadable<Texture2D, Texture2DMeta>? tex = await App.Web.GetTextureUnmipped(mod.Images[0]);
+                                            IReloadable<Texture2D, Texture2DMeta>? tex = await App.Web.GetTextureUnmipped(mod.Screenshots[0]);
                                             await UI.Run(() => {
                                                 Element imgs = panel["Images"];
                                                 Element tints = panel["Tints"];
@@ -538,7 +539,7 @@ namespace Olympus {
                                                                 }
                                                             };
                                                         });
-                                                        (Version? everestVersion, IEnumerable<ModAPI.IModFileInfo> installedMods) = GenerateModList();
+                                                        (Version? everestVersion, IEnumerable<IModFileInfo> installedMods) = GenerateModList();
                                                         ObservableCollection<Element> generateModListPanels = GenerateModListPanels(everestVersion, installedMods);
                                                         UI.Run(() => {
                                                             el.DisposeChildren();
@@ -696,22 +697,22 @@ namespace Olympus {
         }
 
         // Returns a the mods installed, to be ran async
-        private (Version? everestVersion, IEnumerable<ModAPI.IModFileInfo> installedMods) GenerateModList() {
+        private (Version? everestVersion, IEnumerable<IModFileInfo> installedMods) GenerateModList() {
             if (Config.Instance.Installation == null) {
                 AppLogger.Log.Error("GenerateModList called before config was loaded!");
-                return new ValueTuple<Version?, List<ModAPI.LocalInfoAPI.LocalModFileInfo>>(); // shouldn't ever happen
+                return new ValueTuple<Version?, List<LocalInfoAPI.LocalModFileInfo>>(); // shouldn't ever happen
             }
             (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
             = Config.Instance.Installation.ScanVersion(false);
 
             AppLogger.Log.Information("Gathering Mod List");
-            IEnumerable<ModAPI.IModFileInfo> installedMods = Config.Instance.Installation.LocalInfoAPI.CreateAllModFileInfo();
+            IEnumerable<IModFileInfo> installedMods = Config.Instance.Installation.LocalInfoAPI.CreateAllModFileInfo();
 
             return (ModVersion, installedMods);
         }
 
         // Builds the panel list from the installed mods, shouldn't be run on UI
-        private static ObservableCollection<Element> GenerateModListPanels(Version? everestVersion, IEnumerable<ModAPI.IModFileInfo> mods) {
+        private static ObservableCollection<Element> GenerateModListPanels(Version? everestVersion, IEnumerable<IModFileInfo> mods) {
             if (Config.Instance.Installation == null) {
                  AppLogger.Log.Error("GenerateModList called before config was loaded!");
                  return new ObservableCollection<Element>(); // shouldn't ever happen
@@ -772,9 +773,9 @@ namespace Olympus {
                 everestPanel,
             };
 
-            foreach (ModAPI.IModFileInfo mod in mods) {
+            foreach (IModFileInfo mod in mods) {
                 if (Config.Instance.Installation == null) continue;
-                ModAPI.LocalInfoAPI.LocalModFileInfo localMod = (ModAPI.LocalInfoAPI.LocalModFileInfo) mod;
+                LocalInfoAPI.LocalModFileInfo localMod = (LocalInfoAPI.LocalModFileInfo) mod;
                 ModPanel modPanel = new(localMod) {
                     Layout = {
                         Layouts.Fill(1, 0),
@@ -836,19 +837,19 @@ namespace Olympus {
         }
 
         private static void FinishModPanels(ModPanel panel) {
-            ModAPI.IModInfo? modInfo = null;
+            IModInfo? modInfo = null;
             try {
-                modInfo = App.Instance.APIManager.TryAll<ModAPI.IModInfo>(api => api.GetModInfoFromFileInfo(panel.Mod));
+                modInfo = App.Instance.APIManager.TryAll<IModInfo>(api => api.GetModInfoFromFileInfo(panel.Mod));
             } catch (Exception ex) {
                 AppLogger.Log.Error("Couldn't finish mod panels!");
                 AppLogger.Log.Error(ex, ex.Message);
             }
 
 
-            ModAPI.IModFileInfo? remoteFileInfo = null;
+            IModFileInfo? remoteFileInfo = null;
 
             if (modInfo != null) {
-                foreach (ModAPI.IModFileInfo file in modInfo.Files) {
+                foreach (IModFileInfo file in modInfo.Files) {
                     if (file.Name.Equals(panel.Mod.Name)) {
                         remoteFileInfo = file;
                         break;
@@ -927,11 +928,11 @@ namespace Olympus {
                                             if (success) {
                                                 b.Enabled = false;
                                                 if (Config.Instance.Installation == null || panel.Mod.Path == null) return;
-                                                ModAPI.IModFileInfo? newModInfo =
+                                                IModFileInfo? newModInfo =
                                                     Config.Instance.Installation.LocalInfoAPI.CreateModFileInfo(
                                                         panel.Mod.Path);
                                                 if (newModInfo == null) return;
-                                                panel.Mod = (ModAPI.LocalInfoAPI.LocalModFileInfo)newModInfo;
+                                                panel.Mod = (LocalInfoAPI.LocalModFileInfo)newModInfo;
                                                 FinishModPanels(panel);
                                             }
                                         } else if (!success) {
@@ -989,7 +990,7 @@ namespace Olympus {
 
             private bool Disabled;
 
-            public ModAPI.LocalInfoAPI.LocalModFileInfo Mod;
+            public LocalInfoAPI.LocalModFileInfo Mod;
 
             private List<Tuple<Element, Action<bool, Element>>> subscribedClicks = new();
 
@@ -1013,7 +1014,7 @@ namespace Olympus {
                 }
             }
 
-            public ModPanel(ModAPI.LocalInfoAPI.LocalModFileInfo mod)
+            public ModPanel(LocalInfoAPI.LocalModFileInfo mod)
             : base() {
                 this.Mod = mod;
                 this.Disabled = Mod.IsBlacklisted ?? false;
