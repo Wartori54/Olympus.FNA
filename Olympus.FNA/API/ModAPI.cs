@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using YamlDotNet.Serialization;
@@ -249,96 +250,23 @@ namespace Olympus {
             private const string YamlPath = "metadata/urls/maddie_api.yaml";
 
             // Maps file id-name to file info
-            private TimedCache<Dictionary<string, MaddieModFileInfo>> rawUpdateDataBase; 
+            private readonly TimedCache<Dictionary<string, MaddieModFileInfo>> rawUpdateDataBase; 
             // Maps gamebanana id file to id-name
-            private TimedCache<Dictionary<int, string>> mmdlUpdateDataBase;
+            private readonly TimedCache<Dictionary<int, string>> mmdlUpdateDataBase;
             // Contains the featured entries
-            private TimedCache<List<RemoteModInfo>> featuredEntries;
+            private readonly TimedCache<List<RemoteModInfo>> featuredEntries;
             // Maps file id to mod info
-            private TimedCache<Dictionary<int, MaddieModInfo>> searchDataBase;
+            private readonly TimedCache<Dictionary<int, MaddieModInfo>> searchDataBase;
 
             public MaddieModInfoAPI() : base(YamlPath) {
                 rawUpdateDataBase = new(TimeSpan.FromMinutes(15), 
                     DownloadUpdateDataBase, null);
-                mmdlUpdateDataBase = new(TimeSpan.FromMinutes(15), _ => {
-                    AppLogger.Log.Information("Re-indexing UpdateDB");
-                    Dictionary<int, string> ret = new();
-                    foreach (KeyValuePair<string, MaddieModFileInfo> kvp in rawUpdateDataBase.Value) {
-                        if (!ret.TryAdd(kvp.Value.GameBananaFileId, kvp.Key)) {
-                            throw new InvalidDataException("Found multiple GameBananaFileId!");
-                        }
-                    }
-
-                    return ret;
-                }, null);
-                featuredEntries = new(TimeSpan.FromMinutes(15), _ => {
-                    AppLogger.Log.Information("Getting featured entries");
-                    
-                    Stream jsonData = UrlManager.TryHttpGetDataStream("gamebanana-featured");
-                    using StreamReader sr = new(jsonData);
-                    using JsonTextReader jtr = new(sr);
-
-                    List<MaddieModInfo>? entries = JsonHelper.Serializer.Deserialize<List<MaddieModInfo>>(jtr);
-                    if (entries == null) {
-                        entries = new();
-                        AppLogger.Log.Error("Failed obtaining featured entries");
-                    }
-
-                    List<RemoteModInfo> ret = new();
-                    foreach (MaddieModInfo entry in entries) {
-                        // Tools cannot be featured
-                        if (entry.ModType == "Tool") continue;
-                        List<MaddieModFileInfo> newFiles = new();
-                        foreach (IModFileInfo file in entry.Files) {
-                            string mmdl = file.DownloadUrl![0].Split('/')[^1];
-                            if (!mmdlUpdateDataBase.Value.TryGetValue(int.Parse(mmdl), out string? ID)) {
-                                // This means its probably not the latest file, discard it
-                                continue;
-                            }
-                            
-                            newFiles.Add(rawUpdateDataBase.Value[ID]); // rawUpdateDataBase must contain the ID if the above succeded
-                        }
-
-                        entry.DummyFiles = null;
-                        entry.MaddieFiles = newFiles;
-                        ret.Add(entry);
-                    }
-
-                    return ret;
-                }, null);
-                searchDataBase = new(TimeSpan.FromMinutes(15), _ => {
-                    AppLogger.Log.Information("Re-indexing mod search database");
-                    
-                    string yamlData = UrlManager.TryHttpGetDataString("search_database");
-
-                    List<MaddieModInfo> data =
-                        YamlHelper.Deserializer.Deserialize<List<MaddieModInfo>>(yamlData);
-
-                    Dictionary<int, MaddieModInfo> ret = new();
-
-                    foreach (MaddieModInfo modInfo in data) {
-                        List<MaddieModFileInfo> newFiles = new();
-                        foreach (MaddieModFileInfoDummy dummyFile in modInfo.DummyFiles ?? new List<MaddieModFileInfoDummy>()) {
-                            int mmdl = int.Parse(dummyFile.DownloadUrl![0].Split('/')[^1]);
-                            if (!mmdlUpdateDataBase.Value.TryGetValue(mmdl, out string? ID)) {
-                                // This means its probably not the latest file, discard it
-                                continue;
-                            }
-
-                            newFiles.Add(rawUpdateDataBase.Value[ID]);
-                        }
-
-                        modInfo.DummyFiles = null;
-                        modInfo.MaddieFiles = newFiles;
-                        foreach (MaddieModFileInfo file in modInfo.MaddieFiles) { // must contain dummy files
-                            if (!ret.TryAdd(file.GameBananaFileId, modInfo)) {
-                                AppLogger.Log.Error($"ID: {file.GameBananaFileId} appeared multiple times!");
-                            }
-                        }
-                    }
-
-                    return ret;
-                }, null);
+                mmdlUpdateDataBase = new(TimeSpan.FromMinutes(15), 
+                    MmdlUpdateDataBase, null);
+                featuredEntries = new(TimeSpan.FromMinutes(15), 
+                    RefreshFeaturedEntries, null);
+                searchDataBase = new(TimeSpan.FromMinutes(15), 
+                    RefreshSearchDataBase, null);
             }
 
             private Dictionary<string, MaddieModFileInfo> DownloadUpdateDataBase(object? _) {
@@ -353,6 +281,88 @@ namespace Olympus {
                     entry.Value.name = entry.Key;
                 
                 AppLogger.Log.Information("Deserialized updaterDB");
+                return ret;
+            }
+
+            private Dictionary<int, string> MmdlUpdateDataBase(object? _) {
+                AppLogger.Log.Information("Re-indexing UpdateDB");
+                Dictionary<int, string> ret = new();
+                foreach (KeyValuePair<string, MaddieModFileInfo> kvp in rawUpdateDataBase.Value) {
+                    if (!ret.TryAdd(kvp.Value.GameBananaFileId, kvp.Key)) {
+                        throw new InvalidDataException("Found multiple GameBananaFileId!");
+                    }
+                }
+
+                return ret;
+            }
+
+            private List<RemoteModInfo> RefreshFeaturedEntries(object? _) {
+                AppLogger.Log.Information("Getting featured entries");
+                                    
+                Stream jsonData = UrlManager.TryHttpGetDataStream("gamebanana-featured");
+                using StreamReader sr = new(jsonData);
+                using JsonTextReader jtr = new(sr);
+
+                List<MaddieModInfo>? entries = JsonHelper.Serializer.Deserialize<List<MaddieModInfo>>(jtr);
+                if (entries == null) {
+                    entries = new();
+                    AppLogger.Log.Error("Failed obtaining featured entries");
+                }
+
+                List<RemoteModInfo> ret = new();
+                foreach (MaddieModInfo entry in entries) {
+                    // Tools cannot be featured
+                    if (entry.ModType == "Tool") continue;
+                    List<MaddieModFileInfo> newFiles = new();
+                    foreach (IModFileInfo file in entry.Files) {
+                        string mmdl = file.DownloadUrl![0].Split('/')[^1];
+                        if (!mmdlUpdateDataBase.Value.TryGetValue(int.Parse(mmdl), out string? ID)) {
+                            // This means its probably not the latest file, discard it
+                            continue;
+                        }
+                        
+                        newFiles.Add(rawUpdateDataBase.Value[ID]); // rawUpdateDataBase must contain the ID if the above succeded
+                    }
+
+                    entry.DummyFiles = null;
+                    entry.MaddieFiles = newFiles;
+                    ret.Add(entry);
+                }
+
+                return ret;
+            }
+
+            private Dictionary<int, MaddieModInfo> RefreshSearchDataBase(object? _) {
+                AppLogger.Log.Information("Re-indexing mod search database");
+                                    
+                string yamlData = UrlManager.TryHttpGetDataString("search_database");
+
+                List<MaddieModInfo> data =
+                    YamlHelper.Deserializer.Deserialize<List<MaddieModInfo>>(yamlData);
+
+                Dictionary<int, MaddieModInfo> ret = new();
+
+                foreach (MaddieModInfo modInfo in data) {
+                    List<MaddieModFileInfo> newFiles = new();
+                    foreach (MaddieModFileInfoDummy dummyFile in modInfo.DummyFiles ?? new List<MaddieModFileInfoDummy>()) {
+                        int mmdl = int.Parse(dummyFile.DownloadUrl![0].Split('/')[^1]);
+                        if (!mmdlUpdateDataBase.Value.TryGetValue(mmdl, out string? ID)) {
+                            // This means its probably not the latest file, discard it
+                            continue;
+                        }
+
+                        newFiles.Add(rawUpdateDataBase.Value[ID]);
+                    }
+
+                    modInfo.DummyFiles = null;
+                    modInfo.MaddieFiles = newFiles;
+                    foreach (MaddieModFileInfo file in modInfo.MaddieFiles) { // must contain dummy files
+                        if (!ret.TryAdd(file.GameBananaFileId, modInfo)) {
+                            AppLogger.Log.Error($"ID: {file.GameBananaFileId} appeared multiple times!");
+                        }
+                    }
+                }
+
                 return ret;
             }
 
@@ -518,27 +528,27 @@ namespace Olympus {
         #region RemoteAPIManager
 
         public class RemoteAPIManager {
-            private Dictionary<APIs, RemoteModInfoAPI> apis;
+            private List<APIRegister> apis;
+            public APIRegister Default; // Default to first one, prob going to get modified anyway
+            
             public static RemoteAPIManager? Instance;
-            public static APIs Default = 0; // Default to first one, prob going to get modified anyway
 
             public RemoteAPIManager() {
                 if (Instance != null)
                     throw new InvalidOperationException("RemoteAPIManager created multiple times!");
                 Instance = this;
-                apis = new Dictionary<APIs, RemoteModInfoAPI>();
-                // Add all the apis here
-                apis.Add(APIs.MaddieAPI, new MaddieModInfoAPI());
-                
+                apis = new List<APIRegister>();
+                apis = typeof(APIRegister).GetFields(BindingFlags.Public | BindingFlags.Static)
+                    .Where(f => f.FieldType == typeof(APIRegister))
+                    .Select(f => (APIRegister) f.GetValue(null)!)
+                    .ToList();
+
+                Default = apis[0];
             }
 
-
-            public RemoteModInfoAPI GetAPI(APIs api) {
-                return apis[api];
-            }
 
             public RemoteModInfoAPI DefaultAPI() {
-                return apis[Default];
+                return Default.ApiInstance;
             }
             
             /// <summary>
@@ -548,16 +558,25 @@ namespace Olympus {
             /// <typeparam name="T">The expected return type</typeparam>
             /// <returns>null if failure, an object otherwise</returns>
             public T? TryAll<T>(Func<RemoteModInfoAPI, T?> func) where T : class {
-                foreach (RemoteModInfoAPI api in apis.Values) {
-                    T? res = func(api);
+                foreach (APIRegister api in apis) {
+                    T? res = func(api.ApiInstance);
                     if (res != null) return res;
                 }
 
                 return null;
             }
 
-            public enum APIs {
-                MaddieAPI,
+            public class APIRegister {
+                public static readonly APIRegister MaddieAPI = new("Gamebanana Proxy (maddie480.ovh)", new MaddieModInfoAPI());
+                
+                public readonly string FriendlyName;
+                public readonly RemoteModInfoAPI ApiInstance;
+                
+                private APIRegister(string friendlyName, RemoteModInfoAPI apiInstance) {
+                    FriendlyName = friendlyName;
+                    ApiInstance = apiInstance;
+                }
+                
             }
         }
         
