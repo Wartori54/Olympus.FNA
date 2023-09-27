@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using Olympus.API;
 using Olympus.Utils;
 using System;
 using System.Collections.Generic;
@@ -291,7 +292,7 @@ namespace Olympus {
                         foreach (IModFileInfo file in entry.Files) {
                             string mmdl = file.DownloadUrl![0].Split('/')[^1];
                             if (!mmdlUpdateDataBase.Value.TryGetValue(int.Parse(mmdl), out string? ID)) {
-                                AppLogger.Log.Warning($"Can't file for gamebanan ID: {mmdl}");
+                                // This means its probably not the latest file, discard it
                                 continue;
                             }
                             

@@ -8,7 +8,8 @@ using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
-namespace Olympus {
+namespace Olympus.API {
+    // If you're confused about UrlManager and this class, check out UrlManager
     public class Web : IDisposable {
 
         public readonly App App;
@@ -135,6 +136,55 @@ namespace Olympus {
                     return data;
                 }
             }));
+        }
+        
+        
+
+        /// <summary>
+        /// Saves a stream to a file, calling a callback in the meantime
+        /// </summary>
+        /// <param name="outputFile">The file to redirect the stream</param>
+        /// <param name="stream">The data</param>
+        /// <param name="length">The total bytes of data</param>
+        /// <param name="progressCallback">The callback for the progress update</param>
+        public static async Task<bool> Stream2FileWithProgress(string outputFile, Task<Stream> stream, int length, 
+                Func<int, int, int, bool> progressCallback) {
+            if (File.Exists(outputFile))
+                File.Delete(outputFile);
+            await using FileStream output = File.OpenWrite(outputFile);
+
+            DateTime timeStart = DateTime.Now;
+            await using Stream input = await stream;
+            progressCallback(0, length, 0);
+            
+            byte[] buffer = new byte[4096];
+            DateTime timeLastSpeed = timeStart;
+            int read = 1;
+            int readForSpeed = 0;
+            int pos = 0;
+            int speed = 0;
+            while (read > 0) {
+                int count = length > 0 ? (int) Math.Min(buffer.Length, length - pos) : buffer.Length;
+                read = await input.ReadAsync(buffer, 0, count);
+                output.Write(buffer, 0, read);
+                pos += read;
+                readForSpeed += read;
+
+                TimeSpan td = DateTime.Now - timeLastSpeed;
+                if (td.TotalMilliseconds > 100) {
+                    speed = (int) ((readForSpeed / 1024D) / td.TotalSeconds);
+                    readForSpeed = 0;
+                    timeLastSpeed = DateTime.Now;
+                }
+
+                if (!progressCallback(pos, length, speed)) {
+                    return false;
+                }
+            }
+
+            progressCallback(pos, length, speed);
+
+            return true;
         }
 
     }

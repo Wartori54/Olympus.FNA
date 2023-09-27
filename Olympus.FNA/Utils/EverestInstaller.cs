@@ -1,5 +1,6 @@
 using MonoMod.Utils;
 using Newtonsoft.Json;
+using Olympus.API;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -136,7 +137,7 @@ namespace Olympus.Utils {
             string outFile = Path.Combine(Config.GetCacheDir(), "everestVersions",
                                 $"everest_{version.version}.zip");
             if (!File.Exists(outFile)) { // Download only if necessary
-                Task<bool> job = UrlManager.Stream2FileWithProgress(outFile,
+                Task<bool> job = Web.Stream2FileWithProgress(outFile,
                     wc.GetStreamAsync(version.mainDownload), version.mainFileSize,
                     (progress, total, speed) => {
                         statusChannel.Writer.TryWrite(new Status(
@@ -334,7 +335,7 @@ namespace Olympus.Utils {
                     Directory.CreateDirectory(Path.Combine(Config.GetCacheDir(), "everestVersions"));
                 }
                 
-                Task<bool> job = UrlManager.Stream2FileWithProgress(everestCache,
+                Task<bool> job = Web.Stream2FileWithProgress(everestCache,
                     wc.GetStreamAsync(version.mainDownload), version.mainFileSize,
                     (progress, total, speed) => {
                         statusChannel.Writer.TryWrite(new Status($"Downloading files: {(float) progress/total*100}%, {speed} Kb/s", 
