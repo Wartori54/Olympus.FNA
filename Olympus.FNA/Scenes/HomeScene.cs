@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 using OlympUI;
 using OlympUI.Animations;
 using OlympUI.Modifiers;
+using Olympus.API;
 using Olympus.ColorThief;
 using Olympus.Utils;
 using System;
@@ -446,7 +447,7 @@ namespace Olympus {
                                                     });
                                                 });
 
-                                                refreshModList = new LockedAction<Installation?>(_ => {
+                                                refreshModList = new LockedAction<Installation?>(async _ => {
                                                     if (Config.Instance.Installation == null) {
                                                         UI.Run(() => {
                                                             el.DisposeChildren();
@@ -520,7 +521,7 @@ namespace Olympus {
                                                         return;
                                                     }
                                                     try {
-                                                        UI.Run(() => { // remove old and add loading screen
+                                                        await UI.Run(() => { // remove old and add loading screen
                                                             el.DisposeChildren();
                                                             el.Children = new ObservableCollection<Element>() {
                                                                 new Group() {
@@ -541,11 +542,17 @@ namespace Olympus {
                                                         });
                                                         (Version? everestVersion, IEnumerable<IModFileInfo> installedMods) = GenerateModList();
                                                         ObservableCollection<Element> generateModListPanels = GenerateModListPanels(everestVersion, installedMods);
-                                                        UI.Run(() => {
-                                                            el.DisposeChildren();
-                                                            // Copying the children has to be done on UI thread
-                                                            el.Children = generateModListPanels;
-                                                        });
+                                                        
+                                                        await UI.Run(() => el.DisposeChildren());
+                                                        
+                                                        // neat hack to force a single call on every update to prevent freezes
+                                                        uint currGUID = UI.GlobalUpdateID;
+                                                        foreach (Element panel in generateModListPanels) {
+                                                            while (currGUID == UI.GlobalUpdateID) await Task.Delay(1);
+                                                            currGUID = UI.GlobalUpdateID;
+                                                            await UI.Run(() => el.Add(panel));
+                                                            
+                                                        }
                                                     } catch (Exception e) {
                                                         AppLogger.Log.Error("refreshModList crashed with exception {0}", e);
                                                         AppLogger.Log.Error("Stacktrace: {0}", e.StackTrace);
@@ -827,8 +834,12 @@ namespace Olympus {
                 panels.Add(modPanel);
             }
 
-            Task.Run(() => {
+            Task.Run(async () => {
+                // neat hack to force a single call on every update to prevent freezes
+                uint currGUID = UI.GlobalUpdateID;
                 for (int i = 1; i < panels.Count; i++) {
+                    while (currGUID == UI.GlobalUpdateID) await Task.Delay(1);
+                    currGUID = UI.GlobalUpdateID;
                     FinishModPanels((ModPanel)panels[i]);
                 }
             });
