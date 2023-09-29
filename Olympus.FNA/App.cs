@@ -18,6 +18,7 @@ namespace Olympus {
         public static App Instance;
         public Web Web;
         public ModAPI.RemoteAPIManager APIManager;
+        public NewsProviderManager NewsManager;
         public FinderManager FinderManager;
 #pragma warning restore CS8618
 
@@ -135,6 +136,7 @@ namespace Olympus {
             // WebAPI = new ThunderstoreWebAPI(this, "enter-the-gungeon");
             // WebAPI = new CelesteWebAPI(this);
             APIManager = new ModAPI.RemoteAPIManager();
+            NewsManager = new NewsProviderManager();
             FinderManager = new(this);
         }
 

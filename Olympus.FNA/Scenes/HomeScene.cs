@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using static Olympus.ModAPI;
 
@@ -19,8 +20,13 @@ namespace Olympus {
 
         private LockedAction<Installation?>? refreshModList;
 
+        private CancellationTokenSource cancellationToken;
+        private CancellationToken? ct;
+
         public HomeScene() {
+            cancellationToken = new CancellationTokenSource();
             Config.Instance.SubscribeInstallUpdateNotify(i => {
+                cancellationToken.Cancel();
                 refreshModList?.TryRun(i);
             });
         }
@@ -448,21 +454,28 @@ namespace Olympus {
                                                 });
 
                                                 refreshModList = new LockedAction<Installation?>(async _ => {
+                                                    Panel firstPanel = new Panel() {
+                                                        Layout = {
+                                                            Layouts.Fill(1, 0),
+                                                            Layouts.Column(),
+                                                        },
+                                                        Modifiers = {
+                                                            new FadeInAnimation(0.09f).WithDelay(0.05f).With(Ease.SineInOut),
+                                                            new OffsetInAnimation(new Vector2(0f, 10f), 0.15f).WithDelay(0.05f).With(Ease.SineIn),
+                                                            new ScaleInAnimation(0.9f, 0.125f).WithDelay(0.05f).With(Ease.SineOut),
+                                                        }
+                                                       
+                                                    };
                                                     if (Config.Instance.Installation == null) {
                                                         UI.Run(() => {
                                                             el.DisposeChildren();
-                                                            el.Children.Add(new Panel() {
-                                                                Layout = {
-                                                                    Layouts.Fill(1, 0),
-                                                                    Layouts.Column(),
+                                                            firstPanel.Children = new() {
+                                                                new HeaderSmall("Mods start here"),
+                                                                new Label("You have yet to select your celeste installation.\nDo so by pressing on the \"Manage Installs\" button above.") {
+                                                                    Wrap = true,
                                                                 },
-                                                                Children = {
-                                                                    new HeaderSmall("Mods start here"),
-                                                                    new Label("You have yet to select your celeste installation.\nDo so by pressing on the \"Manage Installs\" button above.") {
-                                                                        Wrap = true,
-                                                                    },
-                                                                }
-                                                            });
+                                                            };
+                                                            el.Add(firstPanel);
                                                             UI.Root.InvalidateForce();
                                                         });
                                                         return;
@@ -474,18 +487,14 @@ namespace Olympus {
                                                     if (!Modifiable) {
                                                         UI.Run(() => {
                                                             el.DisposeChildren();
-                                                            el.Children.Add(new Panel() {
-                                                                Layout = {
-                                                                    Layouts.Fill(1, 0),
-                                                                    Layouts.Column(),
+                                                            firstPanel.Children = new() {
+                                                                new HeaderSmall("*Confusion noises*"),
+                                                                new Label(
+                                                                    "Seems like your currently selected celeste install is malformed or unreadable, try revising it.\nOr choose another one by pressing on the \"Manage Installs\" button above.") {
+                                                                    Wrap = true,
                                                                 },
-                                                                Children = {
-                                                                    new HeaderSmall("*Confusion noises*"),
-                                                                    new Label("Seems like your currently selected celeste install is malformed or unreadable, try revising it.\nOr choose another one by pressing on the \"Manage Installs\" button above.") {
-                                                                        Wrap = true,
-                                                                    },
-                                                                }
-                                                            });
+                                                            };
+                                                            el.Add(firstPanel);
                                                             UI.Root.InvalidateForce();
                                                         });
                                                         return;
@@ -493,29 +502,27 @@ namespace Olympus {
                                                     if (ModName == null || ModVersion == null) {
                                                         UI.Run(() => {
                                                             el.DisposeChildren();
-                                                            el.Children.Add(new Panel() {
-                                                                Layout = {
-                                                                    Layouts.Fill(1, 0),
-                                                                    Layouts.Column(),
+                                                            firstPanel.Children = new() {
+                                                                new HeaderSmall("Vanilla Celeste"),
+                                                                new Label(
+                                                                    "The currently selected celeste installation is not yet modded.\nInstall Everest now to play with mods") {
+                                                                    Wrap = true,
                                                                 },
-                                                                Children = {
-                                                                    new HeaderSmall("Vanilla Celeste"),
-                                                                    new Label("The currently selected celeste installation is not yet modded.\nInstall Everest now to play with mods") {
-                                                                        Wrap = true,
+                                                                new Group() {
+                                                                    Layout = {
+                                                                        Layouts.Fill(1, 0, 0, 0),
+                                                                        Layouts.Row(),
+                                                                        Layouts.Right(),
                                                                     },
-                                                                    new Group() {
-                                                                        Layout = {
-                                                                            Layouts.Fill(1, 0, 0, 0),
-                                                                            Layouts.Row(),
-                                                                            Layouts.Right(),
-                                                                        },
-                                                                        Children = {
-                                                                            new Button("Install Everest", 
-                                                                                b => Scener.Push<EverestSimpleInstallScene>()),
-                                                                        }
+                                                                    Children = {
+                                                                        new Button("Install Everest",
+                                                                            b =>
+                                                                                Scener
+                                                                                    .Push<EverestSimpleInstallScene>()),
                                                                     }
                                                                 }
-                                                            });
+                                                            };
+                                                            el.Add(firstPanel);
                                                             UI.Root.InvalidateForce();
                                                         });
                                                         return;
@@ -626,31 +633,109 @@ namespace Olympus {
                                                     });
                                                 });
 
-                                                await Task.Delay(3000);
+                                                IEnumerable<INewsEntry> news;
+                                                try {
+                                                    news = App.NewsManager.GetDefault()
+                                                        .PollAll();
+                                                } catch (Exception e) {
+                                                    AppLogger.Log.Error("Failed to obtain news");
+                                                    AppLogger.Log.Error(e, e.Message);
+                                                    UI.Run(() => {
+                                                        el.DisposeChildren();
+                                                        el.Add(new Group() {
+                                                            Layout = { Layouts.Fill(1, 0), },
+                                                            Children = {
+                                                                new Group() {
+                                                                    Layout = {
+                                                                        Layouts.Left(0.5f, -0.5f), Layouts.Row(8),
+                                                                    },
+                                                                    Children = {
+                                                                        new Label("Failed to obtain news!") {
+                                                                            Layout = { Layouts.Top(0.5f, -0.5f) },
+                                                                        },
+                                                                    }
+                                                                }
+                                                            }
+                                                        });
+                                                    });
+                                                    return;
+                                                }
+
+                                                INewsEntry[] newsArray = news.ToArray();
+                                                Panel[] panels = new Panel[newsArray.Length];
 
                                                 await UI.Run(() => {
                                                     el.DisposeChildren();
-                                                    el.Add(new Panel() {
-                                                        Layout = {
-                                                            Layouts.Fill(1, 0),
-                                                            Layouts.Column(),
-                                                        },
-                                                        Children = {
-                                                            new HeaderSmall("Awesome News"),
-                                                            new Label("TODO"),
+                                                    for (int i = 0; i < newsArray.Length; i++) {
+                                                        INewsEntry newsEntry = newsArray[i];
+                                                        Panel panel = new() {
+                                                            Layout = { Layouts.Fill(1, 0), Layouts.Column(), },
+                                                            Modifiers = {
+                                                                new FadeInAnimation(0.09f).WithDelay(0.05f)
+                                                                    .With(Ease.SineInOut),
+                                                                new OffsetInAnimation(new Vector2(0f, 10f), 0.15f)
+                                                                    .WithDelay(0.05f).With(Ease.SineIn),
+                                                                new ScaleInAnimation(0.9f, 0.125f).WithDelay(0.05f)
+                                                                    .With(Ease.SineOut),
+                                                            },
+                                                            Children = {
+                                                                new HeaderSmall(newsEntry.Title) {
+                                                                    Wrap = true,
+                                                                },
+                                                                new Group() {
+                                                                    ID = "ImageGroup", 
+                                                                    Layout = {
+                                                                        Layouts.FillFull(1, 0)
+                                                                    }
+                                                                },
+                                                                new Label(newsEntry.Text) { Wrap = true, },
+                                                            }
+                                                        };
+
+                                                        foreach (INewsEntry.ILink link in newsEntry.Links) {
+                                                            panel.Add(new IconButton("icons/browser",
+                                                                link.Text,
+                                                                _ => URIHelper.OpenInBrowser(link.Url)));
                                                         }
-                                                    });
-                                                    el.Add(new Panel() {
-                                                        Layout = {
-                                                            Layouts.Fill(1, 0),
-                                                            Layouts.Column(),
-                                                        },
-                                                        Children = {
-                                                            new HeaderSmall("Bad News"),
-                                                            new Label("TODO"),
-                                                        }
-                                                    });
+
+                                                        panels[i] = el.Add(panel);
+                                                    }
                                                 });
+                                                Task[] newsTasks = new Task[newsArray.Length];
+                                                for (int i = 0; i < newsArray.Length; i++) {
+                                                    INewsEntry newsEntry = newsArray[i];
+                                                    Panel panel = panels[i];
+                                                    newsTasks[i] = Task.Run(async () => {
+                                                        IReloadable<Texture2D, Texture2DMeta>? tex = null;
+                                                        foreach (string img in newsEntry.Images) {
+                                                            tex = await App.Web.GetTextureUnmipped(img);
+                                                            if (tex != null) break;
+                                                        }
+
+                                                        if (tex == null) return;
+
+                                                        Element group = panel["ImageGroup"];
+                                                        group.DisposeChildren();
+
+                                                        await UI.Run(() => {
+                                                            group.Add(new Image(tex) {
+                                                                Modifiers = {
+                                                                    new FadeInAnimation(0.6f).With(Ease.QuadOut),
+                                                                    new ScaleInAnimation(1.05f, 0.5f).With(
+                                                                        Ease.QuadOut)
+                                                                },
+                                                                Layout = {
+                                                                    ev => {
+                                                                        Image img = (Image) ev.Element;
+                                                                        img.AutoW = group.W;
+                                                                    },
+                                                                }
+                                                            });
+                                                        });
+                                                    });
+                                                }
+
+                                                await Task.WhenAll(newsTasks);
                                             })
                                         }
                                     },
@@ -719,7 +804,7 @@ namespace Olympus {
         }
 
         // Builds the panel list from the installed mods, shouldn't be run on UI
-        private static ObservableCollection<Element> GenerateModListPanels(Version? everestVersion, IEnumerable<IModFileInfo> mods) {
+        private ObservableCollection<Element> GenerateModListPanels(Version? everestVersion, IEnumerable<IModFileInfo> mods) {
             if (Config.Instance.Installation == null) {
                  AppLogger.Log.Error("GenerateModList called before config was loaded!");
                  return new ObservableCollection<Element>(); // shouldn't ever happen
@@ -771,7 +856,12 @@ namespace Olympus {
                             },
                             versionButton,
                         }
-                    }
+                    },
+                },
+                Modifiers = {
+                    new FadeInAnimation(0.09f).WithDelay(0.05f).With(Ease.SineInOut),
+                    new OffsetInAnimation(new Vector2(0f, 10f), 0.15f).WithDelay(0.05f).With(Ease.SineIn),
+                    new ScaleInAnimation(0.9f, 0.125f).WithDelay(0.05f).With(Ease.SineOut),
                 }
             };
 
@@ -780,6 +870,7 @@ namespace Olympus {
                 everestPanel,
             };
 
+            // TODO: Do not show all mods as panels at first, wait for the user to scroll and generate those on-the-fly
             foreach (IModFileInfo mod in mods) {
                 if (Config.Instance.Installation == null) continue;
                 LocalInfoAPI.LocalModFileInfo localMod = (LocalInfoAPI.LocalModFileInfo) mod;
@@ -825,6 +916,11 @@ namespace Olympus {
                             }
                         },
                         
+                    },
+                    Modifiers = {
+                        new FadeInAnimation(0.09f).WithDelay(0.05f).With(Ease.SineInOut),
+                        new OffsetInAnimation(new Vector2(0f, 10f), 0.15f).WithDelay(0.05f).With(Ease.SineIn),
+                        new ScaleInAnimation(0.9f, 0.125f).WithDelay(0.05f).With(Ease.SineOut),
                     }
                 };
 
@@ -834,15 +930,25 @@ namespace Olympus {
                 panels.Add(modPanel);
             }
 
+            cancellationToken.Dispose();
+            cancellationToken = new CancellationTokenSource();
+            ct = cancellationToken.Token;
+
             Task.Run(async () => {
                 // neat hack to force a single call on every update to prevent freezes
                 uint currGUID = UI.GlobalUpdateID;
                 for (int i = 1; i < panels.Count; i++) {
                     while (currGUID == UI.GlobalUpdateID) await Task.Delay(1);
                     currGUID = UI.GlobalUpdateID;
-                    FinishModPanels((ModPanel)panels[i]);
+                    if (ct.Value.IsCancellationRequested) break;
+                    try {
+                        FinishModPanels((ModPanel) panels[i]);
+                    } catch (Exception ex) {
+                        // FinishModPanels may crash if the panel is no longer valid, just take it and ignore it
+                        break;
+                    }
                 }
-            });
+            }, ct.Value);
             
             return panels;
         }
@@ -1060,6 +1166,38 @@ namespace Olympus {
                 public static readonly Style.Key Normal = new("Normal");
                 public static readonly Style.Key Selected = new("Selected");
                 public static readonly Style.Key Hovered = new("Hovered");
+            }
+        }
+
+        private partial class IconButton : Button {
+
+            public readonly Icon Icon;
+            public readonly Label Label;
+
+            public IconButton(string iconPath, string text, Action<Button> cb) : base() {
+                Cached = true;
+                
+                Layout.Add(Layouts.Row(false));
+
+                Icon = Add(new Icon(OlympUI.Assets.GetTexture(iconPath)) {
+                    ID = "icon",
+                    Style = {
+                        { ImageBase.StyleKeys.Color, Style.GetLink(StyleKeys.Foreground) },
+                    },
+                    Layout = {
+                        Layouts.Top(0.5f, -0.5f),
+                    },
+                    AutoH = 24,
+                });
+
+                Label = Add(new Label(text) {
+                    ID = "label",
+                    Style = {
+                        { Label.StyleKeys.Color, Style.GetLink(StyleKeys.Foreground) },
+                    },
+                });
+
+                Callback = cb;
             }
         }
 

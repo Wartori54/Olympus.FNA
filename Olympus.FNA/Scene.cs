@@ -30,8 +30,15 @@ namespace Olympus {
             => el => {
                 Refreshes.Add(() => {
                     if (!Refreshing.TryGetValue(el, out Task? task) || task.IsCompleted) {
-                        Refreshing[el] = Task.Run(async () => await reload((T) el));
-                    }
+                        Refreshing[el] = Task.Run(async () => {
+                            try {
+                                await reload((T) el);
+                            } catch (Exception ex) {
+                                AppLogger.Log.Error($"Refresh task for scene: {GetType().Name}, encountered an exception while refreshing element: {el.GetType().Name}");
+                                AppLogger.Log.Error(ex, ex.Message);
+                            }
+                        });
+                    };
                 });
             };
 
