@@ -54,15 +54,15 @@ namespace Olympus {
         public class LocalInfoAPI : IModInfoAPI {
             private readonly Installation install;
 
-            public readonly ManualCache<IEnumerable<IModFileInfo>> modFileInfoCache;
+            public readonly ManualCache<IEnumerable<IModFileInfo>> ModFileInfoCache;
 
             public LocalInfoAPI(Installation install) {
                 this.install = install;
-                modFileInfoCache = new ManualCache<IEnumerable<IModFileInfo>>(INTERNAL_CreateAllModFileInfo, this);
+                ModFileInfoCache = new ManualCache<IEnumerable<IModFileInfo>>(INTERNAL_CreateAllModFileInfo, this);
             }
 
             public IEnumerable<IModFileInfo> CreateAllModFileInfo() {
-                return modFileInfoCache.Value;
+                return ModFileInfoCache.Value;
             }
 
             private IEnumerable<IModFileInfo> INTERNAL_CreateAllModFileInfo(object? _) {

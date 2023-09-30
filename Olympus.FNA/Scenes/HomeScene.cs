@@ -887,34 +887,40 @@ namespace Olympus {
                             Wrap = true,
                         },
                         new Group() {
-                            ID = "Info",
-                            Style = {
-                                { Group.StyleKeys.Spacing, 0 },
-                            },
+                            ID = "BottomPart",
                             Layout = {
                                 Layouts.Fill(1, 0),
-                                Layouts.Column()
+                                Layouts.Row(),
                             },
                             Children = {
-                                new LabelSmall("Path: " + Path.GetRelativePath(Config.Instance.Installation.Root, mod.Path!)),
-                                new LabelSmall("Installed Version: " + mod.Version) {
-                                    ID = "VersionLabel"
-                                },
-                                new LabelSmall("Loading...") {
-                                    ID = "UpdateLabel",
-                                },
-                                new LabelSmall("") {
-                                    Data = {
-                                        {"subscribe_click",
-                                            (bool disabled, Element label) => 
-                                            { (label as LabelSmall)!.Text = disabled ? "Disabled" : "";}}
+                                new Group() {
+                                    ID = "Info",
+                                    Style = {
+                                        { Group.StyleKeys.Spacing, 0 },
                                     },
-                                    Modifiers = {
-                                        new OpacityModifier(0.7f),
+                                    Layout = {
+                                        Layouts.Fill(0, 0),
+                                        Layouts.Column()
+                                    },
+                                    Children = {
+                                        new LabelSmall("Path: " + Path.GetRelativePath(Config.Instance.Installation.Root, mod.Path!)),
+                                        new LabelSmall("Installed Version: " + mod.Version) {
+                                            ID = "VersionLabel"
+                                        },
+                                        new LabelSmall("Loading...") {
+                                            ID = "UpdateLabel",
+                                        },
+                                        
                                     }
                                 },
+                                new Group() {
+                                    ID = "UpdateGroup",
+                                    Layout = {
+                                        Layouts.FillFull(1f, 1f, LayoutConsts.Prev),
+                                    }
+                                }
                             }
-                        },
+                        }
                         
                     },
                     Modifiers = {
@@ -978,99 +984,92 @@ namespace Olympus {
                 string? desc = modInfo?.Description;
                 if (desc == "") desc = null;
                 panel.GetChild<Label>("Description").Text = desc ?? "No description available";
-                panel.GetChild<Group>("Info").GetChild<LabelSmall>("VersionLabel").Text = "Installed Version: " + panel.Mod.Version;
+                Group infoGroup = panel.GetChild<Group>("BottomPart").GetChild<Group>("Info");
+                infoGroup.GetChild<LabelSmall>("VersionLabel").Text = "Installed Version: " + panel.Mod.Version;
                 if (remoteFileInfo == null || remoteFileInfo.Hash == panel.Mod.Hash) {
 
-                    panel.GetChild<Group>("Info").GetChild<LabelSmall>("UpdateLabel").Text = "Up to date!";
+                    infoGroup.GetChild<LabelSmall>("UpdateLabel").Text = "Up to date!";
                     return;
                 }
                 
-                panel.GetChild<Group>("Info").GetChild<LabelSmall>("UpdateLabel").Text = "New version available: " + remoteFileInfo.Version;
+                infoGroup.GetChild<LabelSmall>("UpdateLabel").Text = "New version available: " + remoteFileInfo.Version;
 
                 Element? oldUpdateButton = panel.GetChild("UpdateButton");
                 if (oldUpdateButton != null)
                     panel.Children.Remove(oldUpdateButton);
 
-                panel.Children.Add( 
-                    new Group() {
-                        ID = "UpdateButton",
-                        Layout = {
-                            Layouts.Fill(1, 0),
-                            Layouts.Column()
-                        },
-                        Children = {
-                            new Button("Update", b => {
-                                Group? parent = b.Parent as Group; // Should never be null
-                                if (parent == null) {
-                                    AppLogger.Log.Error("ModPanel button parent was null!!!!");
-                                    b.Text = "Error!";
-                                    return;
-                                }
+                panel.GetChild<Group>("BottomPart").GetChild<Group>("UpdateGroup").Add( 
+                    new Button("Update", b => {
+                        Group? parent = b.Parent?.Parent as Group; // Should never be null
+                        if (parent == null) {
+                            AppLogger.Log.Error("ModPanel button parent was null!!!!");
+                            b.Text = "Error!";
+                            return;
+                        }
 
-                                ModPanel? panelParent = parent.Parent as ModPanel;
-                                if (panelParent == null) {
-                                    AppLogger.Log.Error("ModPanel button parent was null!!!!");
-                                    b.Text = "Error!";
-                                    return;
-                                }
-                                panelParent.PreventNextClick();
-                                if (b.Data.TryGet("updating", out bool updating) && updating) {
-                                    b.Data.Add("cancel", true);
-                                    b.Text = "Canceling...";
-                                    return;
-                                }
-                                b.Data.Add("cancel", false);
-                                b.Data.Add("updating", true); // Add will replace existing values
-                                
+                        ModPanel? panelParent = parent.Parent as ModPanel;
+                        if (panelParent == null) {
+                            AppLogger.Log.Error("ModPanel button parent was null!!!!");
+                            b.Text = "Error!";
+                            return;
+                        }
+                        panelParent.PreventNextClick();
+                        if (b.Data.TryGet("updating", out bool updating) && updating) {
+                            b.Data.Add("cancel", true);
+                            b.Text = "Canceling...";
+                            return;
+                        }
+                        b.Data.Add("cancel", false);
+                        b.Data.Add("updating", true); // Add will replace existing values
+                        
 
-                                b.Text = "Starting download...";
+                        b.Text = "Starting download...";
 
-                                ModUpdater.UpdateMod(panelParent.Mod, (position, length, speed) => {
-                                    UI.Run(() => {
-                                        b.Text =
-                                            $"Press to Cancel | {(int) Math.Floor(100D * (position / (double) length))}% @ {speed} KiB/s";
-                                    });
-                                    bool exists = b.Data.TryGet("cancel", out bool cancel);
-                                    if (exists) {
-                                        return !cancel;
-                                    }
-
-                                    return true;
-                                }, (success, isDone) => {
-                                    UI.Run(() => { 
-                                        if (isDone) {
-                                            b.Text = success ? "Mod updated!" : "Mod update failed! Press to retry";
-                                            b.Data.Add("updating", false);
-                                            b.Data.Add("cancel", false);
-                                            if (success) {
-                                                b.Enabled = false;
-                                                if (Config.Instance.Installation == null || panel.Mod.Path == null) return;
-                                                IModFileInfo? newModInfo =
-                                                    Config.Instance.Installation.LocalInfoAPI.CreateModFileInfo(
-                                                        panel.Mod.Path);
-                                                if (newModInfo == null) return;
-                                                panel.Mod = (LocalInfoAPI.LocalModFileInfo)newModInfo;
-                                                FinishModPanels(panel);
-                                            }
-                                        } else if (!success) {
-                                            b.Text = "Retrying in 3 seconds...";
-                                        } else { // !isDone && success
-                                            b.Text = "Update canceled";
-                                            b.Data.Add("updating", false);
-                                            b.Data.Add("cancel", false);
-                                        }
-                                    });
-                                });
-                            }) {
-                                Enabled = !panel.Mod.IsUpdaterBlacklisted ?? true,
-                                Layout = {
-                                    // Layouts.Fill(1, 0),
-                                },
-                                Data = {
-                                    {"updating", false},
-                                }
+                        ModUpdater.UpdateMod(panelParent.Mod, (position, length, speed) => {
+                            bool exists = b.Data.TryGet("cancel", out bool cancel);
+                            if (exists && cancel) {
+                                return false;
                             }
+                            UI.Run(() => {
+                                b.Text =
+                                    $"Press to Cancel | {(int) Math.Floor(100D * (position / (double) length))}% @ {speed} KiB/s";
+                            });
+                            return true;
+                        }, (success, isDone) => {
+                            UI.Run(() => { 
+                                if (isDone) {
+                                    b.Text = success ? "Mod updated!" : "Mod update failed! Press to retry";
+                                    b.Data.Add("updating", false);
+                                    b.Data.Add("cancel", false);
+                                    if (success) {
+                                        b.Enabled = false;
+                                        if (Config.Instance.Installation == null || panel.Mod.Path == null) return;
+                                        IModFileInfo? newModInfo =
+                                            Config.Instance.Installation.LocalInfoAPI.CreateModFileInfo(
+                                                panel.Mod.Path);
+                                        if (newModInfo == null) return;
+                                        panel.Mod = (LocalInfoAPI.LocalModFileInfo)newModInfo;
+                                        FinishModPanels(panel);
+                                    }
+                                } else if (!success) {
+                                    b.Text = "Retrying in 3 seconds...";
+                                } else { // !isDone && success
+                                    b.Text = "Update canceled";
+                                    b.Data.Add("updating", false);
+                                    b.Data.Add("cancel", false);
+                                }
+                            });
+                        });
+                    }) {
+                        Enabled = !panel.Mod.IsUpdaterBlacklisted ?? true,
+                        Layout = {
+                            // Layouts.Fill(1, 0),
+                            Layouts.Right(),
+                            Layouts.Bottom(),
                         },
+                        Data = {
+                            {"updating", false},
+                        }
                     }
                 );
 

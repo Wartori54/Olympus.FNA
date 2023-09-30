@@ -77,6 +77,7 @@ namespace Olympus.Utils {
                         // update canceled
                         AppLogger.Log.Warning($"Updating {mod.Name} was canceled");
                     }
+                    finishCallback.Invoke(success, finished);
 
                     // try to delete mod-update.zip if it still exists.
                     TryDelete(zipPath);
