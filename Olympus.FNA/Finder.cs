@@ -1,4 +1,5 @@
-﻿using MonoMod.Utils;
+﻿using Microsoft.Extensions.Caching.Memory;
+using MonoMod.Utils;
 using Microsoft.Win32;
 using OlympUI;
 using System;
@@ -9,7 +10,6 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using Mono.Cecil;
 using MonoMod.Cil;
-using System.Net.Http.Headers;
 
 namespace Olympus {
     public abstract class Finder {
@@ -223,13 +223,15 @@ namespace Olympus {
     public class Blacklist {
         public HashSet<string> items;
         private string filePath;
+        private bool voidNextFsEvent = false;
+        private DateTime lastVoidFsEvent = DateTime.MinValue;
 
         public Blacklist(string filePath) {
             this.filePath = filePath;
             Load();
         }
 
-        private void Load() {
+        public void Load() {
             if (File.Exists(filePath)) {
                 items = new HashSet<string>(File.ReadAllLines(filePath).Select(l => 
                     (l.StartsWith("#") ? "" : l).Trim()));
@@ -238,7 +240,9 @@ namespace Olympus {
             }
         }
 
-        private void Save() {
+        public void Save() {
+            voidNextFsEvent = true;
+            lastVoidFsEvent = DateTime.Now;
             string newContents = "";
             if (File.Exists(filePath)) {
                 int i = 0;
@@ -270,6 +274,55 @@ namespace Olympus {
 
             Save();
         }
+
+        public bool VoidNextFSEvent() {
+            // fs events get fired too many times, so a cooldown is usually needed
+            if (!voidNextFsEvent && lastVoidFsEvent.Add(TimeSpan.FromSeconds(1)).CompareTo(DateTime.Now) < 0) return false;
+            voidNextFsEvent = false;
+            return true;
+        }
+    }
+
+    public class RunAfterExpire : IDisposable {
+        private readonly Action target;
+        private readonly TimeSpan expirationSpan;
+        private DateTime absoluteExpirationTime;
+        private Task? task = null;
+        private bool completed = false;
+        private bool IsDisposed = false;
+
+        public RunAfterExpire(Action action, TimeSpan expirationTime) {
+            target = action;
+            expirationSpan = expirationTime;
+            Reset();
+            task = Task.Run(ExpirationHandler);
+        }
+
+        public bool IsCompleted() {
+            return completed;
+        }
+
+        public void Reset() {
+            absoluteExpirationTime = DateTime.Now.Add(expirationSpan);
+        }
+
+        private async void ExpirationHandler() {
+            TimeSpan sleptAcc = new();
+            while (absoluteExpirationTime.CompareTo(DateTime.Now) > 0) {
+                sleptAcc += absoluteExpirationTime - DateTime.Now;
+                await Task.Delay(absoluteExpirationTime - DateTime.Now);
+            }
+            AppLogger.Log.Information($"slept: {sleptAcc}");
+
+            completed = true;
+            if (IsDisposed) return;
+            target.Invoke();
+            AppLogger.Log.Information("ran after expire");
+        }
+
+        public void Dispose() {
+            IsDisposed = true;
+        }
     }
 
     public class Installation {
@@ -295,7 +348,22 @@ namespace Olympus {
         [NonSerialized]
         public readonly ModAPI.LocalInfoAPI LocalInfoAPI;
         [NonSerialized]
-        private readonly FileSystemWatcher watcher;
+        private FileSystemWatcher? watcher;
+        public event InstallDirtyDelegate? InstallDirty;
+
+        public delegate void InstallDirtyDelegate(Installation sender);
+        [NonSerialized]
+        private RunAfterExpire? eventSender;
+        [NonSerialized] 
+        private object eventSenderLock = new ();
+        
+        public bool WatcherEnabled {
+            get => watcher?.EnableRaisingEvents ?? false;
+            set {
+                if (watcher != null) 
+                    watcher.EnableRaisingEvents = value;
+            }
+        }
 
         public Installation(string type, string name, string root) {
             Type = type;
@@ -304,17 +372,56 @@ namespace Olympus {
             MainBlacklist = new Blacklist(Path.Combine(Root, "Mods", "blacklist.txt"));
             UpdateBlacklist = new Blacklist(Path.Combine(Root, "Mods", "updaterblacklist.txt"));
             LocalInfoAPI = new ModAPI.LocalInfoAPI(this);
-            watcher = new FileSystemWatcher(Root);
+            
+            SetUpWatcher();
+        }
 
+        private void SetUpWatcher() {
+            watcher?.Dispose();
+            eventSender?.Dispose();
+            if (!Directory.Exists(Path.Combine(Root, "Mods"))) return;
+
+            watcher = new FileSystemWatcher(Path.Combine(Root, "Mods"));
+                        
             void InvalidateAPICache(object _, FileSystemEventArgs? args) {
-                // TODO: only invalidate the affected mod
-                LocalInfoAPI.modFileInfoCache.Invalidate();
+                AppLogger.Log.Information($"fsevent {args?.Name} {args?.ChangeType}");
+                if (args?.Name == null || !args.Name.EndsWith(".zip") && !args.Name.EndsWith(".bin") &&
+                    !Directory.Exists(args.FullPath)) {
+                    if (args?.Name != null && args.Name.EndsWith(".txt")) {
+                        if (args.Name == "blacklist.txt") {
+                            MainBlacklist.Load();
+                            if (!MainBlacklist.VoidNextFSEvent())
+                                InstallDirty?.Invoke(this);
+                        } else if (args.Name == "updaterblacklist.txt") {
+                            UpdateBlacklist.Load();
+                            if (!UpdateBlacklist.VoidNextFSEvent())
+                                InstallDirty?.Invoke(this);
+                        }
+                    }
+                    return;
+                }
+                if (args.Name.Contains("Cache")) return;
+                
+                LocalInfoAPI.InvalidateModFileInfo(Path.Combine(Root, "Mods", args.Name));
+                lock (eventSenderLock) {
+                    AppLogger.Log.Information("enterlock");
+                    if (eventSender == null || eventSender.IsCompleted()) {
+                        eventSender?.Dispose();
+                        AppLogger.Log.Information($"new sender: {eventSender} {eventSender?.IsCompleted()}");
+                        eventSender = new RunAfterExpire(() => InstallDirty?.Invoke(this), TimeSpan.FromSeconds(1));
+                    } else {
+                        AppLogger.Log.Information("Reset sender");
+                        eventSender.Reset();
+                    }
+                }
             }
 
             watcher.Changed += InvalidateAPICache;
             watcher.Created += InvalidateAPICache;
             watcher.Deleted += InvalidateAPICache;
-            watcher.Renamed += (sender, args) => { InvalidateAPICache(sender, null); };
+            watcher.Renamed += InvalidateAPICache;
+            watcher.IncludeSubdirectories = true;
+            watcher.EnableRaisingEvents = ReferenceEquals(Config.Instance.Installation, this);
         }
 
         public bool FixPath() {
@@ -391,6 +498,8 @@ namespace Olympus {
             if (!force && VersionLast != default)
                 return VersionLast;
 
+            SetUpWatcher(); // When force scan is true means that an install might just have been modded, so attempt to set up the fswatcher
+            
             string root = Root;
 
             if (!File.Exists(Path.Combine(root, "Celeste.exe")) && !File.Exists(Path.Combine(root, "Celeste.dll"))) {

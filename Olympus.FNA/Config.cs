@@ -16,7 +16,9 @@ namespace Olympus {
 
         [NonSerialized]
         private List<Action<Installation?>> InstallUpdateEvents = new();
-
+        [NonSerialized]
+        private List<Action<Installation?, Installation?>> InstallUpdateEventsWithOld = new();
+        
         [NonSerialized]
         public static Config Instance = new();
 
@@ -35,10 +37,20 @@ namespace Olympus {
         public Installation? Installation {
             get => Install;
             set {
+                Installation? oldInstall = Install;
+                if (Install != null) Install.WatcherEnabled = false;
                 Install = value;
+                if (Install != null) Install.WatcherEnabled = true;
+                
                 foreach (Action<Installation?> subscribed in InstallUpdateEvents) {
                     Task.Run(() =>
                         subscribed.Invoke(Install)
+                    );
+                }
+                
+                foreach (Action<Installation?, Installation?> subscribed in InstallUpdateEventsWithOld) {
+                    Task.Run(() =>
+                        subscribed.Invoke(Install, oldInstall)
                     );
                 }
             }
@@ -141,10 +153,16 @@ namespace Olympus {
             JsonHelper.Serializer.Serialize(jtw, this);
         }
 
+        
+        // TODO: Please please please move this to an actual good event c# system
         // Subscribes an event for when the currently active install gets changed
         // Note: this call will be asyncronous
         public void SubscribeInstallUpdateNotify(Action<Installation?> action) {
             InstallUpdateEvents.Add(action);
+        }
+
+        public void SubscribeInstallUpdateNotify(Action<Installation?, Installation?> action) {
+            InstallUpdateEventsWithOld.Add(action);
         }
 
     }

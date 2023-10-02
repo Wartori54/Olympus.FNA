@@ -788,7 +788,7 @@ namespace Olympus {
             };
         }
 
-        // Returns a the mods installed, to be ran async
+        // Returns all the mods installed, to be ran async
         private (Version? everestVersion, IEnumerable<IModFileInfo> installedMods) GenerateModList() {
             if (Config.Instance.Installation == null) {
                 AppLogger.Log.Error("GenerateModList called before config was loaded!");
@@ -881,7 +881,27 @@ namespace Olympus {
                     },
                     Clip = false,
                     Children = {
-                        new HeaderSmall(localMod.Name),
+                        new Group() {
+                            Layout = {
+                                Layouts.Row(8),
+                            },
+                            Children = {
+                                new HeaderSmall(localMod.Name),
+                                new LabelSmall("") {
+                                    Data = {
+                                        {"subscribe_click",
+                                            (bool disabled, Element label) => 
+                                            { (label as LabelSmall)!.Text = disabled ? "(Disabled)" : "";}}
+                                    },
+                                    Modifiers = {
+                                        new OpacityModifier(0.7f),
+                                    },
+                                    Layout = {
+                                        Layouts.Bottom(),
+                                    }
+                                },
+                            }
+                        },
                         new Label("Loading...") {
                             ID = "Description",
                             Wrap = true,
@@ -959,7 +979,7 @@ namespace Olympus {
             return panels;
         }
 
-        private static void FinishModPanels(ModPanel panel) {
+        private void FinishModPanels(ModPanel panel) {
             IModInfo? modInfo = null;
             try {
                 modInfo = App.Instance.APIManager.TryAll<IModInfo>(api => api.GetModInfoFromFileInfo(panel.Mod));
@@ -1000,6 +1020,8 @@ namespace Olympus {
 
                 panel.GetChild<Group>("BottomPart").GetChild<Group>("UpdateGroup").Add( 
                     new Button("Update", b => {
+                        using DisposeEvent disposeEvent = new DisposeEvent(() => UpdateInProgress = false);
+                        UpdateInProgress = true;
                         Group? parent = b.Parent?.Parent as Group; // Should never be null
                         if (parent == null) {
                             AppLogger.Log.Error("ModPanel button parent was null!!!!");
@@ -1197,6 +1219,21 @@ namespace Olympus {
                 });
 
                 Callback = cb;
+            }
+        }
+
+        /// <summary>
+        /// Runs an action when disposed
+        /// </summary>
+        private class DisposeEvent : IDisposable {
+            private Action? target;
+            public DisposeEvent(Action target) {
+                this.target = target;
+            }
+
+            public void Dispose() {
+                target?.Invoke();
+                target = null;
             }
         }
 

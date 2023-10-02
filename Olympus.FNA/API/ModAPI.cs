@@ -54,26 +54,20 @@ namespace Olympus {
         public class LocalInfoAPI : IModInfoAPI {
             private readonly Installation install;
 
-            public readonly ManualCache<IEnumerable<IModFileInfo>> ModFileInfoCache;
+            public readonly Dictionary<string, ManualCache<IModFileInfo?>> ModFileInfoCache;
 
             public LocalInfoAPI(Installation install) {
                 this.install = install;
-                ModFileInfoCache = new ManualCache<IEnumerable<IModFileInfo>>(INTERNAL_CreateAllModFileInfo, this);
+                ModFileInfoCache = new Dictionary<string, ManualCache<IModFileInfo?>>();
             }
 
             public IEnumerable<IModFileInfo> CreateAllModFileInfo() {
-                return ModFileInfoCache.Value;
-            }
-
-            private IEnumerable<IModFileInfo> INTERNAL_CreateAllModFileInfo(object? _) {
-                List<IModFileInfo> generated = new();
-                string modsDir = Path.Combine(install.Root, "Mods");
-                foreach (string fsEntry in Directory.EnumerateFileSystemEntries(modsDir)) {
-                    IModFileInfo? res = CreateModFileInfo(fsEntry);
-                    
-                    if (res != null) {
-                        generated.Add(res);
-                    }
+                CacheAllModFileInfo();
+                List<IModFileInfo> generated = new(ModFileInfoCache.Count);
+                foreach (KeyValuePair<string, ManualCache<IModFileInfo?>> cacheEntry in ModFileInfoCache) {
+                    // Here the first .Value is from the KVP and the second from the ManualCache
+                    if (cacheEntry.Value.Value != null)
+                        generated.Add(cacheEntry.Value.Value);
                 }
 
                 return generated;
@@ -106,11 +100,43 @@ namespace Olympus {
                 return res;
             }
             
-            public IModFileInfo CreateModFileInfo(string path, TextReader? readYaml) {
-                return new LocalModFileInfo(path, readYaml, install);
+            public void InvalidateModFileInfo(string path) {
+                if (!ModFileInfoCache.TryGetValue(path, out ManualCache<IModFileInfo?>? cache)) {
+                    ModFileInfoCache.Add(path,
+                        new ManualCache<IModFileInfo?>(modPath => 
+                            CacheModFileInfo(modPath as string ?? ""), 
+                            path));
+                    return;
+                }
+                cache.Invalidate();
             }
 
-            private IModFileInfo? ParseZip(string fsEntry) {
+            private IModFileInfo CreateModFileInfo(string path, TextReader? readYaml) {
+                return new LocalModFileInfo(path, readYaml, install);
+            }
+            
+            private IModFileInfo? CacheModFileInfo(string path) {
+                if (Directory.Exists(path) || File.Exists(path))
+                    return CreateModFileInfo(path);
+                return null;
+            }
+
+            private void CacheAllModFileInfo() {
+                string modsDir = Path.Combine(install.Root, "Mods");
+                foreach (string fsEntry in Directory.EnumerateFileSystemEntries(modsDir)) {
+                    if (ModFileInfoCache.ContainsKey(fsEntry)) continue;
+                    IModFileInfo? res = CreateModFileInfo(fsEntry);
+                    
+                    if (res != null) {
+                        ModFileInfoCache.TryAdd(fsEntry, new ManualCache<IModFileInfo?>(path => 
+                            CacheModFileInfo(path as string ?? ""), 
+                            fsEntry));
+                    }
+                }
+
+            }
+
+            private IModFileInfo ParseZip(string fsEntry) {
                 using (FileStream zipStream = File.Open(fsEntry, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)) {
                     zipStream.Seek(0, SeekOrigin.Begin);
                     using (ZipArchive zip = new ZipArchive(zipStream, ZipArchiveMode.Read))
