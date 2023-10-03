@@ -312,12 +312,10 @@ namespace Olympus {
                 sleptAcc += absoluteExpirationTime - DateTime.Now;
                 await Task.Delay(absoluteExpirationTime - DateTime.Now);
             }
-            AppLogger.Log.Information($"slept: {sleptAcc}");
 
             completed = true;
             if (IsDisposed) return;
             target.Invoke();
-            AppLogger.Log.Information("ran after expire");
         }
 
         public void Dispose() {
@@ -384,7 +382,6 @@ namespace Olympus {
             watcher = new FileSystemWatcher(Path.Combine(Root, "Mods"));
                         
             void InvalidateAPICache(object _, FileSystemEventArgs? args) {
-                AppLogger.Log.Information($"fsevent {args?.Name} {args?.ChangeType}");
                 if (args?.Name == null || !args.Name.EndsWith(".zip") && !args.Name.EndsWith(".bin") &&
                     !Directory.Exists(args.FullPath)) {
                     if (args?.Name != null && args.Name.EndsWith(".txt")) {
@@ -404,13 +401,10 @@ namespace Olympus {
                 
                 LocalInfoAPI.InvalidateModFileInfo(Path.Combine(Root, "Mods", args.Name));
                 lock (eventSenderLock) {
-                    AppLogger.Log.Information("enterlock");
                     if (eventSender == null || eventSender.IsCompleted()) {
                         eventSender?.Dispose();
-                        AppLogger.Log.Information($"new sender: {eventSender} {eventSender?.IsCompleted()}");
                         eventSender = new RunAfterExpire(() => InstallDirty?.Invoke(this), TimeSpan.FromSeconds(1));
                     } else {
-                        AppLogger.Log.Information("Reset sender");
                         eventSender.Reset();
                     }
                 }

@@ -23,12 +23,29 @@ namespace Olympus {
         private CancellationTokenSource cancellationToken;
         private CancellationToken? ct;
 
+        // If updates take more than one second between writes the InstallDirty event may be fired, void those
+        // only allow them back once updating is done
+        public bool UpdateInProgress { get; private set; }
+
         public HomeScene() {
             cancellationToken = new CancellationTokenSource();
-            Config.Instance.SubscribeInstallUpdateNotify(i => {
+
+            if (Config.Instance.Installation != null)
+                Config.Instance.Installation.InstallDirty += SubAction;
+            Config.Instance.SubscribeInstallUpdateNotify((i, oldI) => {
+                if (oldI != null)
+                    oldI.InstallDirty -= SubAction;
+                if (i != null)
+                    i.InstallDirty += SubAction;
                 cancellationToken.Cancel();
                 refreshModList?.TryRun(i);
             });
+            return;
+
+            void SubAction(Installation? i) {
+                if (UpdateInProgress)
+                    refreshModList?.TryRun(i);
+            }
         }
 
         public override Element Generate()
@@ -636,7 +653,7 @@ namespace Olympus {
                                                 IEnumerable<INewsEntry> news;
                                                 try {
                                                     news = App.NewsManager.GetDefault()
-                                                        .PollAll();
+                                                        .PollLast(3);
                                                 } catch (Exception e) {
                                                     AppLogger.Log.Error("Failed to obtain news");
                                                     AppLogger.Log.Error(e, e.Message);
@@ -660,82 +677,107 @@ namespace Olympus {
                                                     });
                                                     return;
                                                 }
-
+                                                
                                                 INewsEntry[] newsArray = news.ToArray();
-                                                Panel[] panels = new Panel[newsArray.Length];
-
-                                                await UI.Run(() => {
-                                                    el.DisposeChildren();
-                                                    for (int i = 0; i < newsArray.Length; i++) {
-                                                        INewsEntry newsEntry = newsArray[i];
-                                                        Panel panel = new() {
-                                                            Layout = { Layouts.Fill(1, 0), Layouts.Column(), },
-                                                            Modifiers = {
-                                                                new FadeInAnimation(0.09f).WithDelay(0.05f)
-                                                                    .With(Ease.SineInOut),
-                                                                new OffsetInAnimation(new Vector2(0f, 10f), 0.15f)
-                                                                    .WithDelay(0.05f).With(Ease.SineIn),
-                                                                new ScaleInAnimation(0.9f, 0.125f).WithDelay(0.05f)
-                                                                    .With(Ease.SineOut),
-                                                            },
-                                                            Children = {
-                                                                new HeaderSmall(newsEntry.Title) {
-                                                                    Wrap = true,
-                                                                },
-                                                                new Group() {
-                                                                    ID = "ImageGroup", 
-                                                                    Layout = {
-                                                                        Layouts.FillFull(1, 0)
-                                                                    }
-                                                                },
-                                                                new Label(newsEntry.Text) { Wrap = true, },
-                                                            }
-                                                        };
-
-                                                        foreach (INewsEntry.ILink link in newsEntry.Links) {
-                                                            panel.Add(new IconButton("icons/browser",
-                                                                link.Text,
-                                                                _ => URIHelper.OpenInBrowser(link.Url)));
-                                                        }
-
-                                                        panels[i] = el.Add(panel);
-                                                    }
-                                                });
-                                                Task[] newsTasks = new Task[newsArray.Length];
+                                                
+                                                Task[] imageTasks = new Task[newsArray.Length];
+                                                await UI.Run(() => el.DisposeChildren());
                                                 for (int i = 0; i < newsArray.Length; i++) {
-                                                    INewsEntry newsEntry = newsArray[i];
-                                                    Panel panel = panels[i];
-                                                    newsTasks[i] = Task.Run(async () => {
-                                                        IReloadable<Texture2D, Texture2DMeta>? tex = null;
-                                                        foreach (string img in newsEntry.Images) {
-                                                            tex = await App.Web.GetTextureUnmipped(img);
-                                                            if (tex != null) break;
-                                                        }
-
-                                                        if (tex == null) return;
-
-                                                        Element group = panel["ImageGroup"];
-                                                        group.DisposeChildren();
-
-                                                        await UI.Run(() => {
-                                                            group.Add(new Image(tex) {
-                                                                Modifiers = {
-                                                                    new FadeInAnimation(0.6f).With(Ease.QuadOut),
-                                                                    new ScaleInAnimation(1.05f, 0.5f).With(
-                                                                        Ease.QuadOut)
-                                                                },
-                                                                Layout = {
-                                                                    ev => {
-                                                                        Image img = (Image) ev.Element;
-                                                                        img.AutoW = group.W;
-                                                                    },
-                                                                }
-                                                            });
-                                                        });
-                                                    });
+                                                    (Panel newsPanel, Task imageTask) = NewsScene.CreateNewsPanel(newsArray[i]);
+                                                    imageTasks[i] = imageTask;
+                                        
+                                                    await UI.Run(() => el.Add(newsPanel));
                                                 }
-
-                                                await Task.WhenAll(newsTasks);
+                                                
+                                                await UI.Run(() => 
+                                                    el.Add(new Button("See all", b => Scener.Push<NewsScene>()) {
+                                                        Layout = {
+                                                            Layouts.FillFull(0, 0), 
+                                                            Layouts.Left(0.5f, -0.5f)
+                                                        },
+                                                    })
+                                                );
+                                        
+                                                await Task.WhenAll(imageTasks);
+                                                // Panel[] panels = new Panel[newsArray.Length];
+                                                //
+                                                // await UI.Run(() => {
+                                                //     el.DisposeChildren();
+                                                //     for (int i = 0; i < newsArray.Length; i++) {
+                                                //         INewsEntry newsEntry = newsArray[i];
+                                                //         Panel panel = new() {
+                                                //             Layout = { Layouts.Fill(1, 0), Layouts.Column(), },
+                                                //             Modifiers = {
+                                                //                 new FadeInAnimation(0.09f).WithDelay(0.05f)
+                                                //                     .With(Ease.SineInOut),
+                                                //                 new OffsetInAnimation(new Vector2(0f, 10f), 0.15f)
+                                                //                     .WithDelay(0.05f).With(Ease.SineIn),
+                                                //                 new ScaleInAnimation(0.9f, 0.125f).WithDelay(0.05f)
+                                                //                     .With(Ease.SineOut),
+                                                //             },
+                                                //             Children = {
+                                                //                 new HeaderSmall(newsEntry.Title) {
+                                                //                     Wrap = true,
+                                                //                 },
+                                                //                 new Group() {
+                                                //                     ID = "ImageGroup", 
+                                                //                     Layout = {
+                                                //                         Layouts.Fill(1, 0)
+                                                //                     }
+                                                //                 },
+                                                //                 new Label(newsEntry.Text) { Wrap = true, },
+                                                //             }
+                                                //         };
+                                                //
+                                                //         foreach (INewsEntry.ILink link in newsEntry.Links) {
+                                                //             panel.Add(new IconButton("icons/browser",
+                                                //                 link.Text,
+                                                //                 _ => URIHelper.OpenInBrowser(link.Url)));
+                                                //         }
+                                                //
+                                                //         panels[i] = el.Add(panel);
+                                                //     }
+                                                //
+                                                //     el.Add(new Button("See all", b => Scener.Push<NewsScene>()) {
+                                                //         Layout = { Layouts.FillFull(0, 0), Layouts.Left(0.5f, -0.5f) },
+                                                //     });
+                                                // });
+                                                // Task[] newsTasks = new Task[newsArray.Length];
+                                                // for (int i = 0; i < newsArray.Length; i++) {
+                                                //     INewsEntry newsEntry = newsArray[i];
+                                                //     Panel panel = panels[i];
+                                                //     newsTasks[i] = Task.Run(async () => {
+                                                //         IReloadable<Texture2D, Texture2DMeta>? tex = null;
+                                                //         foreach (string img in newsEntry.Images) {
+                                                //             tex = await App.Web.GetTextureUnmipped(img);
+                                                //             if (tex != null) break;
+                                                //         }
+                                                //
+                                                //         if (tex == null) return;
+                                                //
+                                                //         Element group = panel["ImageGroup"];
+                                                //
+                                                //         await UI.Run(() => {
+                                                //             group.DisposeChildren();
+                                                //             group.Add(new Image(tex) {
+                                                //                 Modifiers = {
+                                                //                     new FadeInAnimation(0.6f).With(Ease.QuadOut),
+                                                //                     new ScaleInAnimation(1.05f, 0.5f).With(
+                                                //                         Ease.QuadOut)
+                                                //                 },
+                                                //                 Layout = {
+                                                //                     ev => {
+                                                //                         Image img = (Image) ev.Element;
+                                                //                         img.AutoW = Math.Min(group.W, 400);
+                                                //                         img.X = group.W / 2 - img.W/2;
+                                                //                     },
+                                                //                 }
+                                                //             });
+                                                //         });
+                                                //     });
+                                                // }
+                                                //
+                                                // await Task.WhenAll(newsTasks);
                                             })
                                         }
                                     },
@@ -1190,7 +1232,7 @@ namespace Olympus {
             }
         }
 
-        private partial class IconButton : Button {
+        public partial class IconButton : Button {
 
             public readonly Icon Icon;
             public readonly Label Label;
