@@ -73,6 +73,7 @@ namespace Olympus {
                 return generated;
             }
 
+            // Note: a mod requires an everest.yaml to be shown on the list, except for .bin s that are on the Mods folder
             public IModFileInfo? CreateModFileInfo(string fsEntry) {
                 IModFileInfo? res = null;
                 if (File.Exists(fsEntry)) {
@@ -109,6 +110,18 @@ namespace Olympus {
                     return;
                 }
                 cache.Invalidate();
+            }
+
+            /// <summary>
+            /// Invalidates all elements in cache under the specified path
+            /// </summary>
+            /// <param name="rootPath">the path in question</param>
+            public void InvalidatePathModFileInfo(string rootPath) {
+                foreach (string? path in ModFileInfoCache.Keys) {
+                    if (path.StartsWith(rootPath)) {
+                        InvalidateModFileInfo(path);
+                    }
+                }
             }
 
             private IModFileInfo CreateModFileInfo(string path, TextReader? readYaml) {

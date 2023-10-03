@@ -43,7 +43,7 @@ namespace Olympus {
             return;
 
             void SubAction(Installation? i) {
-                if (UpdateInProgress)
+                if (!UpdateInProgress)
                     refreshModList?.TryRun(i);
             }
         }

@@ -382,24 +382,24 @@ namespace Olympus {
             watcher = new FileSystemWatcher(Path.Combine(Root, "Mods"));
                         
             void InvalidateAPICache(object _, FileSystemEventArgs? args) {
-                if (args?.Name == null || !args.Name.EndsWith(".zip") && !args.Name.EndsWith(".bin") &&
-                    !Directory.Exists(args.FullPath)) {
-                    if (args?.Name != null && args.Name.EndsWith(".txt")) {
-                        if (args.Name == "blacklist.txt") {
-                            MainBlacklist.Load();
-                            if (!MainBlacklist.VoidNextFSEvent())
-                                InstallDirty?.Invoke(this);
-                        } else if (args.Name == "updaterblacklist.txt") {
-                            UpdateBlacklist.Load();
-                            if (!UpdateBlacklist.VoidNextFSEvent())
-                                InstallDirty?.Invoke(this);
-                        }
-                    }
+                if (args == null || args.Name == null) return;
+                if (args.Name == "blacklist.txt") {
+                    MainBlacklist.Load();
+                    if (!MainBlacklist.VoidNextFSEvent())
+                        InstallDirty?.Invoke(this);
+                    return;
+                } 
+                if (args.Name == "updaterblacklist.txt") {
+                    UpdateBlacklist.Load();
+                    if (!UpdateBlacklist.VoidNextFSEvent())
+                        InstallDirty?.Invoke(this);
                     return;
                 }
+                
                 if (args.Name.Contains("Cache")) return;
                 
                 LocalInfoAPI.InvalidateModFileInfo(Path.Combine(Root, "Mods", args.Name));
+
                 lock (eventSenderLock) {
                     if (eventSender == null || eventSender.IsCompleted()) {
                         eventSender?.Dispose();
@@ -414,7 +414,7 @@ namespace Olympus {
             watcher.Created += InvalidateAPICache;
             watcher.Deleted += InvalidateAPICache;
             watcher.Renamed += InvalidateAPICache;
-            watcher.IncludeSubdirectories = true;
+            watcher.IncludeSubdirectories = false;
             watcher.EnableRaisingEvents = ReferenceEquals(Config.Instance.Installation, this);
         }
 
