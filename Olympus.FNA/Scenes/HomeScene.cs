@@ -19,6 +19,7 @@ namespace Olympus {
     public class HomeScene : Scene {
 
         private LockedAction<Installation?>? refreshModList;
+        private LockedAction<Installation?>? refreshModsHeader;
 
         private CancellationTokenSource cancellationToken;
         private CancellationToken? ct;
@@ -40,8 +41,10 @@ namespace Olympus {
                 cancellationToken.Cancel();
                 refreshModList?.TryRun(i);
             });
+            
+            Config.Instance.SubscribeInstallUpdateNotify(i => refreshModsHeader?.TryRun(i));
             return;
-
+            
             void SubAction(Installation? i) {
                 if (!UpdateInProgress)
                     refreshModList?.TryRun(i);
@@ -360,27 +363,10 @@ namespace Olympus {
                                 Children = {
                                     new HeaderMedium("Your mods") {
                                         Init = RegisterRefresh<HeaderMedium>(el => {
-                                            void NameGen(Installation? i) {
-                                                UI.Run(() => {
-                                                    if (i == null) {
-                                                        el.Text = "No storby";
-                                                        return;
-                                                    }
+                                            refreshModsHeader =
+                                                new LockedAction<Installation?>(i => UI.Run(() => NameGen(i, el)));
 
-                                                    (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
-                                                        = i.ScanVersion(false);
-                                                    if (!Modifiable) {
-                                                        el.Text = "Wrong game";
-                                                    } else if (ModName == null || ModVersion == null) {
-                                                        el.Text = "No Mods :(";
-                                                    } else {
-                                                        el.Text = "Your Mods";
-                                                    }
-                                                });
-                                            }
-                                            
-                                            Config.Instance.SubscribeInstallUpdateNotify(NameGen);
-                                            NameGen(Config.Instance.Installation);
+                                            refreshModsHeader.TryRun(Config.Instance.Installation);
                                             return Task.CompletedTask; // Cheese it this way since it only schedules functions to run
                                         }),
                                     },
@@ -470,7 +456,7 @@ namespace Olympus {
                                                     });
                                                 });
 
-                                                refreshModList = new LockedAction<Installation?>(async _ => {
+                                                refreshModList = new LockedAction<Installation?>(async i => {
                                                     Panel firstPanel = new Panel() {
                                                         Layout = {
                                                             Layouts.Fill(1, 0),
@@ -574,6 +560,8 @@ namespace Olympus {
                                                         foreach (Element panel in generateModListPanels) {
                                                             while (currGUID == UI.GlobalUpdateID) await Task.Delay(1);
                                                             currGUID = UI.GlobalUpdateID;
+                                                            if (!ReferenceEquals(Config.Instance.Installation, i))
+                                                                break;
                                                             await UI.Run(() => el.Add(panel));
                                                             
                                                         }
@@ -788,6 +776,26 @@ namespace Olympus {
 
                 },
             };
+        
+        public static void NameGen(Installation? i, Label el) {
+            if (i == null) {
+                el.Text = "No storby";
+                return;
+            }
+
+            (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
+                = i.ScanVersion(false);
+            if (!Modifiable) {
+                el.Text = "Wrong game";
+            } else if (ModName == null || ModVersion == null) {
+                el.Text = "No Mods :(";
+            } else {
+                el.Text = "Your Mods";
+            }
+            
+            el.GetParent().GetChild<Group>().Layout.Clear();
+            el.GetParent().GetChild<Group>().Layout.Add(Layouts.Fill(1, 1, LayoutConsts.Prev, 0));
+        }
         
         private static string GetInstallationName() {
             if (Config.Instance.Installation != null) return Config.Instance.Installation.Name;
@@ -1043,99 +1051,107 @@ namespace Olympus {
             }
 
             UI.Run(() => {
-                string? desc = modInfo?.Description;
-                if (desc == "") desc = null;
-                panel.GetChild<Label>("Description").Text = desc ?? "No description available";
-                Group infoGroup = panel.GetChild<Group>("BottomPart").GetChild<Group>("Info");
-                infoGroup.GetChild<LabelSmall>("VersionLabel").Text = "Installed Version: " + panel.Mod.Version;
-                if (remoteFileInfo == null || remoteFileInfo.Hash == panel.Mod.Hash) {
+                try {
+                    string? desc = modInfo?.Description;
+                    if (desc == "") desc = null;
+                    panel.GetChild<Label>("Description").Text = desc ?? "No description available";
+                    Group infoGroup = panel.GetChild<Group>("BottomPart").GetChild<Group>("Info");
+                    infoGroup.GetChild<LabelSmall>("VersionLabel").Text = "Installed Version: " + panel.Mod.Version;
+                    if (remoteFileInfo == null || remoteFileInfo.Hash == panel.Mod.Hash) {
 
-                    infoGroup.GetChild<LabelSmall>("UpdateLabel").Text = "Up to date!";
-                    return;
-                }
-                
-                infoGroup.GetChild<LabelSmall>("UpdateLabel").Text = "New version available: " + remoteFileInfo.Version;
-
-                Element? oldUpdateButton = panel.GetChild("UpdateButton");
-                if (oldUpdateButton != null)
-                    panel.Children.Remove(oldUpdateButton);
-
-                panel.GetChild<Group>("BottomPart").GetChild<Group>("UpdateGroup").Add( 
-                    new Button("Update", b => {
-                        using DisposeEvent disposeEvent = new DisposeEvent(() => UpdateInProgress = false);
-                        UpdateInProgress = true;
-                        Group? parent = b.Parent?.Parent as Group; // Should never be null
-                        if (parent == null) {
-                            AppLogger.Log.Error("ModPanel button parent was null!!!!");
-                            b.Text = "Error!";
-                            return;
-                        }
-
-                        ModPanel? panelParent = parent.Parent as ModPanel;
-                        if (panelParent == null) {
-                            AppLogger.Log.Error("ModPanel button parent was null!!!!");
-                            b.Text = "Error!";
-                            return;
-                        }
-                        panelParent.PreventNextClick();
-                        if (b.Data.TryGet("updating", out bool updating) && updating) {
-                            b.Data.Add("cancel", true);
-                            b.Text = "Canceling...";
-                            return;
-                        }
-                        b.Data.Add("cancel", false);
-                        b.Data.Add("updating", true); // Add will replace existing values
-                        
-
-                        b.Text = "Starting download...";
-
-                        ModUpdater.UpdateMod(panelParent.Mod, (position, length, speed) => {
-                            bool exists = b.Data.TryGet("cancel", out bool cancel);
-                            if (exists && cancel) {
-                                return false;
-                            }
-                            UI.Run(() => {
-                                b.Text =
-                                    $"Press to Cancel | {(int) Math.Floor(100D * (position / (double) length))}% @ {speed} KiB/s";
-                            });
-                            return true;
-                        }, (success, isDone) => {
-                            UI.Run(() => { 
-                                if (isDone) {
-                                    b.Text = success ? "Mod updated!" : "Mod update failed! Press to retry";
-                                    b.Data.Add("updating", false);
-                                    b.Data.Add("cancel", false);
-                                    if (success) {
-                                        b.Enabled = false;
-                                        if (Config.Instance.Installation == null || panel.Mod.Path == null) return;
-                                        IModFileInfo? newModInfo =
-                                            Config.Instance.Installation.LocalInfoAPI.CreateModFileInfo(
-                                                panel.Mod.Path);
-                                        if (newModInfo == null) return;
-                                        panel.Mod = (LocalInfoAPI.LocalModFileInfo)newModInfo;
-                                        FinishModPanels(panel);
-                                    }
-                                } else if (!success) {
-                                    b.Text = "Retrying in 3 seconds...";
-                                } else { // !isDone && success
-                                    b.Text = "Update canceled";
-                                    b.Data.Add("updating", false);
-                                    b.Data.Add("cancel", false);
-                                }
-                            });
-                        });
-                    }) {
-                        Enabled = !panel.Mod.IsUpdaterBlacklisted ?? true,
-                        Layout = {
-                            // Layouts.Fill(1, 0),
-                            Layouts.Right(),
-                            Layouts.Bottom(),
-                        },
-                        Data = {
-                            {"updating", false},
-                        }
+                        infoGroup.GetChild<LabelSmall>("UpdateLabel").Text = "Up to date!";
+                        return;
                     }
-                );
+
+                    infoGroup.GetChild<LabelSmall>("UpdateLabel").Text =
+                        "New version available: " + remoteFileInfo.Version;
+
+                    Element? oldUpdateButton = panel.GetChild("UpdateButton");
+                    if (oldUpdateButton != null)
+                        panel.Children.Remove(oldUpdateButton);
+
+                    panel.GetChild<Group>("BottomPart").GetChild<Group>("UpdateGroup").Add(
+                        new Button("Update", b => {
+                            using DisposeEvent disposeEvent = new DisposeEvent(() => UpdateInProgress = false);
+                            UpdateInProgress = true;
+                            Group? parent = b.Parent?.Parent as Group; // Should never be null
+                            if (parent == null) {
+                                AppLogger.Log.Error("ModPanel button parent was null!!!!");
+                                b.Text = "Error!";
+                                return;
+                            }
+
+                            ModPanel? panelParent = parent.Parent as ModPanel;
+                            if (panelParent == null) {
+                                AppLogger.Log.Error("ModPanel button parent was null!!!!");
+                                b.Text = "Error!";
+                                return;
+                            }
+
+                            panelParent.PreventNextClick();
+                            if (b.Data.TryGet("updating", out bool updating) && updating) {
+                                b.Data.Add("cancel", true);
+                                b.Text = "Canceling...";
+                                return;
+                            }
+
+                            b.Data.Add("cancel", false);
+                            b.Data.Add("updating", true); // Add will replace existing values
+
+
+                            b.Text = "Starting download...";
+
+                            ModUpdater.UpdateMod(panelParent.Mod, (position, length, speed) => {
+                                bool exists = b.Data.TryGet("cancel", out bool cancel);
+                                if (exists && cancel) {
+                                    return false;
+                                }
+
+                                UI.Run(() => {
+                                    b.Text =
+                                        $"Press to Cancel | {(int) Math.Floor(100D * (position / (double) length))}% @ {speed} KiB/s";
+                                });
+                                return true;
+                            }, (success, isDone) => {
+                                UI.Run(() => {
+                                    if (isDone) {
+                                        b.Text = success ? "Mod updated!" : "Mod update failed! Press to retry";
+                                        b.Data.Add("updating", false);
+                                        b.Data.Add("cancel", false);
+                                        if (success) {
+                                            b.Enabled = false;
+                                            if (Config.Instance.Installation == null || panel.Mod.Path == null) return;
+                                            IModFileInfo? newModInfo =
+                                                Config.Instance.Installation.LocalInfoAPI.CreateModFileInfo(
+                                                    panel.Mod.Path);
+                                            if (newModInfo == null) return;
+                                            panel.Mod = (LocalInfoAPI.LocalModFileInfo) newModInfo;
+                                            FinishModPanels(panel);
+                                        }
+                                    } else if (!success) {
+                                        b.Text = "Retrying in 3 seconds...";
+                                    } else {
+                                        // !isDone && success
+                                        b.Text = "Update canceled";
+                                        b.Data.Add("updating", false);
+                                        b.Data.Add("cancel", false);
+                                    }
+                                });
+                            });
+                        }) {
+                            Enabled = !panel.Mod.IsUpdaterBlacklisted ?? true,
+                            Layout = {
+                                // Layouts.Fill(1, 0),
+                                Layouts.Right(), Layouts.Bottom(),
+                            },
+                            Data = { { "updating", false }, }
+                        }
+                    );
+                } catch (Exception ex) {
+                    // No children means we're dealing with a disposed panel, ignore that
+                    if (panel.Children.Count == 0) return;
+                    AppLogger.Log.Warning(ex, "Could not late populate mod panel info");
+                }
 
             });
         }

@@ -21,6 +21,7 @@ namespace Olympus.API {
         public string Title { get; }
         public string Text { get; }
         public IEnumerable<ILink> Links { get; }
+        // TODO: Multiple image support
         public IEnumerable<string> Images { get; }
         
         public interface ILink {

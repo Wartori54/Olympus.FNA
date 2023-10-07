@@ -72,10 +72,11 @@ namespace Olympus.NativeImpls {
         }
 
         public override void Run() {
-            string? forceDriver = null;
+            // TODO: this splash is broken when using vulkan
+            string? forceDriver = Environment.GetEnvironmentVariable("FNA3D_FORCE_DRIVER");
 
-            if (!string.IsNullOrEmpty(forceDriver))
-                SDL.SDL_SetHintWithPriority("FNA3D_FORCE_DRIVER", forceDriver, SDL.SDL_HintPriority.SDL_HINT_OVERRIDE);
+            // if (!string.IsNullOrEmpty(forceDriver))
+                // SDL.SDL_SetHintWithPriority("FNA3D_FORCE_DRIVER", forceDriver, SDL.SDL_HintPriority.SDL_HINT_OVERRIDE);
 
             using (App app = App = new()) {
 
@@ -116,7 +117,7 @@ namespace Olympus.NativeImpls {
                 PollEvents();
                 wrappedGDM.CanCreateDevice = false;
 
-                if (!string.IsNullOrEmpty(forceDriver) && FNAHooks.FNA3DDriver != forceDriver)
+                if (!string.IsNullOrEmpty(forceDriver) && FNAHooks.FNA3DDriver != null && FNAHooks.FNA3DDriver != forceDriver)
                     throw new Exception($"Tried to force FNA3D to use {forceDriver} but got {FNAHooks.FNA3DDriver}.");
 
                 try {
