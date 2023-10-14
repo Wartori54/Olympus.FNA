@@ -100,7 +100,7 @@ namespace OlympUI {
             base.Update(dt);
         }
 
-        public void AfterScroll() {
+        public virtual void AfterScroll() {
             InvalidateFull();
 #if false
             // Can fail as it gets stuck in a loop. Doesn't seem to be necessary anymore anyways.

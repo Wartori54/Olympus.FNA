@@ -19,6 +19,7 @@ namespace Olympus {
     public class HomeScene : Scene {
 
         private LockedAction<Installation?>? refreshModList;
+        private LockedAction<object?>? loadMoreMods;
         private LockedAction<Installation?>? refreshModsHeader;
 
         private CancellationTokenSource cancellationToken;
@@ -343,7 +344,7 @@ namespace Olympus {
 
                     new Group() {
                         Style = {
-                            { Group.StyleKeys.Spacing, 4 },
+                            { Group.StyleKeys.Spacing, 8 },
                         },
                         Layout = {
                             Layouts.Fill(0.7f, 0.6f, 32, 0),
@@ -408,17 +409,10 @@ namespace Olympus {
                                     Layouts.Column(),
                                 },
                                 Children = {
-                                    new Group() {
-                                        Layout = {
-                                            Layouts.Fill(1, 0),
-                                        },
-                                        Children = {
-                                            /*
-                                            new Label("Pinned info here?"),
-                                            */
-                                        }
-                                    },
-                                    new ScrollBox() {
+                                    new CallbackScrollBox(el => {
+                                        if (loadMoreMods == null || loadMoreMods.IsRunning) return;
+                                        Task.Run(() => loadMoreMods?.TryRun(null, false));
+                                    }) {
                                         Layout = {
                                             Layouts.Fill(1, 1, 0, LayoutConsts.Prev)
                                         },
@@ -456,7 +450,8 @@ namespace Olympus {
                                                     });
                                                 });
 
-                                                refreshModList = new LockedAction<Installation?>(async i => {
+                                                refreshModList = new LockedAction<Installation?>(async install => {
+                                                    loadMoreMods = null;
                                                     Panel firstPanel = new Panel() {
                                                         Layout = {
                                                             Layouts.Fill(1, 0),
@@ -469,7 +464,7 @@ namespace Olympus {
                                                         }
                                                        
                                                     };
-                                                    if (Config.Instance.Installation == null) {
+                                                    if (install == null) {
                                                         UI.Run(() => {
                                                             el.DisposeChildren();
                                                             firstPanel.Children = new() {
@@ -486,7 +481,7 @@ namespace Olympus {
                                                     (bool Modifiable, string Full, Version? Version,
                                                             string? Framework, string? ModName,
                                                             Version? ModVersion)
-                                                        = Config.Instance.Installation.ScanVersion(false);
+                                                        = install.ScanVersion(false);
                                                     if (!Modifiable) {
                                                         UI.Run(() => {
                                                             el.DisposeChildren();
@@ -550,31 +545,36 @@ namespace Olympus {
                                                                 }
                                                             };
                                                         });
-                                                        (Version? everestVersion, IEnumerable<IModFileInfo> installedMods) = GenerateModList();
-                                                        ObservableCollection<Element> generateModListPanels = GenerateModListPanels(everestVersion, installedMods);
                                                         
-                                                        await UI.Run(() => el.DisposeChildren());
+                                                        (Version? everestVersion, IEnumerable<IModFileInfo> installedMods) = GenerateModList();
+                                                        Panel everestPanel = GenerateEverestPanel(everestVersion);
+                                                        IEnumerator<IModFileInfo> modsEnumeration = installedMods.GetEnumerator();
+                                                        
+                                                        await UI.Run(() => {
+                                                            el.DisposeChildren();
+                                                            el.Add(everestPanel);
+                                                        });
                                                         
                                                         // neat hack to force a single call on every update to prevent freezes
-                                                        uint currGUID = UI.GlobalUpdateID;
-                                                        foreach (Element panel in generateModListPanels) {
-                                                            while (currGUID == UI.GlobalUpdateID) await Task.Delay(1);
-                                                            currGUID = UI.GlobalUpdateID;
-                                                            if (!ReferenceEquals(Config.Instance.Installation, i))
-                                                                break;
-                                                            await UI.Run(() => el.Add(panel));
-                                                            
-                                                        }
+                                                        loadMoreMods = new LockedAction<object>(async _ => {
+                                                            IEnumerable<Element> generatedModListPanels = GenerateModListPanels(modsEnumeration, 1, true);
+                                                            foreach (Element panel in generatedModListPanels) {
+                                                                if (!ReferenceEquals(Config.Instance.Installation, install))
+                                                                    break;
+                                                                await UI.Run(() => el.Add(panel));
+                                                            }
+                                                        });
+                                                        loadMoreMods.TryRun(null, false);
                                                     } catch (Exception e) {
                                                         AppLogger.Log.Error("refreshModList crashed with exception {0}", e);
                                                         AppLogger.Log.Error("Stacktrace: {0}", e.StackTrace);
                                                     }
                                                     
                                                 }); 
-                                                refreshModList.TryRun(null); // pass null because i is ignored
+                                                refreshModList.TryRun(Config.Instance.Installation); // pass null because i is ignored
                                                 // the correct install will get picked through Config.Instance.Install
                                             })
-                                        }
+                                        },
                                     },
                                 },
                             },
@@ -853,13 +853,12 @@ namespace Olympus {
             return (ModVersion, installedMods);
         }
 
-        // Builds the panel list from the installed mods, shouldn't be run on UI
-        private ObservableCollection<Element> GenerateModListPanels(Version? everestVersion, IEnumerable<IModFileInfo> mods) {
+        private Panel GenerateEverestPanel(Version? everestVersion) {
             if (Config.Instance.Installation == null) {
-                 AppLogger.Log.Error("GenerateModList called before config was loaded!");
-                 return new ObservableCollection<Element>(); // shouldn't ever happen
+                AppLogger.Log.Error("GenerateEverestPanel called before config was loaded!");
+                return new Panel();
             }
-            AppLogger.Log.Information("Generating mod panels");
+            AppLogger.Log.Information("Creating everest panel");
             EverestInstaller.EverestVersion? everestUpdate = null;
             EverestInstaller.EverestBranch? branch = EverestInstaller.DeduceBranch(Config.Instance.Installation);
             if (branch != null) {
@@ -915,15 +914,20 @@ namespace Olympus {
                 }
             };
 
+            return everestPanel;
+        }
 
-            ObservableCollection<Element> panels = new() {
-                everestPanel,
-            };
-
-            // TODO: Do not show all mods as panels at first, wait for the user to scroll and generate those on-the-fly
-            foreach (IModFileInfo mod in mods) {
-                if (Config.Instance.Installation == null) continue;
-                LocalInfoAPI.LocalModFileInfo localMod = (LocalInfoAPI.LocalModFileInfo) mod;
+        // Builds the panel list from the installed mods, shouldn't be run on UI
+        private IEnumerable<Element> GenerateModListPanels(IEnumerator<IModFileInfo> mods, int amount = -1, bool withAnimation = false) {
+            if (Config.Instance.Installation == null) {
+                 AppLogger.Log.Error("GenerateModList called before config was loaded!");
+                 return new ObservableCollection<Element>(); // shouldn't ever happen
+            }
+            
+            List<Element> panels = new();
+            int i = 0;
+            while (mods.MoveNext()) {
+                LocalInfoAPI.LocalModFileInfo localMod = (LocalInfoAPI.LocalModFileInfo) mods.Current;
                 ModPanel modPanel = new(localMod) {
                     Layout = {
                         Layouts.Fill(1, 0),
@@ -973,8 +977,8 @@ namespace Olympus {
                                         Layouts.Column()
                                     },
                                     Children = {
-                                        new LabelSmall("Path: " + Path.GetRelativePath(Config.Instance.Installation.Root, mod.Path!)),
-                                        new LabelSmall("Installed Version: " + mod.Version) {
+                                        new LabelSmall("Path: " + Path.GetRelativePath(Config.Instance.Installation.Root, localMod.Path!)),
+                                        new LabelSmall("Installed Version: " + localMod.Version) {
                                             ID = "VersionLabel"
                                         },
                                         new LabelSmall("Loading...") {
@@ -993,18 +997,25 @@ namespace Olympus {
                         }
                         
                     },
-                    Modifiers = {
-                        new FadeInAnimation(0.09f).WithDelay(0.05f).With(Ease.SineInOut),
-                        new OffsetInAnimation(new Vector2(0f, 10f), 0.15f).WithDelay(0.05f).With(Ease.SineIn),
-                        new ScaleInAnimation(0.9f, 0.125f).WithDelay(0.05f).With(Ease.SineOut),
-                    }
                 };
 
                 // This is a bad idea, since it will overload the thread pool, effectively freezing all other tasks of the app
                 // Task.Run(() => FinishModPanels(modPanel));
+                if (withAnimation) {
+                    modPanel.Modifiers = new ObservableCollection<Modifier> {
+                        new FadeInAnimation(0.09f).WithDelay(0.05f).With(Ease.SineInOut),
+                        new OffsetInAnimation(new Vector2(0f, 10f), 0.15f).WithDelay(0.05f).With(Ease.SineIn),
+                        new ScaleInAnimation(0.9f, 0.125f).WithDelay(0.05f).With(Ease.SineOut),
+                    };
+                }
                 
                 panels.Add(modPanel);
+                i++;
+                if (amount > 0 && amount <= i) break;
             }
+
+            // If nothing was generated, skip the task below
+            if (panels.Count == 0) return panels;
 
             cancellationToken.Dispose();
             cancellationToken = new CancellationTokenSource();
@@ -1013,7 +1024,7 @@ namespace Olympus {
             Task.Run(async () => {
                 // neat hack to force a single call on every update to prevent freezes
                 uint currGUID = UI.GlobalUpdateID;
-                for (int i = 1; i < panels.Count; i++) {
+                for (int i = 0; i < panels.Count; i++) {
                     while (currGUID == UI.GlobalUpdateID) await Task.Delay(1);
                     currGUID = UI.GlobalUpdateID;
                     if (ct.Value.IsCancellationRequested) break;
@@ -1050,6 +1061,8 @@ namespace Olympus {
                 }
             }
 
+            string modHash = panel.Mod.Hash; // This can be expensive, so do it while async
+
             UI.Run(() => {
                 try {
                     string? desc = modInfo?.Description;
@@ -1057,7 +1070,7 @@ namespace Olympus {
                     panel.GetChild<Label>("Description").Text = desc ?? "No description available";
                     Group infoGroup = panel.GetChild<Group>("BottomPart").GetChild<Group>("Info");
                     infoGroup.GetChild<LabelSmall>("VersionLabel").Text = "Installed Version: " + panel.Mod.Version;
-                    if (remoteFileInfo == null || remoteFileInfo.Hash == panel.Mod.Hash) {
+                    if (remoteFileInfo == null || remoteFileInfo.Hash == modHash) {
 
                         infoGroup.GetChild<LabelSmall>("UpdateLabel").Text = "Up to date!";
                         return;
@@ -1278,6 +1291,37 @@ namespace Olympus {
 
                 Callback = cb;
             }
+        }
+
+        /// <summary>
+        /// A scrollbox that generates new elements on scrolling.
+        /// Only considers the vertical direction.
+        /// </summary>
+        public partial class CallbackScrollBox : ScrollBox {
+            private readonly Action<Element> action;
+
+            public CallbackScrollBox(Action<Element> action) {
+                this.action = action;
+            }
+
+
+            public override void Update(float dt) {
+                base.Update(dt);
+                
+                Vector2 xy = -Content.XY;
+                Vector2 wh = Content.WH.ToVector2();
+                Vector2 boxWH = WH.ToVector2();
+                float entrySize = 0;
+                if (Content.Children.Count > 0) {
+                    entrySize = Content.Children[0].H;
+                }
+
+                if (wh.Y <= xy.Y + boxWH.Y + entrySize) {
+                    action.Invoke(this);
+                }
+                
+            }
+            
         }
 
         /// <summary>

@@ -143,13 +143,20 @@ public class NewsScene : Scene {
             },
             Children = {
                 new HeaderSmall(newsEntry.Title) { Wrap = true },
-                new Group() { ID = "ImageGroup", Layout = { Layouts.Fill(1, 0) } },
+                new Group() { ID = "ImageGroup", 
+                    Layout = { Layouts.Fill(1, 0) },
+                    Children = {
+                        new Group() {
+                            ForceWH = new Point(100, 100)
+                        }
+                    }
+                },
                 new Label(newsEntry.Text) { Wrap = true, },
             },
             Modifiers = {
-                new FadeInAnimation(0.09f).WithDelay(0.05f).With(Ease.SineInOut),
+                // new FadeInAnimation(0.09f).WithDelay(0.05f).With(Ease.SineInOut),
                 new OffsetInAnimation(new Vector2(0f, 10f), 0.15f).WithDelay(0.05f).With(Ease.SineIn),
-                new ScaleInAnimation(0.9f, 0.125f).WithDelay(0.05f).With(Ease.SineOut),
+                // new ScaleInAnimation(0.9f, 0.125f).WithDelay(0.05f).With(Ease.SineOut),
             }
         };
 
@@ -170,11 +177,12 @@ public class NewsScene : Scene {
             if (tex == null) return;
 
             await UI.Run(() => {
+                group.DisposeChildren();
                 group.Add(new Image(tex) {
                     Modifiers = {
                         new FadeInAnimation(0.6f).With(Ease.QuadOut),
-                        new ScaleInAnimation(1.05f, 0.5f).With(
-                            Ease.QuadOut)
+                        // new ScaleInAnimation(1.05f, 0.5f).With(
+                        //     Ease.QuadOut)
                     },
                     Layout = {
                         ev => {

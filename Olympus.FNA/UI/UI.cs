@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using OlympUI.MegaCanvas;
+using Olympus;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -61,6 +62,8 @@ namespace OlympUI {
 
         private static readonly AutoRotatingPool<List<Action>> RunListPool = new(8);
         private static List<Action> RunList = RunListPool.Next();
+        private static List<Action>? IteratingRunList;
+        private static IEnumerator<Action>? RunListEnumerator = null;
         private static readonly AutoRotatingPool<List<Action>> RunLateListPool = new(8);
         private static List<Action> RunLateList = RunLateListPool.Next();
         private static HashSet<Action> RunOnceList = new();
@@ -108,14 +111,55 @@ namespace OlympUI {
 
             #region RunList
             {
-                List<Action> runList;
-                lock (RunListPool) {
-                    runList = RunList;
-                    RunList = RunListPool.Next();
+                if (true) {
+                    // Here we are running all the queued actions we can before exceeding a maximum time
+                    // if that's the case we'll just stop and continue next frame 
+                    if (RunListEnumerator == null || IteratingRunList == null)
+                        lock (RunListPool) {
+                            IteratingRunList = RunList;
+                            RunListEnumerator = IteratingRunList.GetEnumerator();
+                            RunList = RunListPool.Next();
+                        }
+
+                    bool outOfTime = false;
+                    DateTime startingTime = DateTime.Now;
+                    while (RunListEnumerator.MoveNext()) {
+#if DEBUG
+                        DateTime lastUpdateTime = DateTime.Now;
+#endif
+                        Action run = RunListEnumerator.Current;
+                        run();
+#if DEBUG
+                        if (DateTime.Now - lastUpdateTime > App.UpdateDelaySpan) {
+                            AppLogger.Log.Debug("A single UI Update took more than max amount");
+                        }
+#endif
+                        if (DateTime.Now - startingTime > App.UpdateDelaySpan) {
+                            outOfTime = true;
+                            break;
+                        }
+
+                    }
+
+                    if (!outOfTime) {
+                        lock (RunListPool) {
+                            RunListEnumerator.Dispose();
+                            RunListEnumerator = null;
+                            IteratingRunList.Clear();
+                            IteratingRunList = null;
+                        }
+                    }
+                } else {
+                    List<Action> runList;
+                    lock (RunListPool) {
+                        runList = RunList;
+                        RunList = RunListPool.Next();
+                    }
+                    foreach (Action run in runList)
+                        run();
+                    runList.Clear(); 
                 }
-                foreach (Action run in runList)
-                    run();
-                runList.Clear();
+                
 
             }
             #endregion

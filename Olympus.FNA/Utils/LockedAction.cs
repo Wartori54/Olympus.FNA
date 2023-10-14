@@ -6,7 +6,7 @@ namespace Olympus.Utils {
     public class LockedAction<T>  {
 
         private Action<T> actionHolder;
-        private bool isRunning = false;
+        public bool IsRunning { get; private set; } = false;
         private Queue<T> queuedRuns = new();
 
         public LockedAction(Action<T> action) {
@@ -14,7 +14,7 @@ namespace Olympus.Utils {
         }
 
         public bool TryRun(T obj, bool enqueueRuns = true) {
-            if (!isRunning) {
+            if (!IsRunning) {
                 Run(obj);
                 return true; // it ran
             }
@@ -26,7 +26,7 @@ namespace Olympus.Utils {
         }
 
         private void Run(T obj) {
-            isRunning = true;
+            IsRunning = true;
             actionHolder(obj);
             // after running it, check if anything was queued
             if (queuedRuns.Count != 0) {
@@ -34,7 +34,7 @@ namespace Olympus.Utils {
                     actionHolder(newObj);
                 }
             }
-            isRunning = false;
+            IsRunning = false;
         }
     }
 }
