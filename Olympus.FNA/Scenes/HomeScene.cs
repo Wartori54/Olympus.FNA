@@ -811,7 +811,7 @@ namespace Olympus {
             }
             (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
             = Config.Instance.Installation.ScanVersion(false);
-            return Full;
+            return $"Celeste-{Version?.ToString() ?? "??"}-{Framework ?? "??"}";
         }
         
         private Action<Installation?>? updateEvent = null;

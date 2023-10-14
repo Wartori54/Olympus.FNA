@@ -327,7 +327,7 @@ namespace Olympus.NativeImpls {
             }
 
             // MSDN demands a minimum width of 300 for acceptable behavior with snapping the window to the grid.
-            SDL.SDL_SetWindowMinimumSize(app.Window.Handle, 800, 600);
+            SDL.SDL_SetWindowMinimumSize(app.Window.Handle, App.MinWindowSize.X, App.MinWindowSize.Y);
 
             SDL.SDL_SysWMinfo info = new();
             SDL.SDL_GetVersion(out info.version);

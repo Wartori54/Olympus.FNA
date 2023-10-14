@@ -27,6 +27,8 @@ namespace Olympus {
         public static readonly string Name = "Olympus.FNA";
         public static readonly Version Version = typeof(App).Assembly.GetName().Version ?? new Version(1, 0, 0, 0);
 
+        public static readonly Point MinWindowSize = new Point(1000, 600);
+
         public static readonly object[] EmptyArgs = new object[0];
 
         public static readonly MethodInfo m_GameWindow_OnClientSizeChanged =
@@ -100,7 +102,7 @@ namespace Olympus {
             Graphics.PreferMultiSampling = false;
             Graphics.PreferredBackBufferWidth = 1100;
             Graphics.PreferredBackBufferHeight = 600;
-            SDL.SDL_SetWindowMinimumSize(Window.Handle, 800, 600);
+            SDL.SDL_SetWindowMinimumSize(Window.Handle, MinWindowSize.X, MinWindowSize.Y);
 
             Graphics.PreparingDeviceSettings += (s, e) => {
                 GraphicsDeviceInformation gdi = e.GraphicsDeviceInformation;
