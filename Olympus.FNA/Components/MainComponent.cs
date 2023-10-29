@@ -134,6 +134,14 @@ namespace Olympus {
                 UI.GlobalDrawDebug = !UI.GlobalDrawDebug;
                 UI.GlobalRepaintID++;
             }
+
+            if (UIInput.Pressed(Keys.F12)) {
+                if (UIInput.Down(Keys.LeftShift)) {
+                    Scener.Push<DebugToolSceneAlert>();
+                } else {
+                    Scener.Set<DebugToolScene>();
+                }
+            }
 #endif
 
             if (Skin.Current != (Skin.Current = SkinForce ?? (Native.DarkMode ? SkinDark : SkinLight))) {

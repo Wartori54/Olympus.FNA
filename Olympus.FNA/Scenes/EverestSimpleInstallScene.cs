@@ -217,18 +217,7 @@ public class EverestSimpleInstallScene : Scene {
                         }),
                     }
                 },
-#if DEBUG
-                new Button("Open WorkingOnItScene", b => {
-                    Scener.PopFront();
-                    WorkingOnItScene.Job job = WorkingOnItScene.GetDummyJob();
-                    Scener.Set<WorkingOnItScene>(job, "download_rot");
-                }),
-                new Button("Open CRASH WorkingOnItScene", b => {
-                    Scener.PopFront();
-                    WorkingOnItScene.Job job = WorkingOnItScene.GetCrashyJob();
-                    Scener.Set<WorkingOnItScene>(job, "download_rot");
-                })
-#endif
+
             }
         };
 
