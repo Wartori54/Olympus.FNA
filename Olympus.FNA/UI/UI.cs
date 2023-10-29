@@ -111,55 +111,43 @@ namespace OlympUI {
 
             #region RunList
             {
-                if (true) {
-                    // Here we are running all the queued actions we can before exceeding a maximum time
-                    // if that's the case we'll just stop and continue next frame 
-                    if (RunListEnumerator == null || IteratingRunList == null)
-                        lock (RunListPool) {
-                            IteratingRunList = RunList;
-                            RunListEnumerator = IteratingRunList.GetEnumerator();
-                            RunList = RunListPool.Next();
-                        }
-
-                    bool outOfTime = false;
-                    DateTime startingTime = DateTime.Now;
-                    while (RunListEnumerator.MoveNext()) {
-#if DEBUG
-                        DateTime lastUpdateTime = DateTime.Now;
-#endif
-                        Action run = RunListEnumerator.Current;
-                        run();
-#if DEBUG
-                        if (DateTime.Now - lastUpdateTime > App.UpdateDelaySpan) {
-                            AppLogger.Log.Debug("A single UI Update took more than max amount");
-                        }
-#endif
-                        if (DateTime.Now - startingTime > App.UpdateDelaySpan) {
-                            outOfTime = true;
-                            break;
-                        }
-
-                    }
-
-                    if (!outOfTime) {
-                        lock (RunListPool) {
-                            RunListEnumerator.Dispose();
-                            RunListEnumerator = null;
-                            IteratingRunList.Clear();
-                            IteratingRunList = null;
-                        }
-                    }
-                } else {
-                    List<Action> runList;
+                // Here we are running all the queued actions we can before exceeding a maximum time
+                // if that's the case we'll just stop and continue next frame 
+                if (RunListEnumerator == null || IteratingRunList == null)
                     lock (RunListPool) {
-                        runList = RunList;
+                        IteratingRunList = RunList;
+                        RunListEnumerator = IteratingRunList.GetEnumerator();
                         RunList = RunListPool.Next();
                     }
-                    foreach (Action run in runList)
-                        run();
-                    runList.Clear(); 
+
+                bool outOfTime = false;
+                DateTime startingTime = DateTime.Now;
+                while (RunListEnumerator.MoveNext()) {
+#if DEBUG
+                    DateTime lastUpdateTime = DateTime.Now;
+#endif
+                    Action run = RunListEnumerator.Current;
+                    run();
+#if DEBUG
+                    if (DateTime.Now - lastUpdateTime > App.UpdateDelaySpan) {
+                        AppLogger.Log.Debug("A single UI Update took more than max amount");
+                    }
+#endif
+                    if (DateTime.Now - startingTime > App.UpdateDelaySpan) {
+                        outOfTime = true;
+                        break;
+                    }
+
                 }
-                
+
+                if (!outOfTime) {
+                    lock (RunListPool) {
+                        RunListEnumerator.Dispose();
+                        RunListEnumerator = null;
+                        IteratingRunList.Clear();
+                        IteratingRunList = null;
+                    }
+                }
 
             }
             #endregion
