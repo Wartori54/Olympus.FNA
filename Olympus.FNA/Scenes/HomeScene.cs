@@ -1114,7 +1114,7 @@ namespace Olympus {
 
                             b.Text = "Starting download...";
 
-                            ModUpdater.UpdateMod(panelParent.Mod, (position, length, speed) => {
+                            Task.Run(() => ModUpdater.UpdateMod(panelParent.Mod, (position, length, speed) => {
                                 bool exists = b.Data.TryGet("cancel", out bool cancel);
                                 if (exists && cancel) {
                                     return false;
@@ -1150,7 +1150,7 @@ namespace Olympus {
                                         b.Data.Add("cancel", false);
                                     }
                                 });
-                            });
+                            }));
                         }) {
                             Enabled = !panel.Mod.IsUpdaterBlacklisted ?? true,
                             Layout = {

@@ -3,15 +3,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
-using System.Security.Cryptography;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace Olympus.Utils {
     public static class ModUpdater {
         
-        public static void UpdateAllMods(Installation install) { //TODO: add update all button and auto update mods
+        public static async void UpdateAllMods(Installation install) { //TODO: add update all button and auto update mods
             IEnumerable<ModAPI.IModFileInfo> mods = install.LocalInfoAPI.CreateAllModFileInfo();
 
             bool TickCallback(int progress, long lenght, int speed) {
@@ -21,80 +20,81 @@ namespace Olympus.Utils {
             void FinishCallback(bool success, bool isDone) { }
             
             foreach (var mod in mods) {
-                UpdateMod(mod, TickCallback, FinishCallback);
+                // Synchronous updates, for now
+                await UpdateMod(mod, TickCallback, FinishCallback);
             }
         }
 
         /// <summary>
-        /// Updates a single mod
+        /// Updates or installs a single mod
         /// </summary>
         /// <param name="mod">The populated mod info</param>
         /// <param name="tickCallback">Callback for download progress, parameters: (pos, lenght, speed) -> abort</param>
         /// <param name="finishCallback">Callback to determine outcome, parameters: (success, isDone)</param>
-        public static void UpdateMod(ModAPI.IModFileInfo mod, Func<int, long, int, bool> tickCallback, Action<bool, bool> finishCallback) {
-            
+        public static async Task UpdateMod(ModAPI.IModFileInfo mod, Func<int, long, int, bool> tickCallback, Action<bool, bool> finishCallback) {
             // The following is copied and adapted from Everest (OuiModUpdateList.cs:257)
-            Task<Task> job = new(async () => {
-                string path;
-                ModAPI.IModFileInfo remoteFileInfo;
-                if (mod.IsLocal) {
-                    path = mod.Path!;
-                    remoteFileInfo = App.Instance.APIManager.TryAll<ModAPI.IModFileInfo>(api => api.GetModFileInfoFromId(mod.Name)) 
-                                     ?? throw new ApplicationException($"Couldn't find update data for mod {mod.Name}");
-                } else {
-                    throw new InvalidOperationException("Tried to update RemoteFileInfo");
+            string path;
+            ModAPI.IModFileInfo remoteFileInfo;
+            if (mod.IsLocal) { // update mod
+                path = mod.Path!;
+                remoteFileInfo = App.Instance.APIManager.TryAll<ModAPI.IModFileInfo>(api => api.GetModFileInfoFromId(mod.Name)) 
+                                 ?? throw new ApplicationException($"Couldn't find update data for mod {mod.Name}");
+            } else { // install it
+                path = Path.Combine(Config.Instance.Installation?.Root ?? "", "Mods");
+                if (path == "")
+                    throw new InvalidOperationException("Tried to install mod without install selected");
+                path = Path.Combine(path, mod.Name);
+                remoteFileInfo = mod; // we can reuse the same modFileInfo, since the provided one is valid
+            }
+            
+            // we will download the mod to Celeste_Directory/[update.GetHashCode()].zip at first.
+            string zipPath = Path.Combine(Path.GetDirectoryName(path)!, $"modupdate-{mod.GetHashCode()}.zip");
+            
+            // download it...
+            AppLogger.Log.Information($"Downloading to {zipPath}");
+            bool success = false;
+            bool finished = false;
+            foreach (string url in remoteFileInfo.DownloadUrl!) {
+                try {
+                    AppLogger.Log.Information($"Trying {url}");
+                    bool b = await DownloadFileWithProgress(url, zipPath,
+                        tickCallback);
+                    finished = b;
+                    success = true;
+                    break;
+                } catch (Exception e) {
+                    const int retryDelaySeconds = 3;
+                    AppLogger.Log.Error($"Download failed, attempting again in {retryDelaySeconds}s");
+                    AppLogger.Log.Error(e, e.Message);
+                    finishCallback.Invoke(false, false);
+                    await Task.Delay(retryDelaySeconds*1000);
+                } 
+            }
+
+            
+            if (!success || !finished) {
+                if (!success)
+                    // update failed
+                    AppLogger.Log.Error($"Installing/Updating {mod.Name} failed");
+                else {
+                    // update canceled
+                    AppLogger.Log.Warning($"Installing/Updating {mod.Name} was canceled");
                 }
-                
-                // we will download the mod to Celeste_Directory/[update.GetHashCode()].zip at first.
-                string zipPath = Path.Combine(Path.GetDirectoryName(path)!, $"modupdate-{mod.GetHashCode()}.zip");
-                
-                // download it...
-                AppLogger.Log.Information($"Downloading to {zipPath}");
-                bool success = false;
-                bool finished = false;
-                foreach (string url in remoteFileInfo.DownloadUrl!) {
-                    try {
-                        AppLogger.Log.Information($"Trying {url}");
-                        bool b = await DownloadFileWithProgress(url, zipPath,
-                            tickCallback);
-                        finished = b;
-                        success = true;
-                        break;
-                    } catch (Exception e) {
-                        AppLogger.Log.Error("Download failed");
-                        AppLogger.Log.Error(e, e.Message);
-                        finishCallback.Invoke(false, false);
-                        await Task.Delay(3000);
-                    } 
-                }
-
-                
-                if (!success || !finished) {
-                    if (!success)
-                        // update failed
-                        AppLogger.Log.Error($"Updating {mod.Name} failed");
-                    else {
-                        // update canceled
-                        AppLogger.Log.Warning($"Updating {mod.Name} was canceled");
-                    }
-                    finishCallback.Invoke(success, finished);
-
-                    // try to delete mod-update.zip if it still exists.
-                    TryDelete(zipPath);
-                    return;
-                }
-
-                // verify its checksum
-                VerifyChecksum(remoteFileInfo, zipPath);
-
-                // install it
-                InstallModUpdate(mod, zipPath);
-
-                // done!
                 finishCallback.Invoke(success, finished);
-            });
 
-            job.Start();
+                // try to delete mod-update.zip if it still exists.
+                TryDelete(zipPath);
+                return;
+            }
+
+            // verify its checksum
+            VerifyChecksum(remoteFileInfo, zipPath);
+
+            // install it
+            InstallModUpdate(mod, zipPath);
+
+            // done!
+            finishCallback.Invoke(success, finished);
         }
 
 
@@ -188,13 +188,21 @@ namespace Olympus.Utils {
         /// <param name="mod">The mod metadata from Everest for the installed mod</param>
         /// <param name="zipPath">The path to the zip the update has been downloaded to</param>
         private static void InstallModUpdate(ModAPI.IModFileInfo mod, string zipPath) {
-            if (!mod.IsLocal) throw new InvalidOperationException("Cant install non local mod");
-            // delete the old zip, and move the new one.
-            AppLogger.Log.Information($"Deleting mod .zip: {mod.Path}");
-            File.Delete(mod.Path!);
+            string destPath;
+            if (!mod.IsLocal) {
+                destPath = Path.Combine(Path.GetDirectoryName(zipPath) ?? throw new InvalidOperationException(), mod.Name + ".zip");
+            } else {
+                destPath = mod.Path!;
+            }
 
-            AppLogger.Log.Information($"Moving {zipPath} to {mod.Path}");
-            File.Move(zipPath, mod.Path!);
+            if (File.Exists(destPath)) {
+                // delete the old zip, and move the new one.
+                AppLogger.Log.Information($"Deleting mod .zip: {destPath}");
+                File.Delete(destPath);
+            }
+
+            AppLogger.Log.Information($"Moving {zipPath} to {destPath}");
+            File.Move(zipPath, destPath);
         }
 
         /// <summary>
@@ -216,6 +224,59 @@ namespace Olympus.Utils {
             using (FileStream modFile = File.OpenRead(filePath))
                 return BitConverter.ToString(BitConverter.GetBytes(xxHash64.ComputeHash(modFile))
                     .Reverse().ToArray()).Replace("-", "").ToLowerInvariant(); 
+        }
+
+        public static class Jobs {
+            public static WorkingOnItScene.Job GetInstallModJob(ModAPI.RemoteModInfoAPI.RemoteModFileInfo mod) {
+                return new WorkingOnItScene.Job(() => JobFunc(mod), "download_rot");
+
+                static async IAsyncEnumerable<EverestInstaller.Status> JobFunc(ModAPI.RemoteModInfoAPI.RemoteModFileInfo mod) {
+                    Channel<(string, float)> chan = Channel.CreateUnbounded<(string, float)>();
+                    Task.Run<Task>(async () => {
+                        try {
+                            bool wasSuccessful = false;
+                            DateTime lastUpdate = DateTime.Now;
+                            await UpdateMod(mod, (pos, length, speed) => {
+                                if (lastUpdate.Add(TimeSpan.FromSeconds(1)).CompareTo(DateTime.Now) < 0) {
+                                    chan.Writer.TryWrite(($"Downloading... {pos*100F/length}% {speed} Kib/s {pos}", (float) pos / length));
+                                    lastUpdate = DateTime.Now;
+                                }
+
+                                return true;
+                            }, (success, finished) => {
+                                wasSuccessful = success && finished;
+                                if (success) {
+                                    chan.Writer.TryWrite(("Downloading... 100% 0Kb/s", 1F)); // i love faking messages :)
+                                } else {
+                                    chan.Writer.TryWrite(("Download failed! Attempting next source", 0F));
+                                }
+                            });
+                            if (wasSuccessful)
+                                chan.Writer.TryWrite(("Mod downloaded successfully!", 1f));
+                            else
+                                chan.Writer.TryWrite(("Failed to update mod!", -1f));
+                        } catch (Exception e) {
+                            chan.Writer.TryWrite((e.ToString(), -1));
+                            chan.Writer.TryWrite(("Failed to update mod!", -1f));
+                            AppLogger.Log.Error(e, e.Message);
+                        }
+                        
+                        chan.Writer.Complete();
+                    });
+                    
+                    while (await chan.Reader.WaitToReadAsync())
+                    while (chan.Reader.TryRead(out (string, float) item)) {
+                        if (item.Item2 >= 0)
+                            yield return new EverestInstaller.Status(item.Item1, item.Item2,
+                                item.Item2 != 1f
+                                    ? EverestInstaller.Status.Stage.InProgress
+                                    : EverestInstaller.Status.Stage.Success);
+                        else
+                            yield return new EverestInstaller.Status(item.Item1, 1f,
+                                EverestInstaller.Status.Stage.Fail);
+                    }
+                }
+            }
         }
         
     }
