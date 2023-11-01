@@ -1,4 +1,6 @@
 using OlympUI;
+using Olympus.Utils;
+using System;
 using System.Collections.ObjectModel;
 
 namespace Olympus {
@@ -36,7 +38,27 @@ namespace Olympus {
                             Config.Instance.Installation = null;
                             Config.Instance.Save();
                         }),
-                    })
+                    }),
+                    // I love syntactic sugarrrr
+                    Section("Mod Installing", new Func<ObservableCollection<Element>>(() => {
+                        ObservableCollection<Element> ret = new();
+                        string[] mods = new[] {
+                            "StrawberryJam2021AudioA", "SpeedrunTool", "StrawberryJam2021", "ExtendedVariantMode"
+                        };
+                        foreach (string mod in mods) {
+                            ret.Add(new Button($"Install {mod} mod", b => {
+                                Scener.PopFront();
+                                ModAPI.RemoteModInfoAPI.RemoteModFileInfo? modFileInfo =
+                                    App.APIManager.TryAll<ModAPI.RemoteModInfoAPI.RemoteModFileInfo>(api =>
+                                        api.GetModFileInfoFromId(mod));
+                                if (modFileInfo == null) return;
+                                WorkingOnItScene.Job job = ModUpdater.Jobs.GetInstallModJob(modFileInfo);
+                                Scener.Set<WorkingOnItScene>(job, "download_rot");
+                            }));
+                        }
+
+                        return ret;
+                    })())
                 }
                 
             };

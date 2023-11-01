@@ -2,6 +2,7 @@
 using MonoMod.Utils;
 using OlympUI;
 using Olympus.NativeImpls;
+using Olympus.Utils;
 using SDL2;
 using System;
 using System.Collections.Generic;
@@ -15,8 +16,62 @@ namespace Olympus {
     public class Program {
 
         public static void Main(string[] args) {
+            // Before anything parse args, as we may exit right after
+            bool help = false;
+            bool console = false;
+            bool forceSDL2 = Environment.GetEnvironmentVariable("OLYMPUS_FORCE_SDL2") == "1";
+            OptionSet options = new() {
+                { "h|help", "Show this message and exit.", v => help = v is not null },
+                { "force-sdl2", "Force using the SDL2 native helpers.", v => forceSDL2 = v is not null },
+            };
+#if DEBUG
+            console = true;
+#else
+            if (PlatformHelper.Is(Platform.Windows)) {
+                options.Add("console", "Open a debug console.", v => console = v is not null);
+            }
+#endif
+
+            List<string> extra = new();
+            try {
+                // parse the command line
+                extra = options.Parse(args);
+            } catch (OptionException e) {
+                Console.WriteLine("Olympus CLI error: {0}", e.Message);
+                help = true;
+            }
+
+            if (help) {
+                options.WriteOptionDescriptions(Console.Out);
+                return;
+            }
+
+            // There should only be one instance of this app
+            bool notUnique = SingleInstance.CheckInstances();
+
+            using IPC ipc = new();
+            // The ipc should only be started by a single process
+            if (!notUnique) {
+                ipc.Start();
+            }
+
+            foreach (string arg in extra) {
+                if (arg.StartsWith("everest")) {
+                    IPC.SendText(arg);
+                }
+            }
+
+            if (notUnique) {
+                Console.WriteLine("Another instance detected, dying...");
+                return;
+            }
+            // Make sure to have the pid file as up to date as possible
+            // The pid file is never deleted intentionally
+            using SingleInstance.PidFile pidFile = SingleInstance.WritePidFile();
+            
+            
+            // Then just proceed as normal
             AppLogger.Create();
-            AppLogger.Log.Information("Created logger!");
             CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
             CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
@@ -27,8 +82,6 @@ namespace Olympus {
                 AppLogger.Log.Error("TLS 1.3 NOT SUPPORTED! CONTINUE AT YOUR OWN RISK!");
                 ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
             }
-
-            bool forceSDL2 = Environment.GetEnvironmentVariable("OLYMPUS_FORCE_SDL2") == "1";
 
             // FIXME: For some reason DWM hates FNA3D's D3D11 renderer and misrepresents the backbuffer too often on multi-GPU setups?!
             // FIXME: Default to D3D11, but detect multi-GPU setups and use the non-Intel GPU with OpenGL (otherwise buggy drivers).
@@ -42,35 +95,6 @@ namespace Olympus {
             // This is new: https://github.com/libsdl-org/SDL/commit/6a2e6c82a0764a00123447d93999ebe14d509aa8
             if (Environment.GetEnvironmentVariable("OLYMPUS_DIRECTINPUT_ENABLED") != "1") {
                 SDL.SDL_SetHint("SDL_DIRECTINPUT_ENABLED", "0");
-            }
-
-            bool help = false;
-            bool console = false;
-            OptionSet options = new() {
-                { "h|help", "Show this message and exit.", v => help = v is not null },
-                { "force-sdl2", "Force using the SDL2 native helpers.", v => forceSDL2 = v is not null },
-            };
-
-#if DEBUG
-            console = true;
-#else
-            if (PlatformHelper.Is(Platform.Windows)) {
-                options.Add("console", "Open a debug console.", v => console = v is not null);
-            }
-#endif
-
-            List<string> extra;
-            try {
-                // parse the command line
-                extra = options.Parse(args);
-            } catch (OptionException e) {
-                AppLogger.Log.Error("Olympus CLI error: {Error}", e.Message);
-                help = true;
-            }
-
-            if (help) {
-                options.WriteOptionDescriptions(Console.Out);
-                return;
             }
 
             if (PlatformHelper.Is(Platform.Windows) && console) {

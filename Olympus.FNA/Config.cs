@@ -85,7 +85,7 @@ namespace Olympus {
             return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), App.Name);
         }
 
-        public static string GetDefaultPath() {
+        public static string GetDefaultConfigFilePath() {
             return System.IO.Path.Combine(GetDefaultDir(), "config.json");
         }
 
@@ -112,7 +112,7 @@ namespace Olympus {
         }
 
         public void Load() {
-            string path = Path ??= GetDefaultPath();
+            string path = Path ??= GetDefaultConfigFilePath();
 
             if (!File.Exists(path))
                 return;
@@ -138,7 +138,7 @@ namespace Olympus {
         }
 
         public void Save() {
-            string path = Path ??= GetDefaultPath();
+            string path = Path ??= GetDefaultConfigFilePath();
 
             string? dir = System.IO.Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))

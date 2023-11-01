@@ -444,6 +444,14 @@ namespace Olympus {
                 return info;
             }
 
+            public RemoteModFileInfo? GetModFileInfoFromFileId(int id) {
+                if (!mmdlUpdateDataBase.Value.TryGetValue(id, out string? stringId))
+                    return null;
+                if (!rawUpdateDataBase.Value.TryGetValue(stringId, out MaddieModFileInfo? modInfo))
+                    return null;
+                return modInfo;
+            }
+
             public class MaddieModFileInfo : RemoteModFileInfo {
                 // FOR SOME REASON THIS IS A LIST, WHAT???? 
                 [YamlMember(Alias = "xxHash")] 
