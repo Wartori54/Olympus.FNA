@@ -59,9 +59,9 @@ namespace Olympus.Utils {
             public void Run(string cmd);
         }
 
-        public class OneClickInstall : IPCCommand {
-            public static readonly OneClickInstall Instance = new OneClickInstall();
-            private OneClickInstall() {}
+        public class GBOneClickInstall : IPCCommand {
+            public static readonly GBOneClickInstall Instance = new GBOneClickInstall();
+            private GBOneClickInstall() {}
             
             public bool Match(string s) {
                 return s.StartsWith("everest:https://gamebanana.com/mmdl/");
@@ -100,7 +100,7 @@ namespace Olympus.Utils {
 
         public static class IPCCommandsManager {
             private static readonly List<IPCCommand> Instances = new() {
-                OneClickInstall.Instance,
+                GBOneClickInstall.Instance,
             };
 
             public static void RunCommand(string text) {
