@@ -143,7 +143,7 @@ namespace Olympus.Finders {
 #if DEBUG
                             throw new Exception($"Encountered unknown VDF type {type}");
 #else
-                            AppLogger.Log.LogLine($"Encountered unknown VDF type {type}");
+                            AppLogger.Log.Warning($"Encountered unknown VDF type {type}");
                             goto EOF;
 #endif
                     }

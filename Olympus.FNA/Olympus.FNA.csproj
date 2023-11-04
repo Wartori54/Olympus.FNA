@@ -16,11 +16,11 @@
     <TargetIsWindows Condition="'$(TargetIsWindows)' == ''">false</TargetIsWindows>
     <DefineConstants Condition="$(TargetIsWindows)">WINDOWS;$(DefineConstants)</DefineConstants>
     <UseWindowsForms>$(TargetIsWindows)</UseWindowsForms>
-    <Platforms>x64</Platforms>
+    <Platform>x64</Platform>
     <OutputType>exe</OutputType>
     <OutputType Condition="$(TargetIsWindows)">winexe</OutputType>
     <OutputPath>bin\$(Platform)\$(Configuration)\$(TargetFramework)</OutputPath>
-    <IntermediateOutputPath>bin\$(Platform)\$(Configuration)\$(TargetFramework)</IntermediateOutputPath>
+    <IntermediateOutputPath>obj\$(Platform)\$(Configuration)\$(TargetFramework)</IntermediateOutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
   </PropertyGroup>

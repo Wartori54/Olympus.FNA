@@ -60,7 +60,7 @@ namespace Olympus.Utils {
         }
 
         public class GBOneClickInstall : IPCCommand {
-            public static readonly GBOneClickInstall Instance = new GBOneClickInstall();
+            public static readonly GBOneClickInstall Instance = new();
             private GBOneClickInstall() {}
             
             public bool Match(string s) {
@@ -98,9 +98,28 @@ namespace Olympus.Utils {
             }
         }
 
+        public class RequestFocusCommand : IPCCommand {
+            public static readonly RequestFocusCommand Instance = new();
+
+            private RequestFocusCommand() { }
+
+            public bool Match(string s) {
+                return s.Equals("IPCreq_focus");
+            }
+
+            public void Run(string cmd) {
+                if (App.Instance != null) {
+                    SingleInstance.RequestFocus();
+                } else {
+                    Console.WriteLine("Could not request focus, app instance not set!");
+                }
+            }
+        }
+
         public static class IPCCommandsManager {
             private static readonly List<IPCCommand> Instances = new() {
                 GBOneClickInstall.Instance,
+                RequestFocusCommand.Instance
             };
 
             public static void RunCommand(string text) {

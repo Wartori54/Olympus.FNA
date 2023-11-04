@@ -1,5 +1,6 @@
 // This file is here because it contains os dependent code that has to run too early to be put on a NativeImpl
 
+using MonoMod.Utils;
 using SDL2;
 using System;
 using System.Diagnostics;
@@ -31,7 +32,7 @@ namespace Olympus.NativeImpls {
 
             // this array is never disposed
             foreach (Process process in Process.GetProcessesByName(currentProcess.ProcessName)) {
-                if (currentProcess.Handle != process.Handle) return true;
+                if (currentProcess.Id != process.Id) return true;
             }
 
             return false;
@@ -57,6 +58,8 @@ namespace Olympus.NativeImpls {
         /// Request focus for the currently open window, noop if theres none
         /// </summary>
         public static void RequestFocus() {
+            if (PlatformHelper.Is(Platform.Windows)) // on windows its needed to force since it wont work at all because M$
+                SDL.SDL_SetHint(SDL.SDL_HINT_FORCE_RAISEWINDOW, "1");
             SDL.SDL_RaiseWindow(App.Instance.Window.Handle);
         }
 

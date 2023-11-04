@@ -53,10 +53,13 @@ namespace Olympus {
             // The ipc should only be started by a single process
             if (!notUnique) {
                 ipc.Start();
+            } else {
+                // command to make the current app request for focus
+                extra.Add("IPCreq_focus");
             }
 
             foreach (string arg in extra) {
-                if (arg.StartsWith("everest")) {
+                if (arg.StartsWith("everest") || arg.StartsWith("IPC")) {
                     IPC.SendText(arg);
                 }
             }
@@ -119,7 +122,7 @@ namespace Olympus {
 #endif
             } else if (PlatformHelper.Is(Platform.Linux)) {
 #if WINDOWS
-                AppLogger.Log.LogLine("Olympus compiled with Windows dependencies and running on linux");
+                AppLogger.Log.Warning("Olympus compiled with Windows dependencies and running on linux");
 #endif
                 NativeImpl.Native = new NativeLinux();
             } else {

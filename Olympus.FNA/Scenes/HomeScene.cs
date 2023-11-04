@@ -799,14 +799,12 @@ namespace Olympus {
         
         private static string GetInstallationName() {
             if (Config.Instance.Installation != null) return Config.Instance.Installation.Name;
-            // AppLogger.Log.LogLine("GetInstallationName called before config was loaded!");
             return "No install selected";
 
         }
 
         private static string GetInstallationInfo() {
             if (Config.Instance.Installation == null) {
-                // AppLogger.Log.LogLine("GetInstallationInfo called before config was loaded!");
                 return "No install selected";
             }
             (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) 
