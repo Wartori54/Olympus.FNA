@@ -1099,6 +1099,8 @@ namespace Olympus.NativeImpls {
                             next->Left = monitorInfo.WorkArea.Left;
                             next->Right = monitorInfo.WorkArea.Right;
                             next->Bottom = monitorInfo.WorkArea.Bottom;
+                            next->Top = monitorInfo.WorkArea.Top;
+                            
                             // The maximized window might extend a bit past the monitor area.
                             MaximizedOffset.Left = monitorInfo.WorkArea.Left - next->Left;
                             MaximizedOffset.Top = monitorInfo.WorkArea.Top - next->Top;

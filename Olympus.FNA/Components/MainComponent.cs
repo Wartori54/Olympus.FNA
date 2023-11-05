@@ -151,7 +151,9 @@ namespace Olympus {
             // FIXME: WHY IS YET ANOTHER ROW OF PIXELS MISSING?! Is this an OlympUI bug or another Windows quirk?
             // FIXME: Size flickering in maximized mode on Windows when using viewport size for UI root size.
             // UI.Root.WH = new(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height - (Native.IsMaximized ? 8 : 1));
-            UI.Root.WH = new(App.Width, App.Height - (Native.IsMaximized ? 8 : 1));
+            // UI.Root.WH = new(App.Width, App.Height - (Native.IsMaximized ? 8 : 1));
+            // Im not sure why removing pixels for height is needed in the first place -wartori
+            UI.Root.WH = new(App.Width, App.Height);
 
             if (DebugLabel.Visible) {
                 DebugLabel.Text =
