@@ -185,7 +185,9 @@ namespace Olympus {
             Config.Load();
             Config.Save();
 
+#if WINDOWS
             Components.Add(new OverlayComponent(this));
+#endif
             Components.Add(new SplashComponent(this));
             Components.Add(new MainComponent(this));
             Components.Add(new CodeWarmupComponent(this));
