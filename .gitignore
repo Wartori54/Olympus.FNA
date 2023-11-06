@@ -1,8 +1,6 @@
 # Olympus temporary build files
 tmp-olympus/
 
-# Library binaries
-lib/
 
 # Personal Steam Deck testing files
 decktest_*
@@ -197,6 +195,7 @@ ClientBin/
 *.publishsettings
 node_modules/
 orleans.codegen.cs
+.idea/
 
 # RIA/Silverlight projects
 Generated_Code/
