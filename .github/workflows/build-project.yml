@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
+        with: 
+          submodules: recursive
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
@@ -27,7 +29,7 @@ jobs:
         run: dotnet restore
       - name: Build Debug
         working-directory: ./Olympus.FNA
-        run: dotnet build --no-restore -c Debug -r ${{ matrix.arch.dotnet_runtime }}
+        run: dotnet build --no-restore -c Debug -r ${{ matrix.arch.dotnet_runtime }} --no-self-contained
       - name: Build Release
         working-directory: ./Olympus.FNA
         run: dotnet publish --no-restore -c Release --self-contained -r ${{ matrix.arch.dotnet_runtime }}
