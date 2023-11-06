@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And '$(RuntimeIdentifiers)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifier>
-    <TargetFrameworks Condition="'$(TargetFrameworks)' == '' And $(RuntimeIdentifier.StartsWith('win'))">net7.0-windows</TargetFrameworks>
-    <TargetFrameworks Condition="'$(TargetFrameworks)' == ''">net7.0</TargetFrameworks>
+    <TargetFramework Condition="'$(TargetFrameworks)' == '' And $(RuntimeIdentifier.StartsWith('win'))">net7.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(TargetFrameworks)' == ''">net7.0</TargetFramework>
     <DefineConstants>HIGHER_VERSIONS</DefineConstants>
     <RootNamespace>Olympus</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -16,6 +16,7 @@
     <TargetIsWindows Condition="'$(TargetIsWindows)' == ''">false</TargetIsWindows>
     <DefineConstants Condition="$(TargetIsWindows)">WINDOWS;$(DefineConstants)</DefineConstants>
     <UseWindowsForms>$(TargetIsWindows)</UseWindowsForms>
+    <PublishReadyToRun>true</PublishReadyToRun>
     <Platform>x64</Platform>
     <OutputType>exe</OutputType>
     <OutputType Condition="$(TargetIsWindows)">winexe</OutputType>
