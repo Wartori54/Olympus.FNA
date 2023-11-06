@@ -1,0 +1,39 @@
+name: Build project
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: ${{ matrix.arch.name }}
+    runs-on: $${{ matrix.arch.os }}
+    
+    strategy: 
+      fail-fast: false
+      matrix: 
+        arch:
+        - { name: Linux,   os: ubuntu-latest,  dotnet_runtime: linux-x64, artifact_name: Linux binary   }
+        - { name: Windows, os: windows-latest, dotnet_runtime: win-x64,   artifact_name: Windows binary }
+        - { name: MacOS,   os: macos-latest,   dotnet_runtime: osx-x64,   artifact_name: MacOS binary   }
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 7.0.x
+      - name: Restore dependencies
+        working-directory: ./Olympus.FNA
+        run: dotnet restore
+      - name: Build Debug
+        working-directory: ./Olympus.FNA
+        run: dotnet build --no-restore -c Debug -r ${{ matrix.arch.dotnet_runtime }}
+      - name: Build Release
+        working-directory: ./Olympus.FNA
+        run: dotnet publish --no-restore -c Release --self-contained -r ${{ matrix.arch.dotnet_runtime }}
+      # Debug artifact cannot be uploaded, since it is not portable
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.arch.artifact_name }}
+          path: ./Olympus.FNA/bin/x64/Release/net7.0/${{ matrix.arch.dotnet_runtime }}/publish
