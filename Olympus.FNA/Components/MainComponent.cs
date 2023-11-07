@@ -44,8 +44,8 @@ namespace Olympus {
             App.FinderManager.Refresh();
 
 #if DEBUG
-            AlwaysRepaint = true;
-            App.VSync = false;
+            AlwaysRepaint = false;
+            App.VSync = true;
 #endif
         }
 
