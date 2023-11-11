@@ -45,7 +45,7 @@ public class EverestSimpleInstallScene : Scene {
 
                                 await UI.Run(() => {
                                     if (newest != null)
-                                        el.Text = $"{newest.Branch}: {newest.version}{(newest.Branch.IsNonNative ? " (Non native)" : "")}";
+                                        el.Text = $"{newest.Branch}: {newest.version}{(newest.Branch.IsNonNative ? " (.NET Framework)" : "")}";
                                     else {
                                         el.Text = "Not found!";
                                     }
@@ -152,7 +152,7 @@ public class EverestSimpleInstallScene : Scene {
                                 
                                 await UI.Run(() => {
                                     if (branch != null)
-                                        el.Text = $"{branch}: {ModVersion?.Minor.ToString() ?? "Unknown"}{(branch.IsNonNative ? " (Non native)" : "")}";
+                                        el.Text = $"{branch}: {ModVersion?.Minor.ToString() ?? "Unknown"}{(branch.IsNonNative ? " (.NET Framework)" : "")}";
                                     else {
                                         el.Text = $"Everest not installed";
                                         el.GetParent().GetChild<Label>("desc").Text = // Too lazy to add an Init to the label right below
@@ -193,7 +193,8 @@ public class EverestSimpleInstallScene : Scene {
                                     ID = currBranch.ToString(),
                                 });
                             }
-                            el.Children.Add(new Button($"Use{((selectedBranch ?? branch).IsNonNative ? "" : " non")} Native", b => {
+                            // Notice how "Core" and "Framework" are swapped here, this represents what we can switch to, rather than what we're using
+                            el.Children.Add(new Button($"Use .NET {((selectedBranch ?? branch).IsNonNative ? "Core" : "Framework")}", b => {
                                 selectedBranch ??= branch;
                                 selectedBranch = new EverestInstaller.EverestBranch(selectedBranch.type, !selectedBranch.IsNonNative);
                                 VersionCache.Invalidate();

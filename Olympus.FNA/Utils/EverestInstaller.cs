@@ -108,7 +108,7 @@ namespace Olympus.Utils {
                 }
             }
 
-            // Here "Native" is used as a synonym for "from the core branch"
+            // Here "Native" is used as a synonym for "uses .net core"
             bool isNativeCurrentInstall = File.Exists(Path.Combine(install.Root, "Celeste.dll"));
             bool isNativeArtifact = !version.Branch.IsNonNative;
 
@@ -265,7 +265,7 @@ namespace Olympus.Utils {
                             Path.Combine(install.Root, binaryName));
                     }
                 } else {
-                    throw new FileNotFoundException("Celeste monokickstart missing! (is it non native?)");
+                    throw new FileNotFoundException("Celeste monokickstart missing! (is it .NET Framework?)");
                 }
 
                 return binaryName; // Note: no chmod needed here since the celeste kickstart will already be executable and it'll be kept
@@ -648,8 +648,9 @@ namespace Olympus.Utils {
             public string description = "";
             public string branch = "";
             public int version;
+            public bool isNative = false;
 
-            public EverestBranch Branch => EverestBranch.FromString(branch, branch != "core");
+            public EverestBranch Branch => EverestBranch.FromString(branch, !isNative);
         }
 
         public class EverestBranch {
