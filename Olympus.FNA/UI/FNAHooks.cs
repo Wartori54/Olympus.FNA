@@ -20,6 +20,7 @@ namespace OlympUI {
 #if FNAHOOKS_RENDERTARGETDISCARDCLEAR
         public static bool RenderTargetDiscardClear = false;
 #endif
+        public static event Action<Game>? ExposeEvent;
 
         public static string? FNA3DDriver;
         public static FNA3DDeviceInfo? FNA3DDevice;
@@ -27,6 +28,7 @@ namespace OlympUI {
 
         private static ILHook? ApplyWindowChangesPatch;
         private static ILHook? DebugFNA3DPatch;
+        public static Hook? RedrawWindowPatch;
 #if FNAHOOKS_RENDERTARGETDISCARDCLEAR
         private static ILHook? DisableRenderTargetDiscardClearPatch;
 #endif
@@ -100,6 +102,14 @@ namespace OlympUI {
             );
 #endif
 
+            RedrawWindowPatch = new Hook(
+                typeof(Game).GetMethod("RedrawWindow", BindingFlags.Instance | BindingFlags.NonPublic),
+                (Action<Game> orig, Game game) => {
+                    ExposeEvent?.Invoke(game);
+                    orig(game);
+                }
+            );
+
             FNALoggerEXT.LogInfo += OnLogInfo;
         }
 
@@ -109,6 +119,7 @@ namespace OlympUI {
 #if FNAHOOKS_RENDERTARGETDISCARDCLEAR
             DisableRenderTargetDiscardClearPatch?.Dispose();
 #endif
+            RedrawWindowPatch?.Dispose();
             FNALoggerEXT.LogInfo -= OnLogInfo;
         }
 

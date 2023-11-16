@@ -134,6 +134,12 @@ namespace Olympus {
 
             UI.MainThread = Thread.CurrentThread;
 
+            FNAHooks.ExposeEvent += game => {
+                if (ReferenceEquals(game, this)) {
+                    ForceBeginDraw = true;
+                }
+            };
+
             Web = new(this);
             // WebAPI = new ThunderstoreWebAPI(this, "enter-the-gungeon");
             // WebAPI = new CelesteWebAPI(this);
