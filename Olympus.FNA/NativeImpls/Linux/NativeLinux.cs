@@ -91,7 +91,7 @@ namespace Olympus.NativeImpls {
                 SDL.SDL_SetWindowSize(App.Window.Handle, App.Graphics.PreferredBackBufferWidth, App.Graphics.PreferredBackBufferHeight);
                 SDL.SDL_SetWindowPosition(App.Window.Handle, SDL.SDL_WINDOWPOS_CENTERED, SDL.SDL_WINDOWPOS_CENTERED);
                 
-                
+                App.Config.Load(); // Load config early for the splash theme
                 SplashThread = new Thread(() => {
                     lock (redrawLoopLock) {
                         SplashRoutine();
