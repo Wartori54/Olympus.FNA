@@ -11,9 +11,9 @@ jobs:
       fail-fast: false
       matrix: 
         arch:
-        - { name: Linux,   os: ubuntu-latest,  dotnet_runtime: linux-x64, artifact_name: Linux binary   }
-        - { name: Windows, os: windows-latest, dotnet_runtime: win-x64,   artifact_name: Windows binary }
-        - { name: MacOS,   os: macos-latest,   dotnet_runtime: osx-x64,   artifact_name: MacOS binary   }
+        - { name: Linux,   os: ubuntu-latest,  dotnet_runtime: linux-x64, artifact_name: Linux binary,   artifact_framework: net7.0         }
+        - { name: Windows, os: windows-latest, dotnet_runtime: win-x64,   artifact_name: Windows binary, artifact_framework: net7.0-windows }
+        - { name: MacOS,   os: macos-latest,   dotnet_runtime: osx-x64,   artifact_name: MacOS binary,   artifact_framework: net7.0         }
 
     steps:
       - name: Checkout repo
@@ -38,4 +38,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.arch.artifact_name }}
-          path: ./Olympus.FNA/bin/x64/Release/net7.0/${{ matrix.arch.dotnet_runtime }}/publish
+          path: ./Olympus.FNA/bin/x64/Release/${{ matrix.arch.artifact_framework }}/${{ matrix.arch.dotnet_runtime }}/publish
