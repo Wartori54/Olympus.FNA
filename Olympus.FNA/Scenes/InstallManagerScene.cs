@@ -190,11 +190,11 @@ namespace Olympus {
             string filter;
 
             if (PlatformHelper.Is(Platform.Linux)) {
-                filter = "exe,bin.x86,bin.x86_64";
+                filter = "exe,bin.x86,bin.x86_64,dll";
             } else if (PlatformHelper.Is(Platform.MacOS)) {
-                filter = "app,exe,bin.osx";
+                filter = "app,exe,bin.osx,dll";
             } else { // default to windows
-                filter = "exe";
+                filter = "exe,dll";
             }
 
             DialogResult result = Dialog.FileOpen(filter);
