@@ -60,6 +60,7 @@ namespace Olympus {
 
         public bool? CSD;
         public bool? VSync;
+        public string Theme = "";
 
         public float Overlay;
 

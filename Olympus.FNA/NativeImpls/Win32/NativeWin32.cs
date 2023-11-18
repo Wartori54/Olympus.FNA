@@ -199,7 +199,15 @@ namespace Olympus.NativeImpls {
         );
 
         private bool? _DarkModePreferred;
-        public override bool? DarkModePreferred => _DarkModePreferred ??= (Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", null) as int? == 0);
+        public override bool? DarkModePreferred => _DarkModePreferred ??=
+            Config.Instance.Theme switch {
+                "" => (bool?)null, // otherwise the switch complains its too dumb
+                "light" => false,
+                _ => true
+            } ?? Registry.GetValue(
+                @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+                "AppsUseLightTheme", null) as int?
+            == 0;
         private bool _DarkMode;
         public override bool DarkMode {
             get => _DarkMode;
@@ -240,6 +248,8 @@ namespace Olympus.NativeImpls {
                     }
                     RefreshImmersiveColorPolicyState?.Invoke();
                 }
+
+                Config.Instance.Theme = value ? "dark" : "light";
             }
         }
 
@@ -334,6 +344,8 @@ namespace Olympus.NativeImpls {
             SDL.SDL_GetWindowWMInfo(app.Window.Handle, ref info);
             IntPtr hwnd = HWnd = info.info.win.window;
             HDc = info.info.win.hdc;
+
+            App.Config.Load(); // Load config early for the splash theme
 
             // Dark mode and the extended frame area + "blur" don't play along together.
             DarkMode = true;

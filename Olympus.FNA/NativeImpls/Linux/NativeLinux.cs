@@ -30,7 +30,10 @@ namespace Olympus.NativeImpls {
 
         // TODO: Dark mode detection
         public override bool? DarkModePreferred => null;
-        public override bool DarkMode { get; set; } = false;
+        public override bool DarkMode {
+            get => Config.Instance.Theme == "dark";
+            set => Config.Instance.Theme = value ? "dark" : "light";
+        }
         public override Color Accent => new(0x00, 0xad, 0xee, 0xff);
         public override Point SplashSize => _SplashSize;
 

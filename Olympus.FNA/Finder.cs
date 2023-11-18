@@ -11,6 +11,7 @@ using System.Runtime.InteropServices;
 using Mono.Cecil;
 using MonoMod.Cil;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 
 namespace Olympus {
     public abstract class Finder {
@@ -341,13 +342,9 @@ namespace Olympus {
         private (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) VersionLast;
 
         [NonSerialized]
-        private Blacklist? mainBlackList;
-
-        public Blacklist MainBlacklist => mainBlackList ??= new Blacklist(Path.Combine(Root, "Mods", "blacklist.txt"));
-
+        public Blacklist MainBlacklist;
         [NonSerialized]
-        private Blacklist? updateBlacklist;
-        public Blacklist UpdateBlacklist => updateBlacklist ??= new Blacklist(Path.Combine(Root, "Mods", "updaterblacklist.txt"));
+        public Blacklist UpdateBlacklist;
         [NonSerialized]
         public readonly ModAPI.LocalInfoAPI LocalInfoAPI;
         [NonSerialized]
@@ -372,6 +369,8 @@ namespace Olympus {
             Type = type;
             Name = name;
             Root = root;
+            MainBlacklist = new Blacklist(Path.Combine(Root, "Mods", "blacklist.txt"));
+            UpdateBlacklist = new Blacklist(Path.Combine(Root, "Mods", "updaterblacklist.txt"));
             LocalInfoAPI = new ModAPI.LocalInfoAPI(this);
             
             SetUpWatcher();

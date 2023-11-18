@@ -6,7 +6,8 @@ namespace Olympus {
     public static class JsonHelper {
 
         public static readonly JsonSerializer Serializer = new() {
-            Formatting = Formatting.Indented
+            Formatting = Formatting.Indented,
+            ObjectCreationHandling = ObjectCreationHandling.Replace
         };
 
         public class ExistingCreationConverter<T> : CustomCreationConverter<T> {

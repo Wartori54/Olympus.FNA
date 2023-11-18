@@ -1,6 +1,6 @@
 <Project>
  <PropertyGroup>
     <SolutionDir>$(MSBuildThisFileDirectory)</SolutionDir>
-    <CompilerToolsetVersion Condition="'$(CompilerToolsetVersion)' == ''">4.5.0</CompilerToolsetVersion>
+    <CompilerToolsetVersion Condition="'$(CompilerToolsetVersion)' == ''">4.7.0</CompilerToolsetVersion>
  </PropertyGroup>
 </Project>
