@@ -346,6 +346,8 @@ namespace Olympus.NativeImpls {
             HDc = info.info.win.hdc;
 
             App.Config.Load(); // Load config early for the splash theme
+            _DarkModePreferred = DarkModePreferred; // And force assignment to _DarkModePreferred
+            // because DarkMode = true is going to modify the Config.Theme
 
             // Dark mode and the extended frame area + "blur" don't play along together.
             DarkMode = true;

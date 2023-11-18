@@ -22,7 +22,7 @@ namespace Olympus {
         public FinderManager FinderManager;
 #pragma warning restore CS8618
 
-        public Config Config = new();
+        public Config Config = Config.Instance;
 
         public static readonly string Name = "Olympus.FNA";
         public static readonly Version Version = typeof(App).Assembly.GetName().Version ?? new Version(1, 0, 0, 0);

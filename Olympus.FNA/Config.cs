@@ -22,7 +22,7 @@ namespace Olympus {
         [NonSerialized]
         public static Config Instance = new();
 
-        public Config() {
+        private Config() {
             Converter = new(this);
             Instance = this;
         }
