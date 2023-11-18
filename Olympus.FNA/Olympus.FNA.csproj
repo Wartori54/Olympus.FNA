@@ -4,8 +4,8 @@
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And '$(RuntimeIdentifiers)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifier>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And '$(RuntimeIdentifiers)' == '' And $([MSBuild]::IsOSPlatform('Linux'))">linux-x64</RuntimeIdentifier>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And '$(RuntimeIdentifiers)' == '' And $([MSBuild]::IsOSPlatform('macOS'))">osx-x64</RuntimeIdentifier>
-    <TargetFrameworks Condition="'$(TargetFrameworks)' == '' And $(RuntimeIdentifier.StartsWith('win'))">net7.0-windows</TargetFrameworks>
-    <TargetFrameworks Condition="'$(TargetFrameworks)' == ''">net7.0</TargetFrameworks>
+    <TargetFramework Condition="'$(TargetFramework)' == '' And $(RuntimeIdentifier.StartsWith('win'))">net7.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(TargetFramework)' == ''">net7.0</TargetFramework>
     <DefineConstants>HIGHER_VERSIONS</DefineConstants>
     <RootNamespace>Olympus</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -14,7 +14,7 @@
     <CopyContent Condition="'$(CopyContent)' == '' And '$(Configuration)' == 'Release'">true</CopyContent>
     <CopyContent Condition="'$(CopyContent)' == ''">false</CopyContent>
     <DefineConstants Condition="!$(CopyContent)">DEBUG_CONTENT;$(DefineConstants)</DefineConstants>
-    <TargetIsWindows Condition="'$(TargetIsWindows)' == '' And $(TargetFrameworks.Contains('-windows'))">true</TargetIsWindows>
+    <TargetIsWindows Condition="'$(TargetIsWindows)' == '' And $(TargetFramework.Contains('-windows'))">true</TargetIsWindows>
     <TargetIsWindows Condition="'$(TargetIsWindows)' == ''">false</TargetIsWindows>
     <DefineConstants Condition="$(TargetIsWindows)">WINDOWS;$(DefineConstants)</DefineConstants>
     <UseWindowsForms>$(TargetIsWindows)</UseWindowsForms>
