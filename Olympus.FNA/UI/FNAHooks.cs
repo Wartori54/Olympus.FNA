@@ -28,7 +28,7 @@ namespace OlympUI {
 
         private static ILHook? ApplyWindowChangesPatch;
         private static ILHook? DebugFNA3DPatch;
-        public static Hook? RedrawWindowPatch;
+        public static ILHook? RedrawWindowPatch;
 #if FNAHOOKS_RENDERTARGETDISCARDCLEAR
         private static ILHook? DisableRenderTargetDiscardClearPatch;
 #endif
@@ -102,11 +102,21 @@ namespace OlympUI {
             );
 #endif
 
-            RedrawWindowPatch = new Hook(
-                typeof(Game).GetMethod("RedrawWindow", BindingFlags.Instance | BindingFlags.NonPublic),
-                (Action<Game> orig, Game game) => {
-                    ExposeEvent?.Invoke(game);
-                    orig(game);
+            RedrawWindowPatch = new ILHook(
+                t_SDL2_FNAPlatform.GetMethod("PollEvents", BindingFlags.Static | BindingFlags.Public)
+                ?? throw new Exception("FNA without SDL2_FNAPlatform.PollEvents?"),
+                il => {
+                    ILCursor c = new(il);
+                    c.GotoNext(i =>
+                        i.MatchCallvirt(typeof(Game).GetMethod("RedrawWindow",
+                            BindingFlags.Instance | BindingFlags.NonPublic)
+                        ?? throw new Exception("FNA without Game.RedrawWindow?")));
+                    c.GotoPrev();
+                    c.Emit(OpCodes.Ldarg_0);
+                    c.Emit(OpCodes.Call,
+                        il.Import(t_FNAHooks.GetMethod(nameof(RedrawWindowPatch_RedrawWindow),
+                            BindingFlags.NonPublic | BindingFlags.Static)));
+                    c.Emit(OpCodes.Nop);
                 }
             );
 
@@ -149,6 +159,10 @@ namespace OlympUI {
                 gd.Clear(options, color, depth, stencil);
         }
 #endif
+
+        private static void RedrawWindowPatch_RedrawWindow(Game game) {
+            ExposeEvent?.Invoke(game);
+        }
 
         private static void OnLogInfo(string line) {
             Console.WriteLine(line);
