@@ -146,7 +146,7 @@ public class LoennScene : Scene {
                                 Layouts.Fill(1.0f, 0.0f),
                             },
                         };
-                        var update = new HomeScene.IconButton("icons/update", "Update", b => { }) {
+                        var update = new HomeScene.IconButton("icons/update", "Update", b => Update()) {
                             Layout = {
                                 Layouts.Fill(1.0f, 0.0f),
                             },
@@ -426,6 +426,79 @@ public class LoennScene : Scene {
             },
         };
 
+    private void Update() {
+        async IAsyncEnumerable<EverestInstaller.Status> UpdateFunc() {
+            Channel<(string, float)> chan = Channel.CreateUnbounded<(string, float)>();
+            Task.Run<Task>(async () => {
+                try {
+                    if (string.IsNullOrWhiteSpace(Config.Instance.LoennInstallDirectory) || !Directory.Exists(Config.Instance.LoennInstallDirectory)) {
+                        AppLogger.Log.Error($"Install directory {Config.Instance.LoennInstallDirectory} doesnt exist");
+                        chan.Writer.TryWrite(("Lönn was never installed!", -1f));
+                        chan.Writer.Complete();
+                        return;
+                    }
+                    
+                    Directory.Delete(Config.Instance.LoennInstallDirectory, recursive: true);
+                    chan.Writer.TryWrite(("Lönn successfully removed old version", 1f));
+
+                    string zipPath = Path.Combine(Config.GetCacheDir(), "Lönn.zip");
+                    
+                    var lastUpdate = DateTime.Now;
+                    AppLogger.Log.Information($"Trying {data.Value.DownloadURL}");
+                    await Web.DownloadFileWithProgress(data.Value.DownloadURL, zipPath, (pos, length, speed) => {
+                        if (lastUpdate.Add(TimeSpan.FromSeconds(1)).CompareTo(DateTime.Now) < 0) {
+                            chan.Writer.TryWrite(($"Downloading... {pos*100F/length}% {speed} Kib/s {pos}", (float) pos / length));
+                            lastUpdate = DateTime.Now;
+                        }
+                        return true;
+                    });
+                    
+                    ZipFile.ExtractToDirectory(zipPath, Config.Instance.LoennInstallDirectory);
+                    
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
+                        // Make Lönn actually executable
+                        Process chmod = new() { 
+                            StartInfo = {
+                                FileName = "chmod", 
+                                Arguments = "+x love Lönn.sh", 
+                                UseShellExecute = true,
+                                WorkingDirectory = Config.Instance.LoennInstallDirectory + "/Lönn.app/Contents/MacOS"
+                            }
+                        };
+                        chmod.Start();
+                        await chmod.WaitForExitAsync();
+                    }
+                    
+                    chan.Writer.TryWrite(("Lönn successfully updated!", 1f));
+
+                    Config.Instance.CurrentLoennVersion = data.Value.LatestVersion;
+                    if (updateButtons != null) await updateButtons();
+                    if (updateLabels != null) await updateLabels();
+                } catch (Exception e) {
+                    chan.Writer.TryWrite((e.ToString(), -1));
+                    chan.Writer.TryWrite(("Failed to install Lönn!", -1f));
+                    AppLogger.Log.Error(e, e.Message);
+                }
+                
+                chan.Writer.Complete();
+            });
+            
+            while (await chan.Reader.WaitToReadAsync())
+            while (chan.Reader.TryRead(out (string, float) item)) {
+                if (item.Item2 >= 0) {
+                    yield return new EverestInstaller.Status(item.Item1, item.Item2,
+                        item.Item2 != 1f
+                            ? EverestInstaller.Status.Stage.InProgress
+                            : EverestInstaller.Status.Stage.Success);
+                } else {
+                    yield return new EverestInstaller.Status(item.Item1, 1f, EverestInstaller.Status.Stage.Fail);
+                }
+            }
+        }
+
+        Scener.Set<WorkingOnItScene>(new WorkingOnItScene.Job(UpdateFunc, "download_rot"), "download_rot");
+    }
+    
     private void Install() {
         async IAsyncEnumerable<EverestInstaller.Status> InstallFunc() {
             Channel<(string, float)> chan = Channel.CreateUnbounded<(string, float)>();
@@ -496,7 +569,12 @@ public class LoennScene : Scene {
             Channel<(string, float)> chan = Channel.CreateUnbounded<(string, float)>();
             Task.Run<Task>(async () => {
                 try {
-                    if (!Directory.Exists(Config.Instance.LoennInstallDirectory)) return;
+                    if (string.IsNullOrWhiteSpace(Config.Instance.LoennInstallDirectory) || !Directory.Exists(Config.Instance.LoennInstallDirectory)) {
+                        AppLogger.Log.Error($"Install directory {Config.Instance.LoennInstallDirectory} doesnt exist");
+                        chan.Writer.TryWrite(("Lönn was never installed!", -1f));
+                        chan.Writer.Complete();
+                        return;
+                    }
 
                     Directory.Delete(Config.Instance.LoennInstallDirectory, recursive: true);
                     chan.Writer.TryWrite(("Lönn successfully uninstalled!", 1f));
