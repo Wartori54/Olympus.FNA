@@ -71,6 +71,8 @@ public class LoennScene : Scene {
     private static bool fetched;
     private static LoennData? data;
 
+    private Func<Task>? updateEvent;
+
     public LoennScene() {
         data = null;
         fetched = false;
@@ -123,6 +125,101 @@ public class LoennScene : Scene {
     private ObservableCollection<Element> GenerateButtonsPanel()
         => new() {
             new Group {
+                Layout = {
+                    Layouts.Fill(1.0f, 0.0f),
+                    Layouts.Column(),
+                },
+                Style = {
+                    { Group.StyleKeys.Spacing, 12 },
+                },
+                Init = RegisterRefresh<Group>(async el => {
+                    updateEvent = async () => await UI.Run(() => {
+                        var play = new PlayButton("icons/play", "Launch", b => { }) {
+                            Layout = {
+                                Layouts.Fill(1.0f, 0.0f),
+                            },
+                        };
+                        var update = new HomeScene.IconButton("icons/update", "Update", b => { }) {
+                            Layout = {
+                                Layouts.Fill(1.0f, 0.0f),
+                            },
+                        };
+                        var install = new HomeScene.IconButton("icons/download", "Install", b => { }) {
+                            Layout = {
+                                Layouts.Fill(1.0f, 0.0f),
+                            },
+                        };
+                        var uninstall = new HomeScene.IconButton("icons/delete", "Uninstall", b => { }) {
+                            Layout = {
+                                Layouts.Fill(1.0f, 0.0f),
+                            },
+                        };
+                        el.DisposeChildren();
+
+                        if (data == null) {
+                            if (Config.Instance.CurrentLoennVersion == null) {
+                                play.Enabled = false;
+                                install.Enabled = false;
+                                uninstall.Enabled = false;
+                                el.Add(play);
+                                el.Add(install);
+                                el.Add(uninstall);
+                            } else {
+                                update.Enabled = false;
+                                el.Add(play);
+                                el.Add(update);
+                                el.Add(uninstall);
+                            }
+                            return;
+                        }
+                        if (Config.Instance.CurrentLoennVersion == null) {
+                            play.Enabled = false;
+                            uninstall.Enabled = false;
+                            el.Add(play);
+                            el.Add(install);
+                            el.Add(uninstall);
+                            return;
+                        }
+                        if (Config.Instance.CurrentLoennVersion != data.Value.LatestVersion) {
+                            el.Add(play);
+                            el.Add(update);
+                            el.Add(uninstall);
+                            return;
+                        }
+
+                        update.Enabled = false;
+                        el.Add(play);
+                        el.Add(update);
+                        el.Add(uninstall);
+                    });
+                    
+                    await updateEvent();
+                    while (!fetched) { await Task.Delay(10); } 
+                    await updateEvent();
+                }),
+            },
+            
+            new Group {
+                Layout = {
+                    Layouts.Fill(1.0f, 0.0f),
+                    Layouts.Column(),
+                },
+                Style = {
+                    { Group.StyleKeys.Spacing, 12 },
+                },
+                Children = {
+                    new Label("Check the README for usage instructions, keybinds, help and more") {
+                        Wrap = true,  
+                    },
+                    new HomeScene.IconButton("icons/wiki", "Open README", b => { }) {
+                        Layout = {
+                            Layouts.Fill(1.0f, 0.0f),
+                        },
+                    },
+                }
+            },
+            
+            new Group {
                 H = 60, 
                 Layout = {
                     Layouts.Fill(1.0f, 0.0f), 
@@ -171,65 +268,31 @@ public class LoennScene : Scene {
 
                     await UI.Run(() => {
                         el.DisposeChildren();
-                        el.Add(new Group {
-                            Layout = {
-                                Layouts.Column(4),
-                            }, 
-                            Children = {
-                                new LabelSmall($"Latest version: {data.Value.LatestVersion}"),
-                                new LabelSmall($"Current version: {Config.Instance.CurrentLoennVersion}"),
-                                new LabelSmall($"Install directory: {Config.Instance.LoennInstallDirectory}"),
-                            }
-                        });
+
+                        if (Config.Instance.CurrentLoennVersion == null) {
+                            el.Add(new Group {
+                                Layout = {
+                                    Layouts.Column(4),
+                                }, 
+                                Children = {
+                                    new Label($"Latest version: {data.Value.LatestVersion}"),
+                                    new Label("Current version: Not installed"),
+                                }
+                            });
+                        } else {
+                            el.Add(new Group {
+                                Layout = {
+                                    Layouts.Column(4),
+                                }, 
+                                Children = {
+                                    new Label($"Latest version: {data.Value.LatestVersion}"),
+                                    new Label($"Current version: {Config.Instance.CurrentLoennVersion}"),
+                                    new Label($"Install directory: {Config.Instance.LoennInstallDirectory}"),
+                                }
+                            });
+                        }
                     });
                 }),
-            },
-            
-            new Group {
-                Layout = {
-                    Layouts.Fill(1.0f, 0.0f),
-                    Layouts.Column(),
-                },
-                Style = {
-                    { Group.StyleKeys.Spacing, 12 },
-                },
-                Children = {
-                    new PlayButton("icons/play", "Launch", b => {}) {
-                        Layout = {
-                            Layouts.Fill(1.0f, 0.0f),
-                        },
-                    },
-                    new HomeScene.IconButton("icons/update", "Update", b => { }) {
-                        Layout = {
-                            Layouts.Fill(1.0f, 0.0f),
-                        },
-                    },
-                    new HomeScene.IconButton("icons/delete", "Uninstall", b => { }) {
-                        Layout = {
-                            Layouts.Fill(1.0f, 0.0f),
-                        },
-                    },
-                }
-            },
-            
-            new Group {
-                Layout = {
-                    Layouts.Fill(1.0f, 0.0f),
-                    Layouts.Column(),
-                },
-                Style = {
-                    { Group.StyleKeys.Spacing, 12 },
-                },
-                Children = {
-                    new Label("Check the README for usage instructions, keybinds, help and more") {
-                        Wrap = true,  
-                    },
-                    new HomeScene.IconButton("icons/wiki", "Open README", b => { }) {
-                        Layout = {
-                            Layouts.Fill(1.0f, 0.0f),
-                        },
-                    },
-                }
             },
         };
 
@@ -366,7 +429,7 @@ public class LoennScene : Scene {
             {
                 StyleKeys.Disabled,
                 new Style() {
-                    { Panel.StyleKeys.Background, new Color(0x70, 0x70, 0x70, 0x70) },
+                    { Panel.StyleKeys.Background, new Color(0x05, 0x35, 0x1E, 0x70) },
                     { Panel.StyleKeys.Shadow, 0f },
                 }
             },
