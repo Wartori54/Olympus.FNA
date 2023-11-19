@@ -58,6 +58,9 @@ namespace Olympus {
         
         public List<Installation> ManualInstalls = new();
 
+        public string? CurrentLoennVersion;
+        public string? LoennInstallDirectory;
+
         public bool? CSD;
         public bool? VSync;
         public string Theme = "";

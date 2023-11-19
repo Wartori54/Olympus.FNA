@@ -234,7 +234,7 @@ namespace Olympus {
                 vanillaPlay,
                 new SidebarNavButton("everest", "Home", Scener.Get<HomeScene>()),
                 new SidebarNavButton("gamebanana", "Find Mods", Scener.Get<TestScene>()),
-                new SidebarNavButton("loenn", "Lönn", new MetaMainScene() { Real = false }),
+                new SidebarNavButton("loenn", "Lönn", Scener.Get<LoennScene>()),
                 // new SidebarNavButton("ahorn", "Ahorn", new MetaMainScene() { Real = false }),
                 new SidebarNavButton("wiki", "Wiki", Scener.Get<TestScene>()),
             };
