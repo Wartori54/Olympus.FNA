@@ -67,8 +67,24 @@ public class LoennScene : Scene {
             return "";
         }
     }
-    
+
+    private static bool fetched;
     private static LoennData? data;
+
+    public LoennScene() {
+        data = null;
+        fetched = false;
+        if (data != null) {
+            fetched = true;
+            return;
+        }
+
+        Task.Run(async () => {
+            data = await LoennData.Fetch();
+            await Task.Delay(1000);
+            fetched = true;
+        });
+    }
     
     public override Element Generate()
         => new Group {
@@ -126,7 +142,7 @@ public class LoennScene : Scene {
                         });
                     });
 
-                    data ??= await LoennData.Fetch();
+                    while (!fetched) { await Task.Delay(10); } 
 
                     if (data == null) {
                         await UI.Run(() => {
@@ -242,13 +258,29 @@ public class LoennScene : Scene {
                                     Layout = {
                                         Layouts.Fill(1.0f, 0.0f),
                                     },
-                                    Children = {
-                                        new HeaderMedium("Changelog") {
-                                            Layout = {
-                                                Layouts.Left(0.5f, -0.5f),
-                                            }
-                                        },
-                                    }
+                                    Init = RegisterRefresh<Group>(async el => {
+                                        await UI.Run(() => {
+                                            el.DisposeChildren();
+                                            el.Add(new HeaderMedium("Changelog") {
+                                                Layout = {
+                                                    Layouts.Left(0.5f, -0.5f),
+                                                }
+                                            });
+                                        });
+                                        
+                                        while (!fetched) { await Task.Delay(10); }
+
+                                        if (data == null) return;
+                                        
+                                        await UI.Run(() => {
+                                            el.DisposeChildren();
+                                            el.Add(new HeaderMedium($"Changelog - {data.Value.LatestVersion}") {
+                                                Layout = {
+                                                    Layouts.Left(0.5f, -0.5f),
+                                                }
+                                            });
+                                        });
+                                    })
                                 },
                                 
                                 new Group {
@@ -271,7 +303,7 @@ public class LoennScene : Scene {
                                             });
                                         });
                                         
-                                        data ??= await LoennData.Fetch();
+                                        while (!fetched) { await Task.Delay(10); }
 
                                         if (data == null) {
                                             await UI.Run(() => {
