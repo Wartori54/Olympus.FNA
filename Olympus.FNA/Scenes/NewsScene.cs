@@ -178,18 +178,30 @@ public class NewsScene : Scene {
 
             await UI.Run(() => {
                 group.DisposeChildren();
-                group.Add(new Image(tex) {
-                    Modifiers = {
-                        new FadeInAnimation(0.6f).With(Ease.QuadOut),
-                        // new ScaleInAnimation(1.05f, 0.5f).With(
-                        //     Ease.QuadOut)
-                    },
+                group.Add(new Panel() {
+                    Clip = true,
                     Layout = {
-                        ev => {
-                            Image img = (Image) ev.Element;
-                            img.AutoW = Math.Min(group.W, 400);
-                            img.X = group.W / 2 - img.W / 2;
-                        },
+                        Layouts.Fill(1F, 0F),
+                    },
+                    Style = {
+                        { Group.StyleKeys.Padding, 0},
+                        { Panel.StyleKeys.Shadow, 0},
+                    },
+                    Children = {
+                        new Image(tex) {
+                            Modifiers = {
+                                new FadeInAnimation(0.6f).With(Ease.QuadOut),
+                                // new ScaleInAnimation(1.05f, 0.5f).With(
+                                //     Ease.QuadOut)
+                            },
+                            Layout = {
+                                ev => {
+                                    Image img = (Image) ev.Element;
+                                    img.AutoW = Math.Min(group.W, 400);
+                                    img.X = group.W / 2 - img.W / 2;
+                                },
+                            }
+                        }
                     }
                 });
 
