@@ -156,7 +156,7 @@ public class LoennScene : Scene {
                                 Layouts.Fill(1.0f, 0.0f),
                             },
                         };
-                        var uninstall = new HomeScene.IconButton("icons/delete", "Uninstall", b => { }) {
+                        var uninstall = new HomeScene.IconButton("icons/delete", "Uninstall", b => Uninstall()) {
                             Layout = {
                                 Layouts.Fill(1.0f, 0.0f),
                             },
@@ -489,6 +489,45 @@ public class LoennScene : Scene {
         }
 
         Scener.Set<WorkingOnItScene>(new WorkingOnItScene.Job(InstallFunc, "download_rot"), "download_rot");
+    }
+    
+    private void Uninstall() {
+        async IAsyncEnumerable<EverestInstaller.Status> UninstallFunc() {
+            Channel<(string, float)> chan = Channel.CreateUnbounded<(string, float)>();
+            Task.Run<Task>(async () => {
+                try {
+                    if (!Directory.Exists(Config.Instance.LoennInstallDirectory)) return;
+
+                    Directory.Delete(Config.Instance.LoennInstallDirectory, recursive: true);
+                    chan.Writer.TryWrite(("Lönn successfully uninstalled!", 1f));
+
+                    Config.Instance.CurrentLoennVersion = null;
+                    Config.Instance.LoennInstallDirectory = null;
+                    if (updateButtons != null) await updateButtons();
+                    if (updateLabels != null) await updateLabels();
+                } catch (Exception e) {
+                    chan.Writer.TryWrite((e.ToString(), -1));
+                    chan.Writer.TryWrite(("Failed to uninstall Lönn!", -1f));
+                    AppLogger.Log.Error(e, e.Message);
+                }
+                
+                chan.Writer.Complete();
+            });
+            
+            while (await chan.Reader.WaitToReadAsync())
+            while (chan.Reader.TryRead(out (string, float) item)) {
+                if (item.Item2 >= 0) {
+                    yield return new EverestInstaller.Status(item.Item1, item.Item2,
+                        item.Item2 != 1f
+                            ? EverestInstaller.Status.Stage.InProgress
+                            : EverestInstaller.Status.Stage.Success);
+                } else {
+                    yield return new EverestInstaller.Status(item.Item1, 1f, EverestInstaller.Status.Stage.Fail);
+                }
+            }
+        }
+
+        Scener.Set<WorkingOnItScene>(new WorkingOnItScene.Job(UninstallFunc, "download_rot"), "download_rot");
     }
 
     public partial class PlayButton : HomeScene.IconButton {
