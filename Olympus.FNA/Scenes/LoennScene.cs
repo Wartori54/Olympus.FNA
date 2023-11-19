@@ -2,11 +2,17 @@ using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OlympUI;
+using Olympus.API;
+using Olympus.Utils;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace Olympus;
@@ -71,7 +77,8 @@ public class LoennScene : Scene {
     private static bool fetched;
     private static LoennData? data;
 
-    private Func<Task>? updateEvent;
+    private Func<Task>? updateButtons;
+    private Func<Task>? updateLabels;
 
     public LoennScene() {
         data = null;
@@ -133,7 +140,7 @@ public class LoennScene : Scene {
                     { Group.StyleKeys.Spacing, 12 },
                 },
                 Init = RegisterRefresh<Group>(async el => {
-                    updateEvent = async () => await UI.Run(() => {
+                    updateButtons = async () => await UI.Run(() => {
                         var play = new PlayButton("icons/play", "Launch", b => { }) {
                             Layout = {
                                 Layouts.Fill(1.0f, 0.0f),
@@ -144,7 +151,7 @@ public class LoennScene : Scene {
                                 Layouts.Fill(1.0f, 0.0f),
                             },
                         };
-                        var install = new HomeScene.IconButton("icons/download", "Install", b => { }) {
+                        var install = new HomeScene.IconButton("icons/download", "Install", b => Install()) {
                             Layout = {
                                 Layouts.Fill(1.0f, 0.0f),
                             },
@@ -193,9 +200,9 @@ public class LoennScene : Scene {
                         el.Add(uninstall);
                     });
                     
-                    await updateEvent();
+                    await updateButtons();
                     while (!fetched) { await Task.Delay(10); } 
-                    await updateEvent();
+                    await updateButtons();
                 }),
             },
             
@@ -266,32 +273,35 @@ public class LoennScene : Scene {
                         return;
                     }
 
-                    await UI.Run(() => {
+                    updateLabels = async () => await UI.Run(() => {
                         el.DisposeChildren();
 
                         if (Config.Instance.CurrentLoennVersion == null) {
                             el.Add(new Group {
-                                Layout = {
-                                    Layouts.Column(4),
-                                }, 
+                                Layout = { Layouts.Column(4), },
                                 Children = {
                                     new Label($"Latest version: {data.Value.LatestVersion}"),
                                     new Label("Current version: Not installed"),
                                 }
                             });
                         } else {
+                            string? home = Environment.GetEnvironmentVariable("HOME");
+                            if (string.IsNullOrEmpty(home)) {
+                                home = "";
+                            }
                             el.Add(new Group {
                                 Layout = {
                                     Layouts.Column(4),
-                                }, 
+                                },
                                 Children = {
                                     new Label($"Latest version: {data.Value.LatestVersion}"),
                                     new Label($"Current version: {Config.Instance.CurrentLoennVersion}"),
-                                    new Label($"Install directory: {Config.Instance.LoennInstallDirectory}"),
+                                    new Label($"Install directory: {Config.Instance.LoennInstallDirectory.Replace(home, "~")}"),
                                 }
                             });
                         }
                     });
+                    await updateLabels();
                 }),
             },
         };
@@ -415,6 +425,71 @@ public class LoennScene : Scene {
                 }
             },
         };
+
+    private void Install() {
+        async IAsyncEnumerable<EverestInstaller.Status> InstallFunc() {
+            Channel<(string, float)> chan = Channel.CreateUnbounded<(string, float)>();
+            Task.Run<Task>(async () => {
+                try {
+                    string zipPath = Path.Combine(Config.GetCacheDir(), "Lönn.zip");
+                    string installPath = Path.Combine(Config.GetDefaultDir(), "Lönn"); 
+                    
+                    var lastUpdate = DateTime.Now;
+                    AppLogger.Log.Information($"Trying {data.Value.DownloadURL}");
+                    await Web.DownloadFileWithProgress(data.Value.DownloadURL, zipPath, (pos, length, speed) => {
+                        if (lastUpdate.Add(TimeSpan.FromSeconds(1)).CompareTo(DateTime.Now) < 0) {
+                            chan.Writer.TryWrite(($"Downloading... {pos*100F/length}% {speed} Kib/s {pos}", (float) pos / length));
+                            lastUpdate = DateTime.Now;
+                        }
+                        return true;
+                    });
+                    
+                    ZipFile.ExtractToDirectory(zipPath, installPath);
+                    
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
+                        // Make Lönn actually executable
+                        Process chmod = new() { 
+                            StartInfo = {
+                                FileName = "chmod", 
+                                Arguments = "+x love Lönn.sh", 
+                                UseShellExecute = true,
+                                WorkingDirectory = installPath + "/Lönn.app/Contents/MacOS"
+                            }
+                        };
+                        chmod.Start();
+                        await chmod.WaitForExitAsync();
+                    }
+                    
+                    chan.Writer.TryWrite(("Lönn successfully installed!", 1f));
+
+                    Config.Instance.CurrentLoennVersion = data.Value.LatestVersion;
+                    Config.Instance.LoennInstallDirectory = installPath;
+                    if (updateButtons != null) await updateButtons();
+                    if (updateLabels != null) await updateLabels();
+                } catch (Exception e) {
+                    chan.Writer.TryWrite((e.ToString(), -1));
+                    chan.Writer.TryWrite(("Failed to install Lönn!", -1f));
+                    AppLogger.Log.Error(e, e.Message);
+                }
+                
+                chan.Writer.Complete();
+            });
+            
+            while (await chan.Reader.WaitToReadAsync())
+            while (chan.Reader.TryRead(out (string, float) item)) {
+                if (item.Item2 >= 0) {
+                    yield return new EverestInstaller.Status(item.Item1, item.Item2,
+                        item.Item2 != 1f
+                            ? EverestInstaller.Status.Stage.InProgress
+                            : EverestInstaller.Status.Stage.Success);
+                } else {
+                    yield return new EverestInstaller.Status(item.Item1, 1f, EverestInstaller.Status.Stage.Fail);
+                }
+            }
+        }
+
+        Scener.Set<WorkingOnItScene>(new WorkingOnItScene.Job(InstallFunc, "download_rot"), "download_rot");
+    }
 
     public partial class PlayButton : HomeScene.IconButton {
         public new static readonly Style DefaultStyle = new() {
