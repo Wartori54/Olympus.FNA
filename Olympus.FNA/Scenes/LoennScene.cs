@@ -141,7 +141,7 @@ public class LoennScene : Scene {
                 },
                 Init = RegisterRefresh<Group>(async el => {
                     updateButtons = async () => await UI.Run(() => {
-                        var play = new PlayButton("icons/play", "Launch", b => { }) {
+                        var play = new PlayButton("icons/play", "Launch", b => Launch()) {
                             Layout = {
                                 Layouts.Fill(1.0f, 0.0f),
                             },
@@ -426,6 +426,31 @@ public class LoennScene : Scene {
             },
         };
 
+    private void Launch() {
+        Process loenn = new();
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+            loenn.StartInfo.FileName = Path.Combine(Config.Instance.LoennInstallDirectory, "Lönn.exe");
+            loenn.StartInfo.WorkingDirectory = Config.Instance.LoennInstallDirectory;
+        } else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
+            // Use the find-love script
+            loenn.StartInfo.FileName = OlympUI.Assets.GetPath("love/find-love.sh");
+            loenn.StartInfo.Arguments = Path.Combine(Config.Instance.LoennInstallDirectory, "Lönn.love");
+            loenn.StartInfo.UseShellExecute = true;
+            loenn.StartInfo.WorkingDirectory = OlympUI.Assets.GetPath("love");
+        } else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
+            // Run the app
+            loenn.StartInfo.FileName = "open";
+            loenn.StartInfo.Arguments = "Lönn.app";
+            loenn.StartInfo.UseShellExecute = true;
+            loenn.StartInfo.WorkingDirectory = Config.Instance.LoennInstallDirectory;
+        }
+
+        Console.Error.WriteLine($"Starting Loenn process: {loenn.StartInfo.FileName} {loenn.StartInfo.Arguments} (in {Config.Instance.LoennInstallDirectory})");
+
+        loenn.Start();
+    }
+    
     private void Update() {
         async IAsyncEnumerable<EverestInstaller.Status> UpdateFunc() {
             Channel<(string, float)> chan = Channel.CreateUnbounded<(string, float)>();
@@ -472,6 +497,7 @@ public class LoennScene : Scene {
                     chan.Writer.TryWrite(("Lönn successfully updated!", 1f));
 
                     Config.Instance.CurrentLoennVersion = data.Value.LatestVersion;
+                    Config.Instance.Save();
                     if (updateButtons != null) await updateButtons();
                     if (updateLabels != null) await updateLabels();
                 } catch (Exception e) {
@@ -537,6 +563,7 @@ public class LoennScene : Scene {
 
                     Config.Instance.CurrentLoennVersion = data.Value.LatestVersion;
                     Config.Instance.LoennInstallDirectory = installPath;
+                    Config.Instance.Save();
                     if (updateButtons != null) await updateButtons();
                     if (updateLabels != null) await updateLabels();
                 } catch (Exception e) {
@@ -581,6 +608,7 @@ public class LoennScene : Scene {
 
                     Config.Instance.CurrentLoennVersion = null;
                     Config.Instance.LoennInstallDirectory = null;
+                    Config.Instance.Save();
                     if (updateButtons != null) await updateButtons();
                     if (updateLabels != null) await updateLabels();
                 } catch (Exception e) {
