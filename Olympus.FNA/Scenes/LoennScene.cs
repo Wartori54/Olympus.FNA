@@ -588,7 +588,16 @@ public class LoennScene : Scene {
             }
         }
 
+        void HandlePopup(Scene? prev, Scene? next) {
+            if (prev is WorkingOnItScene) {
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
+                    Scener.Push<SetupLoennShortcutLinuxScene>();
+                }
+            }
+            Scener.FrontChanged -= HandlePopup;
+        }
         Scener.Set<WorkingOnItScene>(new WorkingOnItScene.Job(InstallFunc, "download_rot"), "download_rot");
+        Scener.FrontChanged += HandlePopup;
     }
     
     private void Uninstall() {
@@ -604,6 +613,17 @@ public class LoennScene : Scene {
                     }
 
                     Directory.Delete(Config.Instance.LoennInstallDirectory, recursive: true);
+                    
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
+                        if (!string.IsNullOrEmpty(Config.Instance.LoennLinuxDesktopEntry) && File.Exists(Config.Instance.LoennLinuxDesktopEntry))
+                            File.Delete(Config.Instance.LoennLinuxDesktopEntry);
+                        if (!string.IsNullOrEmpty(Config.Instance.LoennLinuxDesktopIcon) && File.Exists(Config.Instance.LoennLinuxDesktopIcon))
+                            File.Delete(Config.Instance.LoennLinuxDesktopIcon);
+
+                        Config.Instance.LoennLinuxDesktopEntry = null;
+                        Config.Instance.LoennLinuxDesktopIcon = null;
+                    }
+                    
                     chan.Writer.TryWrite(("Lönn successfully uninstalled!", 1f));
 
                     Config.Instance.CurrentLoennVersion = null;

@@ -60,6 +60,9 @@ namespace Olympus {
 
         public string? CurrentLoennVersion;
         public string? LoennInstallDirectory;
+        
+        public string? LoennLinuxDesktopEntry;
+        public string? LoennLinuxDesktopIcon;
 
         public bool? CSD;
         public bool? VSync;
