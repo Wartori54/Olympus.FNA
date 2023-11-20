@@ -218,7 +218,7 @@ public class LoennScene : Scene {
                     new Label("Check the README for usage instructions, keybinds, help and more") {
                         Wrap = true,  
                     },
-                    new HomeScene.IconButton("icons/wiki", "Open README", b => { }) {
+                    new HomeScene.IconButton("icons/wiki", "Open README", b => URIHelper.OpenInBrowser("https://github.com/CelestialCartographers/Loenn/blob/master/README.md")) {
                         Layout = {
                             Layouts.Fill(1.0f, 0.0f),
                         },
