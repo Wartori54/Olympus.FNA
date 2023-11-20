@@ -18,9 +18,16 @@ if command -v love >/dev/null 2>&1; then
 
     # Get bundled love version
     if [ -f "love" ]; then
-        BUN_LOVE_VER=$(./love --version | awk '{split($0,ver," "); print ver[2]}')
-        BUN_LOVE_VER_MAJ=$(echo $BUN_LOVE_VER | awk '{split($0,mver,"."); print mver[1]}')
-        BUN_LOVE_VER_MIN=$(echo $BUN_LOVE_VER | awk '{split($0,mver,"."); print mver[2]}')
+        BUN_LOVE_OUT=$(./love --version)
+        # if the bundled is just broken assume version is 0.0 so it'll use the system wide install
+        if [ $? -ne 0 ]; then 
+            BUN_LOVE_VER_MAJ="0"
+            BUN_LOVE_VER_MIN="0"
+        else
+            BUN_LOVE_VER=$(echo "$BUN_LOVE_OUT" | awk '{split($0,ver," "); print ver[2]}')
+            BUN_LOVE_VER_MAJ=$(echo $BUN_LOVE_VER | awk '{split($0,mver,"."); print mver[1]}')
+            BUN_LOVE_VER_MIN=$(echo $BUN_LOVE_VER | awk '{split($0,mver,"."); print mver[2]}')
+        fi
         # Compare versions
         if [ $LOVE_VER_MAJ -gt $BUN_LOVE_VER_MAJ ] ||
             ([ $LOVE_VER_MAJ -eq $BUN_LOVE_VER_MAJ ] && [ $LOVE_VER_MIN -ge $BUN_LOVE_VER_MIN ]); then
