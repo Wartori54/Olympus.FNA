@@ -470,16 +470,11 @@ public class LoennScene : Scene {
                     
                     if (PlatformHelper.Is(Platform.MacOS)) {
                         // Make Lönn actually executable
-                        Process chmod = new() { 
-                            StartInfo = {
-                                FileName = "chmod", 
-                                Arguments = "+x love Lönn.sh", 
-                                UseShellExecute = true,
-                                WorkingDirectory = installPath + "/Lönn.app/Contents/MacOS"
-                            }
-                        };
-                        chmod.Start();
-                        await chmod.WaitForExitAsync();
+                        string targetDir = Path.Combine(installPath, "Lönn.app", "Contents", "MacOS");
+                        if (EverestInstaller.chmod(Path.Combine(targetDir, "love"), 0755) != 0)
+                            AppLogger.Log.Error($"Failed to chmod file {Path.Combine(targetDir, "love")}");
+                        if (EverestInstaller.chmod(Path.Combine(targetDir, "Lönn.sh"), 0755) != 0) 
+                            AppLogger.Log.Error($"Failed to chmod file {Path.Combine(targetDir, "Lönn.sh")}");
                     }
                     
                     chan.Writer.TryWrite(("Lönn successfully installed!", 1f));
