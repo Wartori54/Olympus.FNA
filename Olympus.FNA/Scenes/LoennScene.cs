@@ -22,24 +22,43 @@ public class LoennScene : Scene {
         public string LatestVersion;
         public string DownloadURL;
         public string Changelog;
+
+        public class LoennVersion {
+            [JsonProperty("tag_name")]
+            public string TagName = "";
+            [JsonProperty("assets")]
+            public List<LoennVersionAsset> Assets = new();
+            [JsonProperty("body")]
+            public string Body = "";
+
+            public class LoennVersionAsset {
+                [JsonProperty("browser_download_url")]
+                public string BrowserDownloadUrl = "";
+            }
+        }
         
         public static async Task<LoennData?> Fetch(UrlManager urlManager) {
+            
             try {
-                using var client = new HttpClient();
-                client.Timeout = TimeSpan.FromMinutes(5);
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("Olympus");
-                using var res = await client.GetAsync("https://api.github.com/repos/CelestialCartographers/Loenn/releases/latest");
-                using var reader = new StreamReader(await res.Content.ReadAsStreamAsync());
+                // using var client = new HttpClient();
+                // client.Timeout = TimeSpan.FromMinutes(5);
+                // client.DefaultRequestHeaders.UserAgent.ParseAdd("Olympus");
+                // using var res = await client.GetAsync("https://api.github.com/repos/CelestialCartographers/Loenn/releases/latest");
+                // using var reader = new StreamReader(await res.Content.ReadAsStreamAsync());
                 
-                // await using var res = urlManager.TryHttpGetDataStream("loenn_latest");
-                // using var reader = new StreamReader(res);
-                await using var json = new JsonTextReader(reader);
+                await using Stream res = urlManager.TryHttpGetDataStream("loenn_latest");
+                using StreamReader reader = new(res);
+                await using JsonTextReader json = new(reader);
 
-                var obj = (JObject) await JToken.ReadFromAsync(json);
+                LoennVersion? loennVersion = JsonHelper.Serializer.Deserialize<LoennVersion>(json);
+                if (loennVersion == null) {
+                    return null;
+                }
+
                 return new LoennData {
-                   LatestVersion = (string) obj["tag_name"]!,
-                   DownloadURL = GetDownloadURL((JArray) obj["assets"]!),
-                   Changelog = (string) obj["body"]!
+                   LatestVersion = loennVersion.TagName,
+                   DownloadURL = GetDownloadURL(loennVersion.Assets),
+                   Changelog = loennVersion.Body!
                };
             } catch (Exception ex) {
                 AppLogger.Log.Error($"Failed to check for Lönn version: {ex}");
@@ -47,7 +66,7 @@ public class LoennScene : Scene {
             }
         }
         
-        private static string GetDownloadURL(JArray assets) {
+        private static string GetDownloadURL(List<LoennVersion.LoennVersionAsset> assets) {
             string wantedSuffix;
             if (PlatformHelper.Is(Platform.Windows)) {
                 wantedSuffix = "-windows.zip";
@@ -60,8 +79,8 @@ public class LoennScene : Scene {
                 return "";
             }
 
-            foreach (JToken artifact in assets) {
-                string url = (string) (artifact as JObject)!["browser_download_url"]!;
+            foreach (LoennVersion.LoennVersionAsset asset in assets) {
+                string url = asset.BrowserDownloadUrl;
                 if (url.EndsWith(wantedSuffix)) {
                     return url;
                 }

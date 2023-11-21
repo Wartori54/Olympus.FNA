@@ -38,6 +38,7 @@ namespace Olympus.API {
             
             using HttpClient wc = new();
             wc.Timeout = TimeSpan.FromMilliseconds(10000); // 10s timeout
+            wc.DefaultRequestHeaders.UserAgent.ParseAdd("amongus");
             if (!urls.TryGetValue(tag, out DataBaseUrlEntry? urlEntry)) {
                 throw new InvalidOperationException(
                     $"Tried to obtain tag non-existent tag: {tag} from file {urlsYamlPath}");
