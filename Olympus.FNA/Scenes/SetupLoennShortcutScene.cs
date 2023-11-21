@@ -159,8 +159,8 @@ public class SetupLoennShortcutSceneLinux : SetupLoennShortcutSceneBase {
             desktopPath = Path.Combine(data, desktopName);
             iconPath = Path.Combine(data, iconName);
         } else if (!string.IsNullOrEmpty(home)) {
-            desktopPath = Path.Combine(home, ".local/share", desktopName);
-            iconPath = Path.Combine(home, ".local/share", iconName);
+            desktopPath = Path.Combine(home, ".local", "share", desktopName);
+            iconPath = Path.Combine(home, ".local", "share", iconName);
         } else {
             return;
         }
