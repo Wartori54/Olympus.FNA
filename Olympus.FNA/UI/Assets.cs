@@ -219,12 +219,12 @@ namespace OlympUI {
             
             #if DEBUG_CONTENT
             pathFull = System.IO.Path.Combine(PathDebug, fileTarget);
-            if (File.Exists(pathFull))
+            if (File.Exists(pathFull) | Directory.Exists(pathFull))
                 return pathFull;
             #endif
             
             pathFull = System.IO.Path.Combine(Path, fileTarget);
-            if (File.Exists(pathFull))
+            if (File.Exists(pathFull) | Directory.Exists(pathFull))
                 return pathFull;
 
             Console.WriteLine($"Couldn't find content file: {fileTarget}");

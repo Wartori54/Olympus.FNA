@@ -75,8 +75,8 @@ public class SetupLoennShortcutLinuxScene : Scene {
             $"""
             [Desktop Entry]
             Type=Application
-            Path={OlympUI.Assets.GetPath("love")}
-            Exec={OlympUI.Assets.GetPath("love/find-love.sh")} {Path.Combine(Config.Instance.LoennInstallDirectory, "Lönn.love")}
+            Path={OlympUI.Assets.GetPath("loenn")}
+            Exec=./find-love.sh {Path.Combine(Config.Instance.LoennInstallDirectory, "Lönn.love")}
             Name=Lönn
             Keywords=Loenn;Lonn
             GenericName=Celeste Map Editor
@@ -120,7 +120,7 @@ public class SetupLoennShortcutLinuxScene : Scene {
             Directory.CreateDirectory(dir);
         
         File.WriteAllText(desktopPath, desktopEntryContent);
-        File.Copy(OlympUI.Assets.GetPath($"desktop/Lönn.png"), iconPath);
+        File.Copy(OlympUI.Assets.GetPath($"loenn/Loenn.png"), iconPath);
         Config.Instance.LoennLinuxDesktopEntry = desktopPath;
         Config.Instance.LoennLinuxDesktopIcon = iconPath;
         Config.Instance.Save();
