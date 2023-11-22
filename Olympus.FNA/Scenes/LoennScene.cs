@@ -301,7 +301,7 @@ public class LoennScene : Scene {
                     el.DisposeChildren();
                     if (fetched && data == null) {
                         // ReSharper disable once AsyncVoidLambda
-                        el.Add(new HomeScene.IconButton("icons/update", "Retry fetching Lönn data", async _ => {
+                        el.Add(new HomeScene.IconButton("icons/retry", "Retry fetching Lönn data", async _ => {
                             fetched = false;
                             Refresh();
                             data = await LoennData.Fetch(urlManager);
