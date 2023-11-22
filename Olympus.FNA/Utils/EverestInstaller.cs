@@ -622,10 +622,10 @@ namespace Olympus.Utils {
 
 
 #if WINDOWS
-        private static int chmod(string pathname, int mode) { return 0; }
+        public static int chmod(string pathname, int mode) { return 0; }
 #else
         [DllImport("libc", SetLastError = true)]
-        private static extern int chmod(string pathname, int mode);
+        public static extern int chmod(string pathname, int mode);
 #endif
 
         [Serializable]

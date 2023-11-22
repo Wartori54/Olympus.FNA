@@ -33,12 +33,12 @@ namespace Olympus.API {
             }
         }
 
-
         private object TryHttpGetData(string tag, ICollection<string>? withFlags, Func<string, HttpClient, Func<Task<object>?>> task) {
             withFlags ??= new List<string>();
             
             using HttpClient wc = new();
             wc.Timeout = TimeSpan.FromMilliseconds(10000); // 10s timeout
+            wc.DefaultRequestHeaders.UserAgent.ParseAdd("amongus");
             if (!urls.TryGetValue(tag, out DataBaseUrlEntry? urlEntry)) {
                 throw new InvalidOperationException(
                     $"Tried to obtain tag non-existent tag: {tag} from file {urlsYamlPath}");
@@ -51,8 +51,19 @@ namespace Olympus.API {
             AppLogger.Log.Information($"Downloading content from {urlString}");
             return Task.Run(task(urlString, wc)).Result;
         }
+
+        /// <summary>
+        /// Get the database entry of a url tag
+        /// </summary>
+        /// <returns>The database entry</returns>
+        public DataBaseUrlEntry GetEntry(string tag) {
+            if (!urls.TryGetValue(tag, out DataBaseUrlEntry? urlEntry)) {
+                throw new InvalidOperationException($"Tried to obtain tag non-existent tag: {tag} from file {urlsYamlPath}");
+            }
+
+            return urlEntry;
+        }
         
-            
         /// <summary>
         /// Fetches data from a url tag as string
         /// </summary>

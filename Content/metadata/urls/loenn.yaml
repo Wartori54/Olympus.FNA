@@ -1,0 +1,4 @@
+- url: https://api.github.com/repos/CelestialCartographers/Loenn/releases/latest
+  tag: loenn_latest
+- url: https://github.com/CelestialCartographers/Loenn/blob/master/README.md
+  tag: loenn_readme

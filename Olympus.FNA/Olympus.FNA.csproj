@@ -10,7 +10,7 @@
     <RootNamespace>Olympus</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
-    <LangVersion>10</LangVersion>
+    <LangVersion>11</LangVersion>
     <CopyContent Condition="'$(CopyContent)' == '' And '$(Configuration)' == 'Release'">true</CopyContent>
     <CopyContent Condition="'$(CopyContent)' == ''">false</CopyContent>
     <DefineConstants Condition="!$(CopyContent)">DEBUG_CONTENT;$(DefineConstants)</DefineConstants>

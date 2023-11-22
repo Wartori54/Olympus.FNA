@@ -58,6 +58,12 @@ namespace Olympus {
         
         public List<Installation> ManualInstalls = new();
 
+        public string? CurrentLoennVersion;
+        public string? LoennInstallDirectory;
+        
+        public string? LoennLinuxDesktopEntry;
+        public string? LoennLinuxDesktopIcon;
+
         public bool? CSD;
         public bool? VSync;
         public string Theme = "";
