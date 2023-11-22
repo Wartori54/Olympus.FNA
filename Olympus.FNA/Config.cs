@@ -121,10 +121,6 @@ namespace Olympus {
         public void Load() {
             string path = Path ??= GetDefaultConfigFilePath();
 
-            if (!Directory.Exists(GetDefaultDir()))
-                Directory.CreateDirectory(GetDefaultDir());
-            if (!Directory.Exists(GetCacheDir()))
-                Directory.CreateDirectory(GetCacheDir());
             if (!File.Exists(path))
                 return;
 

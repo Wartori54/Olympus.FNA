@@ -1,7 +1,6 @@
 using Microsoft.Xna.Framework;
 using MonoMod.Utils;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using OlympUI;
 using Olympus.API;
 using Olympus.Utils;
@@ -11,7 +10,6 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
-using System.Net.Http;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
@@ -40,12 +38,6 @@ public class LoennScene : Scene {
         public static async Task<LoennData?> Fetch(UrlManager urlManager) {
             
             try {
-                // using var client = new HttpClient();
-                // client.Timeout = TimeSpan.FromMinutes(5);
-                // client.DefaultRequestHeaders.UserAgent.ParseAdd("Olympus");
-                // using var res = await client.GetAsync("https://api.github.com/repos/CelestialCartographers/Loenn/releases/latest");
-                // using var reader = new StreamReader(await res.Content.ReadAsStreamAsync());
-                
                 await using Stream res = urlManager.TryHttpGetDataStream("loenn_latest");
                 using StreamReader reader = new(res);
                 await using JsonTextReader json = new(reader);
@@ -58,7 +50,7 @@ public class LoennScene : Scene {
                 return new LoennData {
                    LatestVersion = loennVersion.TagName,
                    DownloadURL = GetDownloadURL(loennVersion.Assets),
-                   Changelog = loennVersion.Body!
+                   Changelog = loennVersion.Body
                };
             } catch (Exception ex) {
                 AppLogger.Log.Error($"Failed to check for Lönn version: {ex}");
@@ -448,63 +440,55 @@ public class LoennScene : Scene {
     
     private void Install() {
         async IAsyncEnumerable<EverestInstaller.Status> InstallFunc() {
-            Channel<(string, float)> chan = Channel.CreateUnbounded<(string, float)>();
-            Task.Run<Task>(async () => {
+            if (data == null) {
+                AppLogger.Log.Error("Tried to install Lönn while data isn't fetched yet!");
+                yield return new EverestInstaller.Status("ERROR: Tried to install Lönn while data isn't fetched yet!", 0f, EverestInstaller.Status.Stage.Fail);
+                yield break;
+            }
+            
+            if (Config.Instance.LoennInstallDirectory != null && !Directory.Exists(Config.Instance.LoennInstallDirectory)) {
+                AppLogger.Log.Warning("Config / Filesystem desync: Lönn install no longer exists");
+                yield return new EverestInstaller.Status("WARN: Config / Filesystem desync: Lönn install no longer exists", 0f, EverestInstaller.Status.Stage.InProgress);
+                Config.Instance.LoennInstallDirectory = null;
+                Config.Instance.Save();
+            } else if (Config.Instance.LoennInstallDirectory == null && Directory.Exists(Path.Combine(Config.GetDefaultDir(), "Lönn"))) {
+                AppLogger.Log.Warning("Config / Filesystem desync: Lönn wasn't correctly uninstalled");
+                yield return new EverestInstaller.Status("WARN: Config / Filesystem desync: Lönn install no longer exists", 0f, EverestInstaller.Status.Stage.InProgress);
+                
+                string? error = null;
                 try {
-                    if (data == null) {
-                        AppLogger.Log.Warning("Tried to install Lönn while data isn't fetched yet");
-                        return;
-                    }
-                    
-                    if (Config.Instance.LoennInstallDirectory != null && !Directory.Exists(Config.Instance.LoennInstallDirectory)) {
-                        AppLogger.Log.Warning("Config / Filesystem desync: Lönn install no longer exists");
-                        chan.Writer.TryWrite(("WARN: Config / Filesystem desync: Lönn install no longer exists", 0f));
-                        Config.Instance.LoennInstallDirectory = null;
-                        Config.Instance.Save();
-                    } else if (Config.Instance.LoennInstallDirectory == null && Directory.Exists(Path.Combine(Config.GetDefaultDir(), "Lönn"))) {
-                        AppLogger.Log.Warning("Config / Filesystem desync: Lönn wasn't correctly uninstalled");
-                        chan.Writer.TryWrite(("WARN: Config / Filesystem desync: Lönn install no longer exists", 0f));
-                        try {
-                            Directory.Delete(Path.Combine(Config.GetDefaultDir(), "Lönn"), recursive: true);
-                        } catch {
-                            AppLogger.Log.Error("Couldn't delete Lönn directory");
-                            chan.Writer.TryWrite(("ERROR: Couldn't delete Lönn directory", 0f));
-                        }
-                    }
-                    
-                    string zipPath = Path.Combine(Config.GetCacheDir(), "Lönn.zip");
-                    string installPath = Path.Combine(Config.GetDefaultDir(), "Lönn"); 
-                    
+                    Directory.Delete(Path.Combine(Config.GetDefaultDir(), "Lönn"), recursive: true);
+                } catch (Exception e) {
+                    AppLogger.Log.Error(e, "Couldn't delete Lönn directory");
+                    error = e.ToString();
+                    error += "\nERROR: Couldn't delete Lönn directory";
+                }
+                if (error != null) {
+                    yield return new EverestInstaller.Status(error, 0f, EverestInstaller.Status.Stage.Fail);
+                    yield break;
+                }
+            }
+            
+            string zipPath = Path.Combine(Config.GetCacheDir(), "Lönn.zip");
+            string installPath = Path.Combine(Config.GetDefaultDir(), "Lönn");
+
+            Channel<(string, float)> chan = Channel.CreateUnbounded<(string, float)>();
+#pragma warning disable CS4014 // This is awaited while reading the channel
+            Task.Run<Task>(async () => {
+#pragma warning restore CS4014
+                try {
                     var lastUpdate = DateTime.Now;
                     AppLogger.Log.Information($"Trying {data.Value.DownloadURL}");
                     await Web.DownloadFileWithProgress(data.Value.DownloadURL, zipPath, (pos, length, speed) => {
                         if (lastUpdate.Add(TimeSpan.FromSeconds(1)).CompareTo(DateTime.Now) < 0) {
-                            chan.Writer.TryWrite(($"Downloading... {pos*100F/length}% {speed} Kib/s {pos}", (float) pos / length));
+                            chan.Writer.TryWrite(($"Downloading... {pos*100F/length}% {speed} Kib/s {pos}", ((float) pos / length) * 0.9f)); // 0% -> 90%
                             lastUpdate = DateTime.Now;
                         }
                         return true;
                     });
-                    
-                    ZipFile.ExtractToDirectory(zipPath, installPath, overwriteFiles: true);
-                    
-                    if (PlatformHelper.Is(Platform.MacOS)) {
-                        // Make Lönn actually executable
-                        string targetDir = Path.Combine(installPath, "Lönn.app", "Contents", "MacOS");
-                        if (EverestInstaller.chmod(Path.Combine(targetDir, "love"), 0755) != 0)
-                            AppLogger.Log.Error($"Failed to chmod file {Path.Combine(targetDir, "love")}");
-                        if (EverestInstaller.chmod(Path.Combine(targetDir, "Lönn.sh"), 0755) != 0) 
-                            AppLogger.Log.Error($"Failed to chmod file {Path.Combine(targetDir, "Lönn.sh")}");
-                    }
-                    
-                    chan.Writer.TryWrite(("Lönn successfully installed!", 1f));
-
-                    Config.Instance.CurrentLoennVersion = data.Value.LatestVersion;
-                    Config.Instance.LoennInstallDirectory = installPath;
-                    Config.Instance.Save();
-                    Refresh();
                 } catch (Exception e) {
                     chan.Writer.TryWrite((e.ToString(), -1));
-                    chan.Writer.TryWrite(("Failed to install Lönn!", -1f));
+                    chan.Writer.TryWrite(("Failed to download Lönn!", -1f));
                     AppLogger.Log.Error(e, e.Message);
                 }
                 
@@ -523,6 +507,24 @@ public class LoennScene : Scene {
                     yield return new EverestInstaller.Status(item.Item1, 1f, EverestInstaller.Status.Stage.Fail);
                 }
             }
+            
+            ZipFile.ExtractToDirectory(zipPath, installPath, overwriteFiles: true);
+            
+            if (PlatformHelper.Is(Platform.MacOS)) {
+                // Make Lönn actually executable
+                string targetDir = Path.Combine(installPath, "Lönn.app", "Contents", "MacOS");
+                if (EverestInstaller.chmod(Path.Combine(targetDir, "love"), 0755) != 0)
+                    AppLogger.Log.Error($"Failed to chmod file {Path.Combine(targetDir, "love")}");
+                if (EverestInstaller.chmod(Path.Combine(targetDir, "Lönn.sh"), 0755) != 0) 
+                    AppLogger.Log.Error($"Failed to chmod file {Path.Combine(targetDir, "Lönn.sh")}");
+            }
+             
+            yield return new EverestInstaller.Status("Successfully installed Lönn", 1f, EverestInstaller.Status.Stage.Success);
+
+            Config.Instance.CurrentLoennVersion = data.Value.LatestVersion;
+            Config.Instance.LoennInstallDirectory = installPath;
+            Config.Instance.Save();
+            Refresh();
         }
 
         void HandlePopup(Scene? prev, Scene? next) {
@@ -539,64 +541,55 @@ public class LoennScene : Scene {
     }
     
     private void Uninstall() {
+#pragma warning disable CS1998 // Can't use IAsyncEnumerable without async 
         async IAsyncEnumerable<EverestInstaller.Status> UninstallFunc() {
-            Channel<(string, float)> chan = Channel.CreateUnbounded<(string, float)>();
-            Task.Run<Task>(() => {
-                try {
-                    if (string.IsNullOrWhiteSpace(Config.Instance.LoennInstallDirectory) || !Directory.Exists(Config.Instance.LoennInstallDirectory)) {
-                        AppLogger.Log.Error($"Install directory {Config.Instance.LoennInstallDirectory} doesnt exist");
-                        chan.Writer.TryWrite(("Lönn was never installed!", -1f));
-                        chan.Writer.Complete();
-                        return Task.CompletedTask;
-                    }
-
-                    Directory.Delete(Config.Instance.LoennInstallDirectory, recursive: true);
-                    
-                    if (PlatformHelper.Is(Platform.Linux)) {
-                        if (!string.IsNullOrEmpty(Config.Instance.LoennLinuxDesktopEntry) && File.Exists(Config.Instance.LoennLinuxDesktopEntry))
-                            File.Delete(Config.Instance.LoennLinuxDesktopEntry);
-                        if (!string.IsNullOrEmpty(Config.Instance.LoennLinuxDesktopIcon) && File.Exists(Config.Instance.LoennLinuxDesktopIcon))
-                            File.Delete(Config.Instance.LoennLinuxDesktopIcon);
-
-                        Config.Instance.LoennLinuxDesktopEntry = null;
-                        Config.Instance.LoennLinuxDesktopIcon = null;
-                    }
-                    
-                    chan.Writer.TryWrite(("Lönn successfully uninstalled!", 1f));
-
-                    Config.Instance.CurrentLoennVersion = null;
-                    Config.Instance.LoennInstallDirectory = null;
-                    Config.Instance.Save();
-                    Refresh();
-                } catch (Exception e) {
-                    chan.Writer.TryWrite((e.ToString(), -1));
-                    chan.Writer.TryWrite(("Failed to uninstall Lönn!", -1f));
-                    AppLogger.Log.Error(e, e.Message);
-                }
-                
-                chan.Writer.Complete();
-                return Task.CompletedTask;
-            });
-            
-            while (await chan.Reader.WaitToReadAsync())
-            while (chan.Reader.TryRead(out (string, float) item)) {
-                if (item.Item2 >= 0) {
-                    yield return new EverestInstaller.Status(item.Item1, item.Item2,
-                        // ReSharper disable once CompareOfFloatsByEqualityOperator
-                        item.Item2 != 1f
-                            ? EverestInstaller.Status.Stage.InProgress
-                            : EverestInstaller.Status.Stage.Success);
-                } else {
-                    yield return new EverestInstaller.Status(item.Item1, 1f, EverestInstaller.Status.Stage.Fail);
-                }
+#pragma warning restore CS1998
+            if (string.IsNullOrWhiteSpace(Config.Instance.LoennInstallDirectory) || !Directory.Exists(Config.Instance.LoennInstallDirectory)) {
+                AppLogger.Log.Error($"Install directory {Config.Instance.LoennInstallDirectory} doesnt exist");
+                yield return new EverestInstaller.Status("ERROR: Lönn was never installed!", 0f, EverestInstaller.Status.Stage.Fail);
+                yield break;
             }
+            
+            if (PlatformHelper.Is(Platform.Linux)) {
+                if (!string.IsNullOrEmpty(Config.Instance.LoennLinuxDesktopEntry) && File.Exists(Config.Instance.LoennLinuxDesktopEntry)) {
+                    File.Delete(Config.Instance.LoennLinuxDesktopEntry);
+                    yield return new EverestInstaller.Status("Uninstalled Lönn desktop entry", 0.25f, EverestInstaller.Status.Stage.InProgress);
+                }
+                if (!string.IsNullOrEmpty(Config.Instance.LoennLinuxDesktopIcon) && File.Exists(Config.Instance.LoennLinuxDesktopIcon)) {
+                    File.Delete(Config.Instance.LoennLinuxDesktopIcon);
+                    yield return new EverestInstaller.Status("Uninstalled Lönn desktop icon", 0.5f, EverestInstaller.Status.Stage.InProgress);
+                }
+
+                Config.Instance.LoennLinuxDesktopEntry = null;
+                Config.Instance.LoennLinuxDesktopIcon = null;
+            }
+            
+            string? error = null;
+            try {
+                Directory.Delete(Config.Instance.LoennInstallDirectory, recursive: true);
+            } catch (Exception e) {
+                AppLogger.Log.Error(e, "Couldn't delete Lönn directory");
+                error = e.ToString();
+                error += "\nERROR: Couldn't delete Lönn directory";
+            }
+            if (error != null) {
+                yield return new EverestInstaller.Status(error, 0f, EverestInstaller.Status.Stage.Fail);
+                yield break;
+            }
+            yield return new EverestInstaller.Status("Successfully uninstalled Lönn", 1f, EverestInstaller.Status.Stage.Success);
+            
+            Config.Instance.CurrentLoennVersion = null;
+            Config.Instance.LoennInstallDirectory = null;
+            Config.Instance.Save();
+            Refresh();
         }
 
         Scener.Set<WorkingOnItScene>(new WorkingOnItScene.Job(UninstallFunc, "download_rot"), "download_rot");
     }
 
-    public partial class PlayButton : HomeScene.IconButton {
-        public static readonly new Style DefaultStyle = new() {
+    public class PlayButton : HomeScene.IconButton {
+        // ReSharper disable once UnusedMember.Global
+        public new static readonly Style DefaultStyle = new() {
             {
                 StyleKeys.Normal,
                 new Style() {
