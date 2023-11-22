@@ -36,7 +36,6 @@ public class LoennScene : Scene {
         }
         
         public static async Task<LoennData?> Fetch(UrlManager urlManager) {
-            
             try {
                 await using Stream res = urlManager.TryHttpGetDataStream("loenn_latest");
                 using StreamReader reader = new(res);
@@ -238,6 +237,7 @@ public class LoennScene : Scene {
                 },
                 Init = RegisterRefresh<Group>(async el => await UI.Run(() => {
                     el.DisposeChildren();
+
                     if (!fetched) {
                         el.Add(new Group {
                             Layout = {
@@ -250,52 +250,70 @@ public class LoennScene : Scene {
                         });
                         return;
                     }
-                    if (data == null) {
-                        el.Add(new Group {
+
+                    var groupEl = el.Add(new Group {
+                        Layout = { 
+                            Layouts.Column(4), 
+                        },
+                    });
+                    
+                    groupEl.Add(data != null
+                        ? new Label($"Latest version: {data.Value.LatestVersion}")
+                        : new Group {
                             Layout = {
                                 Layouts.Row(4),
-                            }, 
+                            },
                             Children = {
+                                new Label($"Latest version:"),
                                 new Image(OlympUI.Assets.GetTexture("icons/close")) {
                                     AutoH = OlympUI.Assets.Font.Value.LineHeight,
                                     Style = {
                                         {ImageBase.StyleKeys.Color, Color.Red}
                                     },
                                 },
-                                new Label("Failed to fetch Lönn status!\n") {
+                                new Label("Failed to fetch latest Lönn version!\n") {
                                     Style = {
                                         Color.Red
                                     }
                                 },
                             }
                         });
-                        return;
-                    }
-                    if (Config.Instance.CurrentLoennVersion == null) {
-                        el.Add(new Group {
-                            Layout = { Layouts.Column(4), },
-                            Children = {
-                                new Label($"Latest version: {data.Value.LatestVersion}"),
-                                new Label("Current version: Not installed"),
-                            }
-                        });
-                        return;
-                    }
+                    groupEl.Add(Config.Instance.CurrentLoennVersion != null
+                        ? new Label($"Current version: {Config.Instance.CurrentLoennVersion}")
+                        : new Label("Current version: Not installed"));
 
                     string? home = Environment.GetEnvironmentVariable("HOME");
                     if (string.IsNullOrEmpty(home)) {
                         home = "";
                     }
-                    el.Add(new Group {
-                        Layout = {
-                            Layouts.Column(4),
-                        },
-                        Children = {
-                            new Label($"Latest version: {data.Value.LatestVersion}"),
-                            new Label($"Current version: {Config.Instance.CurrentLoennVersion}"),
-                            new Label($"Install directory: {Config.Instance.LoennInstallDirectory?.Replace(home, "~")}"),
-                        }
-                    });
+                    if (Config.Instance.LoennInstallDirectory != null) {
+                        groupEl.Add(new Label($"Install directory: {Config.Instance.LoennInstallDirectory?.Replace(home, "~")}"));
+                    }
+                })),
+            },
+            
+            new Group {
+                Layout = {
+                    Layouts.Fill(1.0f, 0.0f), 
+                    Layouts.Column(false),
+                },
+                Init = RegisterRefresh<Group>(async el => await UI.Run(() => {
+                    el.DisposeChildren();
+                    if (fetched && data == null) {
+                        // ReSharper disable once AsyncVoidLambda
+                        el.Add(new HomeScene.IconButton("icons/update", "Retry fetching Lönn data", async _ => {
+                            fetched = false;
+                            Refresh();
+                            data = await LoennData.Fetch(urlManager);
+                            // If for some reason Github fails, the request would probably error quickly.
+                            // We add an artificially delay to make the user think Olympus is actually doing something.
+                            // This also has the benefit of rate-limiting the user since Github has a pretty bad limit of 60 requests/hours
+                            // for non-authorized users and spamming this button could hit that limit quickly.
+                            await Task.Delay(2000);
+                            fetched = true;
+                            Refresh();
+                        }));
+                    }
                 })),
             },
         };
@@ -327,7 +345,7 @@ public class LoennScene : Scene {
                                     },
                                     Init = RegisterRefresh<Group>(async el => await UI.Run(() => {
                                         el.DisposeChildren();
-                                        if (!fetched) {
+                                        if (!fetched || data == null) {
                                             el.Add(new HeaderMedium("Changelog") {
                                                 Layout = {
                                                     Layouts.Left(0.5f, -0.5f),
@@ -336,8 +354,6 @@ public class LoennScene : Scene {
                                             return;
                                         }
 
-                                        if (data == null) return;
-                                        
                                         el.Add(new HeaderMedium($"Changelog - {data.Value.LatestVersion}") {
                                             Layout = {
                                                 Layouts.Left(0.5f, -0.5f),
@@ -381,7 +397,7 @@ public class LoennScene : Scene {
                                                             {ImageBase.StyleKeys.Color, Color.Red}
                                                         },
                                                     },
-                                                    new Label("Failed to fetch Lönn status!\n") {
+                                                    new Label("Failed to fetch Lönn changelog!\n") {
                                                         Style = {
                                                             Color.Red
                                                         }
