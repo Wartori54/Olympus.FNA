@@ -11,9 +11,19 @@ namespace Olympus.Utils {
         }
 
         public static LaunchResult Launch(Installation install, bool vanilla) {
+            if (vanilla) {
+                MetaNotificationScene.PushNotification(new Notification {
+                    Message = "Launching Vanilla..."
+                });
+            } else {
+                MetaNotificationScene.PushNotification(new Notification {
+                    Message = "Launching Everest..."
+                });
+            }
+            
             Process game = new Process();
 
-            if (PlatformHelper.Is(Platform.Unix)) { // Linux and Mac are diferent
+            if (PlatformHelper.Is(Platform.Unix)) { // Linux and Mac are different
                 game.StartInfo.FileName = Path.Combine(install.Root, "Celeste");
 
                 // The following is stolen from Old Olympus sharp/CmdLaunch.cs#L37
