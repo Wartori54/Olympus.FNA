@@ -12,6 +12,13 @@ namespace Olympus {
         private Skin? SkinDark;
         private Skin? SkinLight;
 
+        private Scene MainScene;
+        private Scene AlertScene;
+        private Scene NotificationScene;
+#if DEBUG
+        private Scene DebugScene;
+#endif
+
         private Label DebugLabel;
 
         private bool AlwaysRepaint;
@@ -23,10 +30,11 @@ namespace Olympus {
             SkinLight = Skin.CreateLight();
 
             UI.Initialize(App, Native, App);
-            UI.Root.Children.Add(Scener.Get<MetaMainScene>().Root);
-            UI.Root.Children.Add(Scener.Get<MetaAlertScene>().Generate());
+            UI.Root.Children.Add((MainScene = Scener.Get<MetaMainScene>()).Root);
+            UI.Root.Children.Add((AlertScene = Scener.Get<MetaAlertScene>()).Generate());
+            UI.Root.Children.Add((NotificationScene = Scener.Get<MetaNotificationScene>()).Generate());
 #if DEBUG
-            UI.Root.Children.Add(Scener.Get<MetaDebugScene>().Generate());
+            UI.Root.Children.Add((DebugScene = Scener.Get<MetaDebugScene>()).Generate());
 #endif
             UI.Root.Children.Add(DebugLabel = new Label("") {
                 Style = {
@@ -88,6 +96,10 @@ namespace Olympus {
                     AppLogger.Log.Error(ex, ex.Message);
                 }
             }
+            if (UIInput.Pressed(Keys.F4)) {
+                MetaNotificationScene.PushNotification(new() { Message = "hi", Duration = TimeSpan.FromSeconds(10)});
+                MetaNotificationScene.PushNotification(new() { Message = "hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi ", Duration = TimeSpan.FromSeconds(5)});
+            }
 
             if (UIInput.Pressed(Keys.F5)) {
                 string path = Path.Combine(Environment.CurrentDirectory, "skin.yaml");
@@ -123,6 +135,23 @@ namespace Olympus {
             if (UIInput.Pressed(Keys.F8)) {
                 // Run debug code that prints to stdout here
                 UI.Root.InvalidateForce();
+            }
+            
+            if (UIInput.Pressed(Keys.F9)) {
+                SkinDefault = Skin.CreateDump();
+                SkinDark = SkinDefault;
+                SkinLight = Skin.CreateLight();
+
+                UI.Root.InvalidateCollect();
+                UI.Root.InvalidateForce();
+                UI.Root.InvalidatePaintDown();
+                UI.Root.InvalidateFullDown();
+                UI.Root.InvalidateCachedTextureDown();
+                
+                MainScene.Refresh();
+                AlertScene.Refresh();
+                NotificationScene.Refresh();
+                DebugScene.Refresh();
             }
 
             if (UIInput.Pressed(Keys.F10)) {
@@ -175,6 +204,7 @@ namespace Olympus {
             }
 
             Scener.Update(dt);
+            NotificationScene.Update(dt);
             UI.Update(dt);
         }
 
