@@ -4,7 +4,6 @@ using OlympUI;
 using OlympUI.Animations;
 using Olympus.NativeImpls;
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Olympus; 
@@ -14,8 +13,7 @@ public record Notification {
 
     public TimeSpan Duration = TimeSpan.FromSeconds(3);
     private TimeSpan Elapsed = TimeSpan.Zero;
-    
-    public bool Finished = false;
+
     public float Progress => (float)(Elapsed / Duration);
     
     public void Update(float dt) {
@@ -26,54 +24,36 @@ public record Notification {
 public class MetaNotificationScene : Scene  {
     public static readonly TimeSpan NotificationFadeout = TimeSpan.FromSeconds(0.4f);
 
-    private static MetaNotificationScene instance = null!; // Will be initialized at startup
-    private static readonly List<Notification> notifications = new();
-    
     public static void PushNotification(Notification notification) {
-        notifications.Add(notification);
-        instance.Refresh();
-    }
-    
-    public MetaNotificationScene() {
-        instance = this;
+        UI.Run(() => {
+            UI.Root.GetChild(nameof(MetaNotificationScene))?.Children.Insert(0, new NotificationPanel(notification) {
+                W = 300,
+            });
+        });
     }
 
     public override Element Generate()
         => new Group {
+            ID = nameof(MetaNotificationScene),
             Layout = {
                 Layouts.Bottom(10),
                 Layouts.Right(10),
                 Layouts.Column(10),
             },
-            Init = RegisterRefresh<Group>(el => {
-                UI.Run(() => {
-                    Console.WriteLine(el);
-                    el.DisposeChildren();
-                    foreach (var notification in notifications) {
-                        el.Add(new NotificationPanel(notification) { W = 300, });
-                    }
-                });
-                return Task.CompletedTask;
-            }),
         };
-
-    public override void Update(float dt) {
-        foreach (var notification in notifications) {
-            notification.Update(dt);
-        }
-        notifications.RemoveAll(notification => notification.Finished);
-
-        base.Update(dt);
-    }
     
     public class NotificationPanel : Panel {
+        public enum Lifecycle {
+            Show, StartFadeOut, FadeOut, Remove,
+        }
+
         public new static readonly Style DefaultStyle = new() {
             { StyleKeys.Background, new ColorFader(AddColor(new Color(15, 15, 15, 255), NativeImpl.Native.Accent * 0.8f)) },
             { StyleKeys.Shadow, 5f },
         };
         
         private readonly Notification Notification;
-        private bool startedFadeout = false;
+        private Lifecycle Status = Lifecycle.Show;
         
         public NotificationPanel(Notification notification) {
             Clip = true;
@@ -82,7 +62,7 @@ public class MetaNotificationScene : Scene  {
             var close = new CloseButton("close") {
                 W = 24, H = 24,
                 Callback = _ => {
-                    if (!startedFadeout) StartFadeout();
+                    if (Status == Lifecycle.Show) StartFadeout();
                 },
                 Layout = {
                     Layouts.Fill(0.0f, 0.0f),
@@ -107,20 +87,55 @@ public class MetaNotificationScene : Scene  {
             });
         }
 
+        public override void Awake() {
+            Modifiers.Add(new FadeInAnimation());
+            Modifiers.Add(new OffsetInAnimation(Vector2.UnitX * W));
+            base.Awake();
+        }
+
         public override void Update(float dt) {
-            if (Notification.Progress > 1.0f && !startedFadeout) StartFadeout();
+            Notification.Update(dt);
+            
+            if (Status == Lifecycle.Remove)
+                UI.Run(() => {
+                    // Remove the move down animations again
+                    if (Parent == null) return;
+                    int idx = Parent.Children.IndexOf(this);
+                    for (int i = idx - 1; i >= 0; i--) {
+                        var element = Parent.Children[i];
+                        int modIdx = -1;
+                        for (int j = 0; j < element.Modifiers.Count; j++) {
+                            if (element.Modifiers[j] is OffsetOutAnimation offset && Math.Abs(offset.Value - 1.0f) < 0.01f) {
+                                modIdx = j;
+                                break;
+                            }
+                        }
+                        if (modIdx == -1) continue;
+                        element.Modifiers.RemoveAt(modIdx);
+                    }
+                    RemoveSelf();
+                });
+            if (Notification.Progress >= 1.0f && Status == Lifecycle.Show) 
+                StartFadeout();
+
             base.Update(dt);
         }
         
         private void StartFadeout() {
-            startedFadeout = true;
+            Status = Lifecycle.StartFadeOut;
             Modifiers.Add(new FadeOutAnimation((float)NotificationFadeout.TotalSeconds));
-            Modifiers.Add(new OffsetOutAnimation(-Vector2.UnitY * 20, (float)NotificationFadeout.TotalSeconds));
+            Modifiers.Add(new OffsetOutAnimation(Vector2.UnitX * W, (float)NotificationFadeout.TotalSeconds));
+            // Move above notifications down
+            if (Parent == null) return;
+            int idx = Parent.Children.IndexOf(this);
+            for (int i = idx - 1; i >= 0; i--) {
+                var element = Parent.Children[i]; 
+                element.Modifiers.Add(new OffsetOutAnimation(Vector2.UnitY * H, (float)NotificationFadeout.TotalSeconds));
+            }
             // Remove ourselves once the animation is done
             Task.Run(async () => {
                 await Task.Delay(NotificationFadeout);  
-                RemoveSelf();
-                Notification.Finished = true;
+                Status = Lifecycle.Remove;
             });
         }
 
@@ -148,7 +163,7 @@ public class MetaNotificationScene : Scene  {
         public override void DrawContent() {
             MeshShapes<MiniVertex> shapes = Mesh.Shapes;
             shapes.Clear();
-            shapes.Add(new MeshShapes.Rect() {
+            shapes.Add(new MeshShapes.Rect {
                 Color = Color.White,
                 XY1 = new Vector2(-Parent?.Padding.L ?? 0.0f, Parent?.Padding.B ?? 0.0f),
                 Size = new Vector2((W + (Parent?.Padding.R ?? 0.0f) * 2.0f) * (1.0f - Notification.Progress), H),
@@ -168,35 +183,35 @@ public class MetaNotificationScene : Scene  {
         }
     }
     
-    public partial class CloseButton : Button {
-        public static readonly new Style DefaultStyle = new() {
+    public class CloseButton : Button {
+        public new static readonly Style DefaultStyle = new() {
             {
-                Button.StyleKeys.Normal,
-                new Style() {
+                StyleKeys.Normal,
+                new Style {
                     { Panel.StyleKeys.Background, new Color(0x00, 0x00, 0x00, 0x50) },
                     { Panel.StyleKeys.Shadow, 0f },
                 }
             },
 
             {
-                Button.StyleKeys.Disabled,
-                new Style() {
+                StyleKeys.Disabled,
+                new Style {
                     { Panel.StyleKeys.Background, new Color(0x70, 0x70, 0x70, 0x70) },
                     { Panel.StyleKeys.Shadow, 0f },
                 }
             },
 
             {
-                Button.StyleKeys.Hovered,
-                new Style() {
+                StyleKeys.Hovered,
+                new Style {
                     { Panel.StyleKeys.Background, new Color(0x60, 0x60, 0x60, 0x70) },
                     { Panel.StyleKeys.Shadow, 0f },
                 }
             },
 
             {
-                Button.StyleKeys.Pressed,
-                new Style() {
+                StyleKeys.Pressed,
+                new Style {
                     { Panel.StyleKeys.Background, new Color(0x30, 0x30, 0x30, 0x70) },
                     { Panel.StyleKeys.Shadow, 0f },
                 }
@@ -221,8 +236,7 @@ public class MetaNotificationScene : Scene  {
             : this(() => OlympUI.Assets.GetTexture($"icons/{icon()}")) {
         }
 
-        public CloseButton(Func<IReloadable<Texture2D, Texture2DMeta>> iconGen)
-            : base() {
+        public CloseButton(Func<IReloadable<Texture2D, Texture2DMeta>> iconGen) {
             IconGen = iconGen;
             IReloadable<Texture2D, Texture2DMeta> icon = iconGen();
 
@@ -230,19 +244,13 @@ public class MetaNotificationScene : Scene  {
                 W = 16, H = 16,
                 ID = "icon",
                 Style = {
-                    { ImageBase.StyleKeys.Color, Style.GetLink(Button.StyleKeys.Foreground) },
+                    { ImageBase.StyleKeys.Color, Style.GetLink(StyleKeys.Foreground) },
                 },
                 Layout = {
                     Layouts.Left(0.5f, -0.5f),
                     Layouts.Top(0.5f, -0.5f),
                 }
             };
-            // Texture2DMeta icont = icon.Meta;
-            // if (icont.Width > icont.Height) {
-            //     iconi.AutoW = 16;
-            // } else {
-            //     iconi.AutoH = 16;
-            // }
             Children.Add(iconi);
         }
 

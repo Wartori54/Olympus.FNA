@@ -97,8 +97,7 @@ namespace Olympus {
                 }
             }
             if (UIInput.Pressed(Keys.F4)) {
-                MetaNotificationScene.PushNotification(new() { Message = "hi", Duration = TimeSpan.FromSeconds(10)});
-                MetaNotificationScene.PushNotification(new() { Message = "hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi hi ", Duration = TimeSpan.FromSeconds(5)});
+                MetaNotificationScene.PushNotification(new() { Message = "hi", Duration = TimeSpan.FromSeconds(3)});
             }
 
             if (UIInput.Pressed(Keys.F5)) {
@@ -204,7 +203,6 @@ namespace Olympus {
             }
 
             Scener.Update(dt);
-            NotificationScene.Update(dt);
             UI.Update(dt);
         }
 
