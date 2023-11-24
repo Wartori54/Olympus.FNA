@@ -23,6 +23,7 @@ public record Notification {
 
 public partial class MetaNotificationScene : Scene  {
     public static readonly TimeSpan NotificationFadeout = TimeSpan.FromSeconds(0.4f);
+    private const int Spacing = 10;
 
     public static void PushNotification(Notification notification) {
         UI.Run(() => {
@@ -38,7 +39,7 @@ public partial class MetaNotificationScene : Scene  {
             Layout = {
                 Layouts.Bottom(10),
                 Layouts.Right(10),
-                Layouts.Column(10),
+                Layouts.Column(Spacing),
             },
         };
     
@@ -46,10 +47,12 @@ public partial class MetaNotificationScene : Scene  {
         public enum Lifecycle {
             Show, StartFadeOut, FadeOut, Remove,
         }
+        
+        private const int Shadow = 5;
 
         public new static readonly Style DefaultStyle = new() {
             { StyleKeys.Background, new ColorFader(new Color(0x1F, 0x1F, 0x1F, 0xFF)) },
-            { StyleKeys.Shadow, 5f },
+            { StyleKeys.Shadow, Shadow },
         };
         
         private readonly Notification Notification;
@@ -57,6 +60,7 @@ public partial class MetaNotificationScene : Scene  {
         
         public NotificationPanel(Notification notification) {
             Clip = true;
+            ClipExtend = Shadow * 8;
             Notification = notification;
             
             var close = new NotificationCloseButton("close") {
@@ -130,7 +134,7 @@ public partial class MetaNotificationScene : Scene  {
             int idx = Parent.Children.IndexOf(this);
             for (int i = idx - 1; i >= 0; i--) {
                 var element = Parent.Children[i]; 
-                element.Modifiers.Add(new OffsetOutAnimation(Vector2.UnitY * H, (float)NotificationFadeout.TotalSeconds));
+                element.Modifiers.Add(new OffsetOutAnimation(Vector2.UnitY * (H + Spacing), (float)NotificationFadeout.TotalSeconds));
             }
             // Remove ourselves once the animation is done
             Task.Run(async () => {
