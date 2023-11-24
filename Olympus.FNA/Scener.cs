@@ -196,6 +196,12 @@ namespace Olympus {
                                    ?? throw new ArgumentException($"Couldn't instantiate {sceneType}, is it a scene?");
             return Generated[sceneType];
         }
+        
+        public static void RefreshAll() {
+            foreach (var sceneType in Generated.Keys) {
+                Regenerate(sceneType).Refresh();
+            }
+        }
 #endif
     }
 }

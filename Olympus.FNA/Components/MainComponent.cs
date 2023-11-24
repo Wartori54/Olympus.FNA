@@ -12,13 +12,6 @@ namespace Olympus {
         private Skin? SkinDark;
         private Skin? SkinLight;
 
-        private Scene MainScene;
-        private Scene AlertScene;
-        private Scene NotificationScene;
-#if DEBUG
-        private Scene DebugScene;
-#endif
-
         private Label DebugLabel;
 
         private bool AlwaysRepaint;
@@ -30,11 +23,23 @@ namespace Olympus {
             SkinLight = Skin.CreateLight();
 
             UI.Initialize(App, Native, App);
-            UI.Root.Children.Add((MainScene = Scener.Get<MetaMainScene>()).Root);
-            UI.Root.Children.Add((AlertScene = Scener.Get<MetaAlertScene>()).Generate());
-            UI.Root.Children.Add((NotificationScene = Scener.Get<MetaNotificationScene>()).Generate());
+            AddMetaScenes();
+            Scener.Push<HomeScene>();
+
+            App.FinderManager.Refresh();
+
 #if DEBUG
-            UI.Root.Children.Add((DebugScene = Scener.Get<MetaDebugScene>()).Generate());
+            AlwaysRepaint = false;
+            App.VSync = true;
+#endif
+        }
+        
+        private void AddMetaScenes() {
+            UI.Root.Children.Add(Scener.Get<MetaMainScene>().Root);
+            UI.Root.Children.Add(Scener.Get<MetaAlertScene>().Root);
+            UI.Root.Children.Add(Scener.Get<MetaNotificationScene>().Root);
+#if DEBUG
+            UI.Root.Children.Add(Scener.Get<MetaDebugScene>().Root);
 #endif
             UI.Root.Children.Add(DebugLabel = new Label("") {
                 Style = {
@@ -47,14 +52,6 @@ namespace Olympus {
                 Visible = false,
 #endif
             });
-            Scener.Push<HomeScene>();
-
-            App.FinderManager.Refresh();
-
-#if DEBUG
-            AlwaysRepaint = false;
-            App.VSync = true;
-#endif
         }
 
         protected override void LoadContent() {
@@ -86,7 +83,17 @@ namespace Olympus {
                 }
             }
 
-            if (UIInput.Pressed(Keys.F3) && Scener.Front != null) {
+            if (UIInput.Pressed(Keys.F3) && UIInput.Down(Keys.LeftShift)) {
+                UI.Root.InvalidateCollect();
+                UI.Root.InvalidateForce();
+                UI.Root.InvalidatePaintDown();
+                UI.Root.InvalidateFullDown();
+                UI.Root.InvalidateCachedTextureDown();
+            
+                UI.Root.Clear();
+                Scener.RefreshAll();
+                AddMetaScenes();
+            } else if (UIInput.Pressed(Keys.F3) && Scener.Front != null) {
                 Type sceneType = Scener.Front.GetType();
                 try {
                     Scener.PopFront();
@@ -96,6 +103,7 @@ namespace Olympus {
                     AppLogger.Log.Error(ex, ex.Message);
                 }
             }
+
             if (UIInput.Pressed(Keys.F4)) {
                 MetaNotificationScene.PushNotification(new() { Message = "hi" });
             }
@@ -136,23 +144,6 @@ namespace Olympus {
                 UI.Root.InvalidateForce();
             }
             
-            if (UIInput.Pressed(Keys.F9)) {
-                SkinDefault = Skin.CreateDump();
-                SkinDark = SkinDefault;
-                SkinLight = Skin.CreateLight();
-
-                UI.Root.InvalidateCollect();
-                UI.Root.InvalidateForce();
-                UI.Root.InvalidatePaintDown();
-                UI.Root.InvalidateFullDown();
-                UI.Root.InvalidateCachedTextureDown();
-                
-                MainScene.Refresh();
-                AlertScene.Refresh();
-                NotificationScene.Refresh();
-                DebugScene.Refresh();
-            }
-
             if (UIInput.Pressed(Keys.F10)) {
                 AlwaysRepaint = !AlwaysRepaint;
                 App.VSync = !AlwaysRepaint;
