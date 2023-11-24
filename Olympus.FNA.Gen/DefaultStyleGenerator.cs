@@ -128,13 +128,13 @@ namespace Olympus.Gen {
                 string hint;
                 string? ns = null;
                 {
-                    NamespaceDeclarationSyntax? nsNode = null;
+                    BaseNamespaceDeclarationSyntax? nsNode = null;
 
                     for (ClassDeclarationSyntax? type = elType; type is not null; type = type.Parent as ClassDeclarationSyntax) {
                         string name = type.Identifier.Text;
                         nests.Add((type.Modifiers[0].Text, name));
                         builder.Insert(0, name);
-                        if ((nsNode = type.Parent as NamespaceDeclarationSyntax) is null)
+                        if ((nsNode = type.Parent as BaseNamespaceDeclarationSyntax) is null)
                             builder.Insert(0, "+");
                     }
 
