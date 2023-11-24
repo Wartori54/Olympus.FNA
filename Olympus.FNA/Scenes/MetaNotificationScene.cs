@@ -188,19 +188,10 @@ public class MetaNotificationScene : Scene  {
             {
                 StyleKeys.Normal,
                 new Style {
-                    { Panel.StyleKeys.Background, new Color(0x00, 0x00, 0x00, 0x50) },
+                    { Panel.StyleKeys.Background, Color.Transparent },
                     { Panel.StyleKeys.Shadow, 0f },
                 }
             },
-
-            {
-                StyleKeys.Disabled,
-                new Style {
-                    { Panel.StyleKeys.Background, new Color(0x70, 0x70, 0x70, 0x70) },
-                    { Panel.StyleKeys.Shadow, 0f },
-                }
-            },
-
             {
                 StyleKeys.Hovered,
                 new Style {
@@ -208,7 +199,6 @@ public class MetaNotificationScene : Scene  {
                     { Panel.StyleKeys.Shadow, 0f },
                 }
             },
-
             {
                 StyleKeys.Pressed,
                 new Style {
@@ -217,7 +207,8 @@ public class MetaNotificationScene : Scene  {
                 }
             },
 
-            { Panel.StyleKeys.Radius, 32f },
+            { Panel.StyleKeys.BorderSize, 0f },
+            { Panel.StyleKeys.Border, Color.Transparent },
             { Panel.StyleKeys.Padding, 0 },
         };
 
