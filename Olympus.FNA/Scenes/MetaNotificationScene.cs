@@ -59,7 +59,7 @@ public partial class MetaNotificationScene : Scene  {
             Clip = true;
             Notification = notification;
             
-            var close = new CloseButton("close") {
+            var close = new NotificationCloseButton("close") {
                 W = 24, H = 24,
                 Callback = _ => {
                     if (Status == Lifecycle.Show) StartFadeout();
@@ -71,7 +71,7 @@ public partial class MetaNotificationScene : Scene  {
             };
             Children.Add(new Group {
                 Layout = {
-                    Layouts.Fill(1.0f, 0.0f, close.W),
+                    Layouts.Fill(1.0f, 0.0f, LayoutConsts.Next),
                 },
                 Children = {
                     new Label(Notification.Message) { Wrap = true, }
@@ -186,7 +186,7 @@ public partial class MetaNotificationScene : Scene  {
         }
     }
     
-    public class CloseButton : Button {
+    public class NotificationCloseButton : Button {
         public new static readonly Style DefaultStyle = new() {
             {
                 StyleKeys.Normal,
@@ -218,19 +218,19 @@ public partial class MetaNotificationScene : Scene  {
         public Func<IReloadable<Texture2D, Texture2DMeta>> IconGen;
         private Icon Icon;
 
-        public CloseButton(string icon)
+        public NotificationCloseButton(string icon)
             : this(OlympUI.Assets.GetTexture($"icons/{icon}")) {
         }
 
-        public CloseButton(IReloadable<Texture2D, Texture2DMeta> icon)
+        public NotificationCloseButton(IReloadable<Texture2D, Texture2DMeta> icon)
             : this(() => icon) {
         }
 
-        public CloseButton(Func<string> icon)
+        public NotificationCloseButton(Func<string> icon)
             : this(() => OlympUI.Assets.GetTexture($"icons/{icon()}")) {
         }
 
-        public CloseButton(Func<IReloadable<Texture2D, Texture2DMeta>> iconGen) {
+        public NotificationCloseButton(Func<IReloadable<Texture2D, Texture2DMeta>> iconGen) {
             IconGen = iconGen;
             IReloadable<Texture2D, Texture2DMeta> icon = iconGen();
 
