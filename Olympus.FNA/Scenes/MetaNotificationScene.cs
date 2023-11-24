@@ -11,7 +11,7 @@ namespace Olympus {
 public record Notification {
     public required string Message;
 
-    public TimeSpan Duration = TimeSpan.FromSeconds(3);
+    public TimeSpan Duration = TimeSpan.FromSeconds(5);
     private TimeSpan Elapsed = TimeSpan.Zero;
 
     public float Progress => (float)(Elapsed / Duration);

@@ -97,7 +97,7 @@ namespace Olympus {
                 }
             }
             if (UIInput.Pressed(Keys.F4)) {
-                MetaNotificationScene.PushNotification(new() { Message = "hi", Duration = TimeSpan.FromSeconds(3)});
+                MetaNotificationScene.PushNotification(new() { Message = "hi" });
             }
 
             if (UIInput.Pressed(Keys.F5)) {
