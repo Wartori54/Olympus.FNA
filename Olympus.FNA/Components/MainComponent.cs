@@ -12,7 +12,9 @@ namespace Olympus {
         private Skin? SkinDark;
         private Skin? SkinLight;
 
+#if DEBUG
         private Label DebugLabel;
+#endif
 
         private bool AlwaysRepaint;
 
@@ -40,25 +42,22 @@ namespace Olympus {
             UI.Root.Children.Add(Scener.Get<MetaNotificationScene>().Root);
 #if DEBUG
             UI.Root.Children.Add(Scener.Get<MetaDebugScene>().Root);
-#endif
             UI.Root.Children.Add(DebugLabel = new Label("") {
                 Style = {
                     Color.Red,
                     OlympUI.Assets.FontMonoOutlined,
                 },
-#if DEBUG
-                Visible = true,
-#else
-                Visible = false,
-#endif
             });
+#endif
         }
 
         protected override void LoadContent() {
             UI.LoadContent();
 
+#if DEBUG
             // Otherwise it keeps fooling itself.
             DebugLabel.CachePool = new(UI.MegaCanvas, false);
+#endif
 
             base.LoadContent();
         }
@@ -174,24 +173,24 @@ namespace Olympus {
             // Im not sure why removing pixels for height is needed in the first place -wartori
             UI.Root.WH = new(App.Width, App.Height);
 
-            if (DebugLabel.Visible) {
-                DebugLabel.Text =
-                    $"FPS: {App.FPS}\n" +
-                    $"Repaint Mode: {(AlwaysRepaint ? "always (debug)" : "on demand")}\n" +
-                    $"Mouse: {UIInput.Mouse}\n" +
-                    $"Root Size: {UI.Root.WH.X} x {UI.Root.WH.Y}\n" +
-                    $"App Size: {App.Width} x {App.Height} ({(Native.IsMaximized ? "maximized" : "windowed")})\n" +
-                    $"Reloadable Texture2D Used: {TextureTracker.Instance.UsedCount} / {TextureTracker.Instance.TotalCount}\n" +
-                    $"Reloadable Texture2D Memory: {GetHumanFriendlyBytes(TextureTracker.Instance.UsedMemory)} / {GetHumanFriendlyBytes(TextureTracker.Instance.TotalMemory)}\n" +
-                    $"Pool MAIN Available: {UI.MegaCanvas.Pool.EntriesAlive}\n" +
-                    $"Pool MAIN Used: {UI.MegaCanvas.Pool.Used.Count}\n" +
-                    $"Pool MAIN Memory: {GetHumanFriendlyBytes(UI.MegaCanvas.Pool.UsedMemory)} / {GetHumanFriendlyBytes(UI.MegaCanvas.Pool.TotalMemory)} \n" +
-                    $"Pool MSAA Available: {UI.MegaCanvas.PoolMSAA.EntriesAlive}\n" +
-                    $"Pool MSAA Used: {UI.MegaCanvas.PoolMSAA.Used.Count}\n" +
-                    $"Pool MSAA Memory: {GetHumanFriendlyBytes(UI.MegaCanvas.PoolMSAA.UsedMemory)} / {GetHumanFriendlyBytes(UI.MegaCanvas.PoolMSAA.TotalMemory)} \n" +
-                    $"Atlas Pages: {UI.MegaCanvas.Pages.Count} x {GetHumanFriendlyBytes(UI.MegaCanvas.PageSize * UI.MegaCanvas.PageSize * 4)} \n" +
-                    $"Element: {UI.Hovering}, WH: {UI.Hovering?.WH}";
-            }
+#if DEBUG
+            DebugLabel.Text =
+                $"FPS: {App.FPS}\n" +
+                $"Repaint Mode: {(AlwaysRepaint ? "always (debug)" : "on demand")}\n" +
+                $"Mouse: {UIInput.Mouse}\n" +
+                $"Root Size: {UI.Root.WH.X} x {UI.Root.WH.Y}\n" +
+                $"App Size: {App.Width} x {App.Height} ({(Native.IsMaximized ? "maximized" : "windowed")})\n" +
+                $"Reloadable Texture2D Used: {TextureTracker.Instance.UsedCount} / {TextureTracker.Instance.TotalCount}\n" +
+                $"Reloadable Texture2D Memory: {GetHumanFriendlyBytes(TextureTracker.Instance.UsedMemory)} / {GetHumanFriendlyBytes(TextureTracker.Instance.TotalMemory)}\n" +
+                $"Pool MAIN Available: {UI.MegaCanvas.Pool.EntriesAlive}\n" +
+                $"Pool MAIN Used: {UI.MegaCanvas.Pool.Used.Count}\n" +
+                $"Pool MAIN Memory: {GetHumanFriendlyBytes(UI.MegaCanvas.Pool.UsedMemory)} / {GetHumanFriendlyBytes(UI.MegaCanvas.Pool.TotalMemory)} \n" +
+                $"Pool MSAA Available: {UI.MegaCanvas.PoolMSAA.EntriesAlive}\n" +
+                $"Pool MSAA Used: {UI.MegaCanvas.PoolMSAA.Used.Count}\n" +
+                $"Pool MSAA Memory: {GetHumanFriendlyBytes(UI.MegaCanvas.PoolMSAA.UsedMemory)} / {GetHumanFriendlyBytes(UI.MegaCanvas.PoolMSAA.TotalMemory)} \n" +
+                $"Atlas Pages: {UI.MegaCanvas.Pages.Count} x {GetHumanFriendlyBytes(UI.MegaCanvas.PageSize * UI.MegaCanvas.PageSize * 4)} \n" +
+                $"Element: {UI.Hovering}, WH: {UI.Hovering?.WH}";
+#endif
 
             Scener.Update(dt);
             UI.Update(dt);
