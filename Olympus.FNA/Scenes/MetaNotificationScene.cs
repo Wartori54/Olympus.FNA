@@ -6,7 +6,7 @@ using Olympus.NativeImpls;
 using System;
 using System.Threading.Tasks;
 
-namespace Olympus; 
+namespace Olympus {
 
 public record Notification {
     public required string Message;
@@ -21,7 +21,7 @@ public record Notification {
     }
 }
 
-public class MetaNotificationScene : Scene  {
+public partial class MetaNotificationScene : Scene  {
     public static readonly TimeSpan NotificationFadeout = TimeSpan.FromSeconds(0.4f);
 
     public static void PushNotification(Notification notification) {
@@ -48,7 +48,7 @@ public class MetaNotificationScene : Scene  {
         }
 
         public new static readonly Style DefaultStyle = new() {
-            { StyleKeys.Background, new ColorFader(AddColor(new Color(15, 15, 15, 255), NativeImpl.Native.Accent * 0.8f)) },
+            { StyleKeys.Background, new ColorFader(new Color(0x1F, 0x1F, 0x1F, 0xFF)) },
             { StyleKeys.Shadow, 5f },
         };
         
@@ -142,7 +142,9 @@ public class MetaNotificationScene : Scene  {
         private static Color AddColor(Color a, Color b) => new(a.R + b.R, a.G + b.G, a.B + b.B, a.A + b.A);
     }
     
-    public class NotificationProgress : Element {
+    public partial class NotificationProgress : Element {
+        protected Style.Entry StyleColor = new(new ColorFader(new Color(0x7F, 0x7F, 0x7F, 0xE0)));
+
         protected override bool IsComposited => false;
 
         private readonly Notification Notification;
@@ -161,10 +163,11 @@ public class MetaNotificationScene : Scene  {
         }
 
         public override void DrawContent() {
+            StyleColor.GetCurrent(out Color color);
             MeshShapes<MiniVertex> shapes = Mesh.Shapes;
             shapes.Clear();
             shapes.Add(new MeshShapes.Rect {
-                Color = Color.White,
+                Color = color,
                 XY1 = new Vector2(-Parent?.Padding.L ?? 0.0f, Parent?.Padding.B ?? 0.0f),
                 Size = new Vector2((W + (Parent?.Padding.R ?? 0.0f) * 2.0f) * (1.0f - Notification.Progress), H),
             });
@@ -257,4 +260,6 @@ public class MetaNotificationScene : Scene  {
             base.Update(dt);
         }
     }
+}
+
 }
