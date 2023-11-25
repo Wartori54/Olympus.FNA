@@ -104,7 +104,9 @@ namespace Olympus {
             }
 
             if (UIInput.Pressed(Keys.F4)) {
-                MetaNotificationScene.PushNotification(new() { Message = "hi" });
+                MetaNotificationScene.PushNotification(new() { Message = "Information", Level = Notification.SeverityLevel.Information });
+                MetaNotificationScene.PushNotification(new() { Message = "Warning", Level = Notification.SeverityLevel.Warning });
+                MetaNotificationScene.PushNotification(new() { Message = "Error", Level = Notification.SeverityLevel.Error });
             }
 
             if (UIInput.Pressed(Keys.F5)) {

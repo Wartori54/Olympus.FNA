@@ -2,16 +2,20 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using OlympUI;
 using OlympUI.Animations;
-using Olympus.NativeImpls;
 using System;
 using System.Threading.Tasks;
 
 namespace Olympus {
 
 public record Notification {
+    public enum SeverityLevel {
+        Information, Warning, Error
+    }
+    
     public required string Message;
-
     public TimeSpan Duration = TimeSpan.FromSeconds(5);
+    public SeverityLevel Level = SeverityLevel.Information;
+
     private TimeSpan Elapsed = TimeSpan.Zero;
 
     public float Progress => (float)(Elapsed / Duration);
@@ -43,16 +47,38 @@ public partial class MetaNotificationScene : Scene  {
             },
         };
     
+    private static readonly Color WarningColor = new(0xE8, 0x9A, 0x14, 0xFF);
+    private static readonly Color ErrorColor = new(0x6F, 0x10, 0x10, 0xFF);
+    private static readonly Color ErrorColorHighlight = new(0xBF, 0x00, 0x00, 0xFF);
+    
     public class NotificationPanel : Panel {
         public enum Lifecycle {
-            Show, StartFadeOut, FadeOut, Remove,
+            Show, FadeOut, Remove,
         }
         
         private const int Shadow = 5;
 
         public new static readonly Style DefaultStyle = new() {
-            { StyleKeys.Background, new ColorFader(new Color(0x1F, 0x1F, 0x1F, 0xFF)) },
-            { StyleKeys.Shadow, Shadow },
+            {
+                StyleKeys.Information,
+                new Style { }
+            },
+            {
+                StyleKeys.Warning,
+                new Style {
+                    { Panel.StyleKeys.Border, WarningColor },
+                    { Panel.StyleKeys.BorderSize, -2f }
+                }
+            },
+            {
+                StyleKeys.Error,
+                new Style {
+                    { Panel.StyleKeys.Background, ErrorColor },                    
+                }
+            },
+            
+            { Panel.StyleKeys.Background, new Color(0x1F, 0x1F, 0x1F, 0xFF) },
+            { Panel.StyleKeys.Shadow, Shadow },
         };
         
         private readonly Notification Notification;
@@ -62,7 +88,7 @@ public partial class MetaNotificationScene : Scene  {
             Clip = true;
             ClipExtend = Shadow * 8;
             Notification = notification;
-            
+                
             var close = new NotificationCloseButton("close") {
                 W = 24, H = 24,
                 Callback = _ => {
@@ -100,6 +126,14 @@ public partial class MetaNotificationScene : Scene  {
         public override void Update(float dt) {
             Notification.Update(dt);
             
+            Style.Apply(Notification.Level switch {
+                Notification.SeverityLevel.Information => StyleKeys.Information,
+                Notification.SeverityLevel.Warning => StyleKeys.Warning,
+                Notification.SeverityLevel.Error => StyleKeys.Error,
+                _ => throw new ArgumentOutOfRangeException()
+            });
+            InvalidatePaint();
+            
             if (Status == Lifecycle.Remove)
                 UI.Run(() => {
                     // Remove the move down animations again
@@ -126,7 +160,7 @@ public partial class MetaNotificationScene : Scene  {
         }
         
         private void StartFadeout() {
-            Status = Lifecycle.StartFadeOut;
+            Status = Lifecycle.FadeOut;
             Modifiers.Add(new FadeOutAnimation((float)NotificationFadeout.TotalSeconds));
             Modifiers.Add(new OffsetOutAnimation(Vector2.UnitX * W, (float)NotificationFadeout.TotalSeconds));
             // Move above notifications down
@@ -143,11 +177,36 @@ public partial class MetaNotificationScene : Scene  {
             });
         }
 
-        private static Color AddColor(Color a, Color b) => new(a.R + b.R, a.G + b.G, a.B + b.B, a.A + b.A);
+        public new abstract class StyleKeys {
+            public static readonly Style.Key Information = new("Information");
+            public static readonly Style.Key Warning = new("Warning");
+            public static readonly Style.Key Error = new("Error");
+        }
     }
     
     public partial class NotificationProgress : Element {
-        protected Style.Entry StyleColor = new(new ColorFader(new Color(0x7F, 0x7F, 0x7F, 0xE0)));
+        public new static readonly Style DefaultStyle = new() {
+            {
+                StyleKeys.Information,
+                new Style { }
+            },
+            {
+                StyleKeys.Warning,
+                new Style {
+                    { StyleKeys.Color, WarningColor }
+                }
+            },
+            {
+                StyleKeys.Error,
+                new Style {
+                    { StyleKeys.Color, ErrorColorHighlight }
+                }
+            },
+            
+            { StyleKeys.Color, new Color(0x7F, 0x7F, 0x7F, 0xE0) }
+        };
+
+        protected Style.Entry StyleColor = new(new ColorFader());
 
         protected override bool IsComposited => false;
 
@@ -162,6 +221,13 @@ public partial class MetaNotificationScene : Scene  {
         }
 
         public override void Update(float dt) {
+            Style.Apply(Notification.Level switch {
+                Notification.SeverityLevel.Information => StyleKeys.Information,
+                Notification.SeverityLevel.Warning => StyleKeys.Warning,
+                Notification.SeverityLevel.Error => StyleKeys.Error,
+                _ => throw new ArgumentOutOfRangeException()
+            });
+
             InvalidatePaint();
             base.Update(dt);
         }
@@ -187,6 +253,12 @@ public partial class MetaNotificationScene : Scene  {
             });
             
             base.DrawContent();
+        }
+        
+        public new abstract partial class StyleKeys {
+            public static readonly Style.Key Information = new("Information");
+            public static readonly Style.Key Warning = new("Warning");
+            public static readonly Style.Key Error = new("Error");
         }
     }
     
