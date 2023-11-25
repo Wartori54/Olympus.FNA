@@ -2,6 +2,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using OlympUI;
 using OlympUI.Animations;
+using OlympUI.Modifiers;
 using Olympus.API;
 using Olympus.Utils;
 using System;
@@ -136,29 +137,52 @@ public class NewsScene : Scene {
     }
 
     public static (Panel, Task) CreateNewsPanel(INewsEntry newsEntry) {
+        // 400 here is just arbitrary, it looks good enough
+        int maxImageWidth = 400;
+        int maxImageHeight = (int) (maxImageWidth * (9f / 16f)); // default to 16:9 aspect ratio since most imgs are shaped like this
         Panel newsPanel = new Panel() {
             Layout = {
                 Layouts.Fill(1f, 0), 
                 Layouts.Column(), 
             },
-            Children = {
-                new HeaderSmall(newsEntry.Title) { Wrap = true },
-                new Group() { ID = "ImageGroup", 
-                    Layout = { Layouts.Fill(1, 0) },
-                    Children = {
-                        new Group() {
-                            ForceWH = new Point(100, 100)
-                        }
-                    }
-                },
-                new Label(newsEntry.Text) { Wrap = true, },
-            },
             Modifiers = {
-                // new FadeInAnimation(0.09f).WithDelay(0.05f).With(Ease.SineInOut),
                 new OffsetInAnimation(new Vector2(0f, 10f), 0.15f).WithDelay(0.05f).With(Ease.SineIn),
-                // new ScaleInAnimation(0.9f, 0.125f).WithDelay(0.05f).With(Ease.SineOut),
             }
         };
+        // Adding children after creation is mandatory here because of the need to access `newsPanel` in its children
+        newsPanel.Children.Add(new HeaderSmall(newsEntry.Title) { Wrap = true });
+        newsPanel.Children.Add(new Panel() { 
+            ID = "ImagePanel", 
+            Clip = true,
+            Layout = {
+                Layouts.Left(0.5f, -0.5f),
+            },
+            Style = { { Group.StyleKeys.Padding, 0 }, { Panel.StyleKeys.Shadow, 0 }, },
+            MinWH = new Point(10, 10),
+            Children = {
+                new Group() { // Fake group to make an empty space
+                    Layout = {
+                        ev => {
+                            int width = Math.Min(newsPanel.W-newsPanel.Padding*2, maxImageWidth);
+                            ev.Element.W = width;
+                            ev.Element.H = maxImageHeight;
+                        }
+                    },
+                    Children = {
+                        new Label("Loading...") { // TODO: some animation for when an image is loading
+                            Layout = {
+                                Layouts.Top(0.5f, -0.5f),
+                                Layouts.Left(0.5f, -0.5f),
+                            },
+                            Modifiers = {
+                                new OpacityModifier(0.5f),
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        newsPanel.Children.Add(new Label(newsEntry.Text) { Wrap = true, });
 
         foreach (INewsEntry.ILink link in newsEntry.Links) {
             newsPanel.Add(new HomeScene.IconButton("icons/browser",
@@ -166,7 +190,7 @@ public class NewsScene : Scene {
                 _ => URIHelper.OpenInBrowser(link.Url)));
         }
         
-        Element group = newsPanel["ImageGroup"];
+        Element imagePanel = newsPanel["ImagePanel"];
         Task imageTask = Task.Run(async () => {
             IReloadable<Texture2D, Texture2DMeta>? tex = null;
             foreach (string img in newsEntry.Images) {
@@ -177,33 +201,28 @@ public class NewsScene : Scene {
             if (tex == null) return;
 
             await UI.Run(() => {
-                group.DisposeChildren();
-                group.Add(new Panel() {
-                    Clip = true,
+                Image image = new Image(tex) {
+                    Modifiers = {
+                        new FadeInAnimation(0.6f).With(Ease.QuadOut),
+                    },
                     Layout = {
-                        Layouts.Fill(1F, 0F),
-                    },
-                    Style = {
-                        { Group.StyleKeys.Padding, 0},
-                        { Panel.StyleKeys.Shadow, 0},
-                    },
-                    Children = {
-                        new Image(tex) {
-                            Modifiers = {
-                                new FadeInAnimation(0.6f).With(Ease.QuadOut),
-                                // new ScaleInAnimation(1.05f, 0.5f).With(
-                                //     Ease.QuadOut)
-                            },
-                            Layout = {
-                                ev => {
-                                    Image img = (Image) ev.Element;
-                                    img.AutoW = Math.Min(group.W, 400);
-                                    img.X = group.W / 2 - img.W / 2;
-                                },
-                            }
-                        }
+                        ev => {
+                            Image img = (Image) ev.Element;
+                            img.AutoH = maxImageHeight;
+                            img.X = imagePanel.W/2 - img.AutoW/2;
+
+                        },
                     }
+                };
+                imagePanel.DisposeChildren();
+                imagePanel.Layout.Add(ev => {
+                    int width = Math.Min(newsPanel.W-newsPanel.Padding*2, image.W);
+                    ev.Element.W = width; 
+                    ev.Element.H = maxImageHeight;
                 });
+                // alright let me be clear here
+                // WHYY THE FRICK DOES A HECKING GROUP NEED TO BE HERE IN ORDER FOR THE IMG TO BE CENTERED
+                imagePanel.Add(new Group() {image});
 
             });
         });
