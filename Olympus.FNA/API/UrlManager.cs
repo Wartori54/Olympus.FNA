@@ -29,6 +29,7 @@ namespace Olympus.API {
             foreach (DataBaseUrlEntry url in readUrls) {
                 if (!urls.TryAdd(url.Tag, url)) {
                     AppLogger.Log.Error($"File {urlsYamlPath} contains multiple urls with same tag: {url.Tag}");
+                    MetaNotificationScene.PushNotification(new Notification{ Message = $"File {urlsYamlPath} contains multiple urls with same tag: {url.Tag}", Level = Notification.SeverityLevel.Warning });
                 }
             }
         }

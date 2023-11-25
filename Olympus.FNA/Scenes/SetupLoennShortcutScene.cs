@@ -167,10 +167,12 @@ public class SetupLoennShortcutSceneLinux : SetupLoennShortcutSceneBase {
 
         if (File.Exists(desktopPath)) {
             AppLogger.Log.Error($"Lönn Desktop Entry: {desktopPath} already exists!");
+            MetaNotificationScene.PushNotification(new Notification{ Message = $"Lönn Desktop Entry: {desktopPath} already exists!", Level = Notification.SeverityLevel.Warning });
             return;
         }
         if (File.Exists(iconPath)) {
             AppLogger.Log.Error($"Lönn Desktop Entry: {iconPath} already exists!");
+            MetaNotificationScene.PushNotification(new Notification{ Message = $"Lönn Desktop Entry: {iconPath} already exists!", Level = Notification.SeverityLevel.Warning });
             return;
         }
         

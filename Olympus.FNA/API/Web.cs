@@ -42,6 +42,7 @@ namespace Olympus.API {
                 dataCompressed = await Client.GetByteArrayAsync(url);
             } catch (Exception e) {
                 AppLogger.Log.Error($"Failed to download texture data \"{url}\":\n{e}");
+                MetaNotificationScene.PushNotification(new Notification{ Message = $"Failed to download texture data \"{url}\":\n{e}", Level = Notification.SeverityLevel.Warning });
                 return (null, null, 0, 0);
             }
 

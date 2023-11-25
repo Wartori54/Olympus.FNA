@@ -51,6 +51,7 @@ namespace Olympus.Utils {
                         AppLogger.Log.Information("nextLaunchIsVanilla.txt created");
                     } catch (Exception e) {
                         AppLogger.Log.Error($"Failed to create nextLaunchIsVanilla.txt: {e}");
+                        MetaNotificationScene.PushNotification(new Notification{ Message = $"Failed to create nextLaunchIsVanilla.txt: {e}", Level = Notification.SeverityLevel.Warning });
                         return LaunchResult.IOError;
                     }
                 } else {

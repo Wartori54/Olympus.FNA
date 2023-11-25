@@ -53,6 +53,7 @@ public class LoennScene : Scene {
                };
             } catch (Exception ex) {
                 AppLogger.Log.Error($"Failed to check for Lönn version: {ex}");
+                MetaNotificationScene.PushNotification(new Notification{ Message = $"Failed to check for Lönn version: {ex}", Level = Notification.SeverityLevel.Warning });
                 return null;
             }
         }

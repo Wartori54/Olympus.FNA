@@ -71,6 +71,7 @@ namespace Olympus.API {
             if (entries == null) {
                 entries = new();
                 AppLogger.Log.Error("Failed to obtain olympus-news");
+                MetaNotificationScene.PushNotification(new Notification{ Message = "Failed to obtain olympus-news", Level = Notification.SeverityLevel.Warning });
             }
 
             return entries;
