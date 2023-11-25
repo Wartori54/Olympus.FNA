@@ -100,7 +100,6 @@ namespace Olympus {
                 } catch (Exception ex) {
                     AppLogger.Log.Error($"Failed to reload scene: {sceneType.Name}");
                     AppLogger.Log.Error(ex, ex.Message);
-                    MetaNotificationScene.PushNotification(new Notification{ Message = $"Failed to reload scene: {sceneType.Name}", Level = Notification.SeverityLevel.Warning });
                 }
             }
 

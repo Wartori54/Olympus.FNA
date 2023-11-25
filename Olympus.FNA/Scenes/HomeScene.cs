@@ -1047,7 +1047,6 @@ namespace Olympus {
             } catch (Exception ex) {
                 AppLogger.Log.Error("Couldn't finish mod panels!");
                 AppLogger.Log.Error(ex, ex.Message);
-                MetaNotificationScene.PushNotification(new Notification{ Message = "Couldn't finish mod panels!", Level = Notification.SeverityLevel.Warning });
             }
 
 

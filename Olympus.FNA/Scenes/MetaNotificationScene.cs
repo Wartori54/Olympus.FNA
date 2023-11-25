@@ -49,7 +49,7 @@ public partial class MetaNotificationScene : Scene  {
     
     private static readonly Color WarningColor = new(0xE8, 0x9A, 0x14, 0xFF);
     private static readonly Color ErrorColor = new(0x6F, 0x10, 0x10, 0xFF);
-    private static readonly Color ErrorColorHighlight = new(0xBF, 0x00, 0x00, 0xFF);
+    private static readonly Color ErrorHighlightColor = new(0xBF, 0x00, 0x00, 0xFF);
     
     public class NotificationPanel : Panel {
         public enum Lifecycle {
@@ -74,6 +74,8 @@ public partial class MetaNotificationScene : Scene  {
                 StyleKeys.Error,
                 new Style {
                     { Panel.StyleKeys.Background, ErrorColor },                    
+                    { Panel.StyleKeys.Border, ErrorHighlightColor },
+                    { Panel.StyleKeys.BorderSize, -2f }
                 }
             },
             
@@ -188,7 +190,9 @@ public partial class MetaNotificationScene : Scene  {
         public new static readonly Style DefaultStyle = new() {
             {
                 StyleKeys.Information,
-                new Style { }
+                new Style {
+                    { StyleKeys.Color, new Color(0x7F, 0x7F, 0x7F, 0xE0) }
+                }
             },
             {
                 StyleKeys.Warning,
@@ -199,11 +203,9 @@ public partial class MetaNotificationScene : Scene  {
             {
                 StyleKeys.Error,
                 new Style {
-                    { StyleKeys.Color, ErrorColorHighlight }
+                    { StyleKeys.Color, ErrorHighlightColor }
                 }
             },
-            
-            { StyleKeys.Color, new Color(0x7F, 0x7F, 0x7F, 0xE0) }
         };
 
         protected Style.Entry StyleColor = new(new ColorFader());
