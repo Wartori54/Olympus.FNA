@@ -11,9 +11,19 @@ namespace Olympus.Utils {
         }
 
         public static LaunchResult Launch(Installation install, bool vanilla) {
+            if (vanilla) {
+                MetaNotificationScene.PushNotification(new Notification {
+                    Message = "Launching Vanilla..."
+                });
+            } else {
+                MetaNotificationScene.PushNotification(new Notification {
+                    Message = "Launching Everest..."
+                });
+            }
+            
             Process game = new Process();
 
-            if (PlatformHelper.Is(Platform.Unix)) { // Linux and Mac are diferent
+            if (PlatformHelper.Is(Platform.Unix)) { // Linux and Mac are different
                 game.StartInfo.FileName = Path.Combine(install.Root, "Celeste");
 
                 // The following is stolen from Old Olympus sharp/CmdLaunch.cs#L37
@@ -41,6 +51,7 @@ namespace Olympus.Utils {
                         AppLogger.Log.Information("nextLaunchIsVanilla.txt created");
                     } catch (Exception e) {
                         AppLogger.Log.Error($"Failed to create nextLaunchIsVanilla.txt: {e}");
+                        MetaNotificationScene.PushNotification(new Notification{ Message = $"Failed to create nextLaunchIsVanilla.txt: {e}", Level = Notification.SeverityLevel.Warning });
                         return LaunchResult.IOError;
                     }
                 } else {

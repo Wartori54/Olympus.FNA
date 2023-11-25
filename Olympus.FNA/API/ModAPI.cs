@@ -346,6 +346,7 @@ namespace Olympus {
                 if (entries == null) {
                     entries = new();
                     AppLogger.Log.Error("Failed obtaining featured entries");
+                    MetaNotificationScene.PushNotification(new Notification{ Message = "Failed obtaining featured entries", Level = Notification.SeverityLevel.Warning });
                 }
 
                 List<RemoteModInfo> ret = new();

@@ -134,6 +134,15 @@ namespace OlympUI {
                         Radius = radius,
                         Border = borderSize,
                     });
+                } else if (border != default && borderSize <= -0.01f && border.A >= 1) {
+                    float halfBorder = borderSize / 2.0f; // Move outer border's center on the edge, to avoid seams
+                    shapes.Add(new MeshShapes.Rect() {
+                        Color = border,
+                        XY1 = new(halfBorder, halfBorder),
+                        XY2 = new(wh.X + Math.Abs(borderSize), wh.Y + Math.Abs(borderSize)),
+                        Radius = radius,
+                        Border = Math.Abs(borderSize),
+                    });
                 }
 
                 // Fix UVs manually as we're using a gradient texture.
