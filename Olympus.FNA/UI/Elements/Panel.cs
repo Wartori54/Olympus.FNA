@@ -135,11 +135,11 @@ namespace OlympUI {
                         Border = borderSize,
                     });
                 } else if (border != default && borderSize <= -0.01f && border.A >= 1) {
-                    float paddedSize = borderSize + 0.25f; // Apply slight padding to avoid seams
+                    float halfBorder = borderSize / 2.0f; // Move outer border's center on the edge, to avoid seams
                     shapes.Add(new MeshShapes.Rect() {
                         Color = border,
-                        XY1 = new(paddedSize, paddedSize),
-                        Size = new(wh.X + Math.Abs(2 * paddedSize), wh.Y + Math.Abs(2 * paddedSize)),
+                        XY1 = new(halfBorder, halfBorder),
+                        XY2 = new(wh.X + Math.Abs(borderSize), wh.Y + Math.Abs(borderSize)),
                         Radius = radius,
                         Border = Math.Abs(borderSize),
                     });
