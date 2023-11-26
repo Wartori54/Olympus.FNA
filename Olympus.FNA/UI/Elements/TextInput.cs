@@ -60,7 +60,10 @@ public partial class TextInput : Panel {
     
     public string Text {
         get => TextLabel.Text;
-        set => TextLabel.Text = MaxLength > 0 ? value.Substring(0, Math.Min(value.Length, MaxLength)) : value;
+        set { 
+            TextLabel.Text = MaxLength > 0 ? value.Substring(0, Math.Min(value.Length, MaxLength)) : value;
+            TextCallback?.Invoke(this);
+        }
     }
     public string Placeholder {
         get => PlaceholderLabel.Text;
@@ -144,10 +147,10 @@ public partial class TextInput : Panel {
         }
         return true;
     }
-    private void AfterCursorMove() {
+    private void AfterCursorMove(Action action) {
         Cursor = Math.Clamp(Cursor, 0, Text.Length);
 
-        if (UIInput.Down(Keys.LeftShift) || UIInput.Down(Keys.RightShift)) {
+        if ((UIInput.Down(Keys.LeftShift) || UIInput.Down(Keys.RightShift)) && action != Action.Edit) {
             Selection.End = Cursor;
         }
     }
@@ -182,7 +185,7 @@ public partial class TextInput : Panel {
                 Text = Text.Remove(Cursor - 1, 1);
                 Cursor--;
             }
-            AfterCursorMove();
+            AfterCursorMove(Action.Edit);
             InvalidatePaint();
         } else if (chr == DELETE) {
             BeforeCursorMove(Action.Edit);
@@ -202,18 +205,18 @@ public partial class TextInput : Panel {
         } else if (chr == HOME) {
             BeforeCursorMove(Action.MoveLeft);
             Cursor = 0;
-            AfterCursorMove();
+            AfterCursorMove(Action.MoveLeft);
             InvalidatePaint();
         } else if (chr == END) {
             BeforeCursorMove(Action.MoveRight);
             Cursor = Text.Length;
-            AfterCursorMove();
+            AfterCursorMove(Action.MoveRight);
             InvalidatePaint();
         } else {
             BeforeCursorMove(Action.Edit);
             Text = Text.Insert(Cursor, chr.ToString());
             Cursor++;
-            AfterCursorMove();
+            AfterCursorMove(Action.Edit);
             InvalidatePaint();
         }
 
@@ -287,7 +290,7 @@ public partial class TextInput : Panel {
                     Cursor--;
                 }
             }
-            AfterCursorMove();
+            AfterCursorMove(Action.MoveLeft);
             InvalidatePaint();
         }
         if (UIInput.PressedWithRepeat(Keys.Right)) {
@@ -302,7 +305,7 @@ public partial class TextInput : Panel {
                     Cursor++;
                 }
             }
-            AfterCursorMove();
+            AfterCursorMove(Action.MoveRight);
             InvalidatePaint();
         }
         if (Selection.Active && UIInput.PressedWithRepeat(Keys.C) && (UIInput.Down(Keys.LeftControl) || UIInput.Down(Keys.RightControl))) {
@@ -315,7 +318,7 @@ public partial class TextInput : Panel {
             string clipboard = SDL.SDL_GetClipboardText();
             Text = Text.Insert(Cursor, clipboard);
             Cursor += clipboard.Length;
-            AfterCursorMove();
+            AfterCursorMove(Action.Edit);
             InvalidatePaint();
         }
         if (UIInput.Pressed(Keys.A) && (UIInput.Down(Keys.LeftControl) || UIInput.Down(Keys.RightControl))) {

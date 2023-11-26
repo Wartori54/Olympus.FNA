@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Olympus.Finders {
     public class LutrisDatabaseFinder : Finder {
+        protected override Installation.InstallationType InstallationType => Installation.InstallationType.LutrisDatabase;
 
         public LutrisDatabaseFinder(FinderManager manager)
             : base(manager) {
@@ -40,7 +41,7 @@ namespace Olympus.Finders {
             }
 
             if (!string.IsNullOrEmpty(path)) {
-                yield return new(FinderTypeDefault, "Lutris (DB)", path);
+                yield return new(InstallationType, "Lutris (DB)", path);
                 yield break;
             }
         }

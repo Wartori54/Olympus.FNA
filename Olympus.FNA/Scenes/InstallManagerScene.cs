@@ -38,6 +38,8 @@ namespace Olympus {
         };
 
         private List<Installation> InstallsFoundAdded = new();
+        
+        private HashSet<Installation> RenamingInstalls = new();
 
         public enum InstallList {
             Found,
@@ -72,7 +74,8 @@ namespace Olympus {
                                         { Group.StyleKeys.Spacing, 16 },
                                     },
                                     Layout = {
-                                        Layouts.Fill(1, 0),
+                                        // Slight offset to avoid colliding with the scrollbar
+                                        Layouts.Fill(1, 0, 20, 0),
                                         Layouts.Column()
                                     },
                                     Children = {
@@ -206,7 +209,7 @@ namespace Olympus {
                 return;
             }
 
-            Installation newInstall = new("manual", "Manual installation", result.Path);
+            Installation newInstall = new(Installation.InstallationType.Manual, "", result.Path);
 
             if (!newInstall.FixPath()) { // Ignore for now
                 AppLogger.Log.Warning("Bad path: " + newInstall.Root);
@@ -219,7 +222,9 @@ namespace Olympus {
 
         private Panel CreateEntry(Installation install) {
             Label? labelVersion = null;
-            InstallerSelectablePanel panel = new(install, b => {
+            
+            InstallerSelectablePanel panel = null!; // Required to reference it inside the body
+            panel = new(install, b => {
                 SelectedInstall = install;
                 Config.Instance.Installation = install;
                 Config.Instance.Save();
@@ -242,16 +247,23 @@ namespace Olympus {
                             Layouts.Column(),
                         },
                         Style = {
-                            { Group.StyleKeys.Spacing, 0 },
+                            { Group.StyleKeys.Spacing, 4 },
                         },
                         Init = el => {
-                            if (install.EditingName) {
-                                el.Add(new HeaderSmall("EDITING NAME"));
+                            if (RenamingInstalls.Contains(install)) {
+                                el.Add(new TextInput(install.Name) {
+                                    MaxLength = 50,
+                                    Placeholder = "Manual Installation",
+                                    ClickCallback = _ => panel.PreventNextClick(),
+                                    Style = {
+                                        { TextInput.StyleKeys.Placeholder, Color.Yellow}
+                                    }
+                                });
                                 el.Add(labelVersion = new Label("Scanning..."));
                                 el.Add(new LabelSmall(install.Root));
                                 return;
                             }
-                            el.Add(new HeaderSmall(install.Name) {
+                            el.Add(new HeaderSmall(string.IsNullOrWhiteSpace(install.Name) ? "Manual Installation" : install.Name) {
                                 Wrap = true,
                             });
                             el.Add(labelVersion = new Label("Scanning..."));
@@ -261,30 +273,32 @@ namespace Olympus {
                     
                 }
             };
-            if (install.Type == "manual") {
+            if (install.Type == Installation.InstallationType.Manual) {
                 var group = panel.Add(new Group {
                     Layout = {
-                        Layouts.Right(),
+                        Layouts.Top(0.5f, -0.5f),
+                        Layouts.Right(8),
                         Layouts.Row(8, resize: false),
                     },
                 });
-                if (install.EditingName) {
+                if (RenamingInstalls.Contains(install)) {
                     //TODO: Use a proper done icon
                     group.Add(new RenameButton("search", "Done", b => {
                         panel.PreventNextClick();
-                        install.EditingName = false;
+                        install.Name = panel.FindChild<TextInput>()!.Text;
+                        RenamingInstalls.Remove(install);
                         UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
                     }));
                     group.Add(new RenameButton("close", "Cancel", b => {
                         panel.PreventNextClick();
-                        install.EditingName = false;
+                        RenamingInstalls.Remove(install);
                         UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
                     })); 
                 } else {
                     //TODO: Use a proper edit icon
                     group.Add(new RenameButton("search", "Rename", b => {
                         panel.PreventNextClick();
-                        install.EditingName = true;
+                        RenamingInstalls.Add(install);
                         UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
                     }));                    
                 }

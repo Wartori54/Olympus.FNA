@@ -7,6 +7,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Olympus.Finders {
     public class ItchFinder : Finder {
+        protected override Installation.InstallationType InstallationType => Installation.InstallationType.Itch;
 
         public ItchFinder(FinderManager manager)
             : base(manager) {
@@ -63,7 +64,7 @@ namespace Olympus.Finders {
 
             if (data is not null &&
                 data.TryGetValue("basePath", out object? pathRaw) && pathRaw is string path) {
-                yield return new(FinderTypeDefault, "itch.io", path);
+                yield return new(InstallationType, "itch.io", path);
                 yield break;
             }
         }

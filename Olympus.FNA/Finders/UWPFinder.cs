@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 
 namespace Olympus.Finders {
     public unsafe class UWPFinder : Finder {
+        protected override Installation.InstallationType InstallationType => Installation.InstallationType.UWP;
 
         public UWPFinder(FinderManager manager)
             : base(manager) {
@@ -75,7 +76,7 @@ namespace Olympus.Finders {
                 buffer = IntPtr.Zero;
 
 
-                return Result(new(FinderTypeDefault, "Microsoft Store", package));
+                return Result(new(InstallationType, "Microsoft Store", package));
 
             } catch {
                 return Result();

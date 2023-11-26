@@ -22,14 +22,10 @@ namespace Olympus {
 
         public virtual int Priority => 0;
 
-        protected readonly string FinderTypeDefault;
+        protected abstract Installation.InstallationType InstallationType { get; }
 
         public Finder(FinderManager manager) {
             Manager = manager;
-            FinderTypeDefault = GetType().Name;
-            if (FinderTypeDefault.EndsWith("Finder")) {
-                FinderTypeDefault = FinderTypeDefault[..^"Finder".Length];
-            }
         }
 
         protected string? IsDir(string? path) {
@@ -68,7 +64,7 @@ namespace Olympus {
         }
 
         public virtual bool Owns(Installation i) {
-            return i.Type == FinderTypeDefault;
+            return i.Type == InstallationType;
         }
 
         public abstract IAsyncEnumerable<Installation> FindCandidates();
@@ -326,17 +322,36 @@ namespace Olympus {
     }
 
     public class Installation {
+        public enum InstallationType {
+            Epic,
+            Itch,
+            Legendary,
+            LutrisDatabase,
+            LutrisYaml,
+            Steam,
+            SteamShortcut,
+            UWP,
+            Manual
+        }
 
-        public string Type; // TODO: Make this an enum
+        public InstallationType Type;
         public string Name;
         public string Root;
 
         public string? IconOverride;
 
-        public string Icon => IconOverride ?? Type;
-        
-        [NonSerialized]
-        public bool EditingName = false;
+        public string Icon => IconOverride?? Type switch {
+            InstallationType.Epic => "epic",
+            InstallationType.Itch => "itch",
+            InstallationType.Legendary => "legendary",
+            InstallationType.LutrisDatabase => "lutris",
+            InstallationType.LutrisYaml => "lutris",
+            InstallationType.Steam => "steam",
+            InstallationType.SteamShortcut => "steam_shortcut",
+            InstallationType.UWP => "uwp",
+            InstallationType.Manual => "manual",
+            _ => throw new ArgumentOutOfRangeException()
+        };
 
         [NonSerialized]
         public Finder? Finder;
@@ -368,7 +383,7 @@ namespace Olympus {
             }
         }
 
-        public Installation(string type, string name, string root) {
+        public Installation(InstallationType type, string name, string root) {
             Type = type;
             Name = name;
             Root = root;

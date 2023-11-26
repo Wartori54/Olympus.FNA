@@ -9,9 +9,7 @@ using System.Text.RegularExpressions;
 
 namespace Olympus.Finders {
     public class SteamFinder : Finder {
-
-        public const string FinderType = "Steam";
-        public const string FinderTypeShortcut = "SteamShortcut";
+        protected override Installation.InstallationType InstallationType => Installation.InstallationType.Steam;
 
         public SteamFinder(FinderManager manager)
             : base(manager) {
@@ -19,8 +17,8 @@ namespace Olympus.Finders {
 
         public override bool Owns(Installation i) {
             return
-                i.Type == FinderType ||
-                i.Type == FinderTypeShortcut ||
+                i.Type == Installation.InstallationType.Steam ||
+                i.Type == Installation.InstallationType.SteamShortcut ||
                 base.Owns(i);
         }
 
@@ -184,7 +182,7 @@ namespace Olympus.Finders {
             foreach (string library in FindLibraries()) {
                 string? path = IsDir(Combine(library, GameID));
                 if (!string.IsNullOrEmpty(path))
-                    yield return new Installation(FinderType, "Steam", path);
+                    yield return new Installation(Installation.InstallationType.Steam, "Steam", path);
             }
 
             // This will add *all* shortcutted games and their startup dirs, but eh.
@@ -207,10 +205,10 @@ namespace Olympus.Finders {
 
                 if (!string.IsNullOrEmpty(path)) {
                     if (shortcut.TryGetValue("appname", out object? appnameRaw) && appnameRaw is string appname) {
-                        yield return new Installation(FinderTypeShortcut, $"Steam Shortcut: {appname}", path);
+                        yield return new Installation(Installation.InstallationType.SteamShortcut, $"Steam Shortcut: {appname}", path);
 
                     } else {
-                        yield return new Installation(FinderTypeShortcut, "Steam Shortcut", path);
+                        yield return new Installation(Installation.InstallationType.SteamShortcut, "Steam Shortcut", path);
                     }
                 }
             }

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 
 namespace Olympus.Finders {
     public class LegendaryFinder : Finder {
+        protected override Installation.InstallationType InstallationType => Installation.InstallationType.Legendary;
 
         public LegendaryFinder(FinderManager manager)
             : base(manager) {
@@ -29,7 +30,7 @@ namespace Olympus.Finders {
             if (db is not null &&
                 db.TryGetValue("Salt", out object? dataRaw) && dataRaw is Dictionary<string, object> data &&
                 data.TryGetValue("install_path", out object? pathRaw) && pathRaw is string path) {
-                yield return new(FinderTypeDefault, "Legendary", path);
+                yield return new(InstallationType, "Legendary", path);
                 yield break;
             }
         }
