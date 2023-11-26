@@ -93,6 +93,11 @@ namespace OlympUI {
 
         private static void OnFastClick(int x, int y, MouseButtons btn) {
             Element? el = UIInput.MouseFocus ? Root.GetInteractiveChildAt(UIInput.Mouse.ToPoint()) : null;
+            if (el != Focusing) {
+                el?.InvokeUp(new FocusEvent.Unfocus());
+                Focusing = el;
+                el?.InvokeUp(new FocusEvent.Focus());
+            }
             el?.InvokeUp(new MouseEvent.Click() {
                 Button = btn,
                 Dragging = false
@@ -176,20 +181,20 @@ namespace OlympUI {
                 for (MouseButtons btn = MouseButtons.First; btn <= MouseButtons.Last; btn = (MouseButtons) ((int) btn << 1)) {
                     if (UIInput.Pressed(btn)) {
                         if (Dragging is null || Dragging == Hovering) {
+                            Focusing?.InvokeUp(new FocusEvent.Unfocus());
                             Dragging = Hovering;
-                            // Focusing?.InvokeUp(TODO: UNFOCUS);
+                            Focusing = Hovering;
+                            Hovering?.InvokeUp(new FocusEvent.Focus());
                             Hovering?.InvokeUp(new MouseEvent.Press() {
                                 Button = btn,
                                 Dragging = true
                             });
-
                         } else {
                             Hovering?.InvokeUp(new MouseEvent.Press() {
                                 Button = btn,
                                 Dragging = false
                             });
                         }
-
                     } else if (UIInput.Released(btn)) {
                         if (UIInput.MousePresses == 0) {
                             Element? dragging = Dragging;
@@ -204,7 +209,6 @@ namespace OlympUI {
                                     Dragging = false
                                 });
                             }
-
                         } else {
                             Dragging?.InvokeUp(new MouseEvent.Release() {
                                 Button = btn,

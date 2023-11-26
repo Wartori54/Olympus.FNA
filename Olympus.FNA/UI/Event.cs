@@ -577,6 +577,11 @@ namespace OlympUI {
             }
 
         }
-
+    }
+    
+    [AutoInteractiveEvent]
+    public class FocusEvent : Event {
+        public class Focus : FocusEvent { }
+        public class Unfocus : FocusEvent { }
     }
 }
