@@ -2,6 +2,7 @@
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;
 using MonoMod.RuntimeDetour;
@@ -34,6 +35,8 @@ namespace OlympUI {
 #endif
 
         private static Action<RenderTarget2D, RenderTargetUsage>? _SetRenderTargetUsage;
+        
+        private static MethodInfo m_ToXNAKey;
 
         public static void Apply() {
             Undo();
@@ -120,6 +123,9 @@ namespace OlympUI {
                 }
             );
 
+            m_ToXNAKey = t_SDL2_FNAPlatform.GetMethod("ToXNAKey", BindingFlags.Static | BindingFlags.NonPublic) 
+                         ?? throw new Exception("FNA without SDL2_FNAPlatform.ToXNAKey?");
+            
             FNALoggerEXT.LogInfo += OnLogInfo;
         }
 
@@ -133,6 +139,10 @@ namespace OlympUI {
             FNALoggerEXT.LogInfo -= OnLogInfo;
         }
 
+        public static Keys ToXNAKey(ref SDL.SDL_Keysym key) {
+            return (Keys)m_ToXNAKey.Invoke(null, new object[] { key })!;
+        }
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SetRenderTargetUsage(this RenderTarget2D self, RenderTargetUsage value) {
             _SetRenderTargetUsage!.Invoke(self, value);

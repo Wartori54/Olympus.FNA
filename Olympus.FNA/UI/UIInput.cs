@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Input;
 using SDL2;
 using System;
+using System.Collections.Generic;
 
 namespace OlympUI {
     public static unsafe class UIInput {
@@ -10,6 +11,9 @@ namespace OlympUI {
         public static KeyboardState Keyboard;
         public static MouseState MousePrev;
         public static MouseState Mouse;
+        
+        private static HashSet<Keys> KeyboardRepeated = new();
+        private static HashSet<Keys> KeyboardRepeatedNext = new();
 
         public static bool MouseFocus;
         public static int MousePresses;
@@ -47,6 +51,9 @@ namespace OlympUI {
                         OnFastClick?.Invoke(mouseReal.X, mouseReal.Y, (MouseButtons) evt->button.button);
                     }
                     break;
+                case SDL.SDL_EventType.SDL_KEYDOWN when evt->button.windowID == SDL.SDL_GetWindowID(UI.Game.Window.Handle):
+                    KeyboardRepeatedNext.Add(FNAHooks.ToXNAKey(ref evt->key.keysym));
+                    break;
             }
 
             return EventFilterPrev?.Invoke(userdata, evtPtr) ?? 1;
@@ -59,6 +66,11 @@ namespace OlympUI {
             Keyboard = Microsoft.Xna.Framework.Input.Keyboard.GetState();
             MousePrev = Mouse;
             MouseState mouseReal = Microsoft.Xna.Framework.Input.Mouse.GetState();
+            KeyboardRepeated.Clear();
+            foreach (var key in KeyboardRepeatedNext)
+                KeyboardRepeated.Add(key);
+            KeyboardRepeatedNext.Clear();
+
             Point mouseOffs = UI.Native.MouseOffset;
             Mouse = new(
                 mouseReal.X + mouseOffs.X,
@@ -117,6 +129,9 @@ namespace OlympUI {
 
         public static bool Pressed(Keys key)
             => !KeyboardPrev.IsKeyDown(key) && Keyboard.IsKeyDown(key);
+        
+        public static bool PressedWithRepeat(Keys key)
+            => (!KeyboardPrev.IsKeyDown(key) && Keyboard.IsKeyDown(key)) || KeyboardRepeated.Contains(key);
 
         public static bool Released(Keys key)
             => KeyboardPrev.IsKeyDown(key) && !Keyboard.IsKeyDown(key);
