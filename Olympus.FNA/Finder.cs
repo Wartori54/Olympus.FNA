@@ -334,6 +334,9 @@ namespace Olympus {
         public string? IconOverride;
 
         public string Icon => IconOverride ?? Type;
+        
+        [NonSerialized]
+        public bool EditingName = false;
 
         [NonSerialized]
         public Finder? Finder;

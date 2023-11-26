@@ -218,7 +218,7 @@ namespace Olympus {
         }
 
         private Panel CreateEntry(Installation install) {
-            Label labelVersion;
+            Label? labelVersion = null;
             InstallerSelectablePanel panel = new(install, b => {
                 SelectedInstall = install;
                 Config.Instance.Installation = install;
@@ -244,52 +244,71 @@ namespace Olympus {
                         Style = {
                             { Group.StyleKeys.Spacing, 0 },
                         },
-                        Children = {
-                            new HeaderSmall(install.Name) { // TODO: make name changeable
+                        Init = el => {
+                            if (install.EditingName) {
+                                el.Add(new HeaderSmall("EDITING NAME"));
+                                el.Add(labelVersion = new Label("Scanning..."));
+                                el.Add(new LabelSmall(install.Root));
+                                return;
+                            }
+                            el.Add(new HeaderSmall(install.Name) {
                                 Wrap = true,
-                            },
-                            (labelVersion = new Label("Scanning...")),
-                            new LabelSmall(install.Root),
-                        }
+                            });
+                            el.Add(labelVersion = new Label("Scanning..."));
+                            el.Add(new LabelSmall(install.Root));
+                        },
                     },
                     
                 }
             };
-            if (install.Type == "manual")
-                panel.Children.Add(
-                    new RemoveButton("delete", "Delete", b => {
+            if (install.Type == "manual") {
+                var group = panel.Add(new Group {
+                    Layout = {
+                        Layouts.Right(),
+                        Layouts.Row(8, resize: false),
+                    },
+                });
+                if (install.EditingName) {
+                    //TODO: Use a proper done icon
+                    group.Add(new RenameButton("search", "Done", b => {
                         panel.PreventNextClick();
-                        App.FinderManager.RemoveInstallation(install);
+                        install.EditingName = false;
                         UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
-                    }) {
-                        Layout = {
-                            Layouts.Right(),
-                        }
-                    }   
-                );
+                    }));
+                    group.Add(new RenameButton("close", "Cancel", b => {
+                        panel.PreventNextClick();
+                        install.EditingName = false;
+                        UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
+                    })); 
+                } else {
+                    //TODO: Use a proper edit icon
+                    group.Add(new RenameButton("search", "Rename", b => {
+                        panel.PreventNextClick();
+                        install.EditingName = true;
+                        UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
+                    }));                    
+                }
+                
+                group.Add(new RemoveButton("delete", "Delete", b => {
+                    panel.PreventNextClick();
+                    App.FinderManager.RemoveInstallation(install);
+                    UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
+                }));
+            }
 
             Task.Run(() => {
                 (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) version = install.ScanVersion(true);
                 UI.Run(() => {
+                    if (labelVersion == null) return;
                     labelVersion.Text = version.Full;
                 });
             });
 
             return panel;
         }
-
-        public partial class RemoveButton : MetaMainScene.SidebarButton {
-
-            public static readonly new Style DefaultStyle = new() {
-                {
-                    StyleKeys.Current,
-                    new Style() {
-                        { Panel.StyleKeys.Background, () => NativeImpl.Native.Accent * 0.2f },
-                        // { Button.StyleKeys.Foreground, new Color(0xff, 0xff, 0xff, 0xff) },
-                        { Button.StyleKeys.Foreground, () => NativeImpl.Native.Accent },
-                        { Panel.StyleKeys.Shadow, 0f },
-                    }
-                },
+        
+        public class RemoveButton : MetaMainScene.SidebarButton {
+            public new static readonly Style DefaultStyle = new() {
                 {
                     StyleKeys.Hovered,
                     new Style() {
@@ -308,25 +327,42 @@ namespace Olympus {
                 },
             };
 
-            public override Style.Key StyleState =>
-                base.StyleState;
-
             public RemoveButton(string icon, string text, Action<Button> cb)
-                : this(OlympUI.Assets.GetTexture($"icons/{icon}"), text, cb) {
-            }
-
+                : this(OlympUI.Assets.GetTexture($"icons/{icon}"), text, cb) { }
             public RemoveButton(IReloadable<Texture2D, Texture2DMeta> icon, string text, Action<Button> cb)
                 : base(icon, text) {
                 Callback += cb;
                 WH = new(64, 64);
             }
+        }
+        
+        public class RenameButton : MetaMainScene.SidebarButton {
+            public new static readonly Style DefaultStyle = new() {
+                {
+                    StyleKeys.Hovered,
+                    new Style() {
+                        { Panel.StyleKeys.Background, new Color(0xff, 0x30, 0x30, 0xff) },
+                        { StyleKeys.Foreground, new Color(0xff, 0xff, 0xff, 0xff) },
+                        { Panel.StyleKeys.Shadow, 0f },
+                    }
+                },
+                {
+                    StyleKeys.Pressed,
+                    new Style() {
+                        { Panel.StyleKeys.Background, new Color(0xc3, 0x00, 0x00, 0xc0) },
+                        { StyleKeys.Foreground, new Color(0xff, 0xff, 0xff, 0xff) },
+                        { Panel.StyleKeys.Shadow, 0f },
+                    }
+                },
+            };
 
-            public new abstract partial class StyleKeys : MetaMainScene.SidebarButton.StyleKeys {
-                protected StyleKeys(Secret secret) : base(secret) { }
-
-                public static readonly Style.Key Current = new("Current");
+            public RenameButton(string icon, string text, Action<Button> cb)
+                : this(OlympUI.Assets.GetTexture($"icons/{icon}"), text, cb) { }
+            public RenameButton(IReloadable<Texture2D, Texture2DMeta> icon, string text, Action<Button> cb)
+                : base(icon, text) {
+                Callback += cb;
+                WH = new(64, 64);
             }
-
         }
 
         public partial class InstallerSelectablePanel : Panel { // TODO: merge this with the other SelectablePanel
