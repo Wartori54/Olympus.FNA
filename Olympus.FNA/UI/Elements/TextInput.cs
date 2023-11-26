@@ -29,7 +29,7 @@ public partial class TextInput : Panel {
                 { StyleKeys.Foreground, new Color(0xe8, 0xe8, 0xe8, 0xff) },
                 { StyleKeys.Placeholder, new Color(0x88, 0x88, 0x88, 0xff) },
                 { StyleKeys.Cursor, new Color(0xe8, 0xe8, 0xe8, 0xff) },
-                { StyleKeys.Selection, new Color(0x18, 0x18, 0xe8, 0x7f) },
+                { StyleKeys.Selection, new Color(0x00, 0x33, 0x55, 0x7f) },
                 { Panel.StyleKeys.Border, new Color(0x38, 0x38, 0x38, 0x80) },
                 { Panel.StyleKeys.Shadow, 0.5f },
             }
@@ -223,10 +223,42 @@ public partial class TextInput : Panel {
         //TODO: Support IMEs
     }
 
-    private void OnClick(MouseEvent.Click e) {
+    private void OnPress(MouseEvent.Press e) {
         if (!Enabled) return;
         ClickCallback?.Invoke(this);
+
+        Vector2 dxy = e.XY.ToVector2() - ScreenXY - StylePadding.GetCurrent<Padding>().LT.ToVector2();
+        Console.WriteLine(dxy);
+        
+        TextLabel.Style.GetCurrent(out DynamicSpriteFont font);
+        Bounds bounds = new();
+        //TODO: Optimize this somehow
+        for (int i = 0; i <= Text.Length; i++) {
+            font.TextBounds(Text.Substring(0, i), Vector2.Zero, ref bounds, Vector2.One);
+            Cursor = i;
+            Selection.Start = i;
+            Selection.End = -1;
+            
+            if (bounds.X2 > dxy.X) break;
+        }
     }
+    private void OnDrag(MouseEvent.Drag e) {
+        if (!Enabled) return;
+        ClickCallback?.Invoke(this);
+    
+        Vector2 dxy = e.XY.ToVector2() - ScreenXY - StylePadding.GetCurrent<Padding>().LT.ToVector2();
+        
+        TextLabel.Style.GetCurrent(out DynamicSpriteFont font);
+        Bounds bounds = new();
+        //TODO: Optimize this somehow
+        for (int i = 0; i <= Text.Length; i++) {
+            font.TextBounds(Text.Substring(0, i), Vector2.Zero, ref bounds, Vector2.One);
+            Selection.End = i;
+            
+            if (bounds.X2 > dxy.X) break;
+        }
+    }
+
     private void OnFocus(FocusEvent.Focus e) {
         if (!Enabled) return;
         TextInputEXT.StartTextInput();
