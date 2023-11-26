@@ -240,37 +240,53 @@ namespace Olympus {
                     { Group.StyleKeys.Spacing, 0 },
                 },
                 Children = {
-                    new Group() {
-                        Clip = true,
+                    new Group {
                         Layout = {
                             Layouts.Fill(1, 0),
-                            Layouts.Column(),
+                            Layouts.Row(),
                         },
                         Style = {
                             { Group.StyleKeys.Spacing, 4 },
                         },
-                        Init = el => {
-                            if (RenamingInstalls.Contains(install)) {
-                                el.Add(new TextInput(install.Name) {
-                                    MaxLength = 50,
-                                    Placeholder = "Manual Installation",
-                                    ClickCallback = _ => panel.PreventNextClick(),
-                                    Style = {
-                                        { TextInput.StyleKeys.Placeholder, Color.Yellow}
+                        Children = {
+                            new Icon(OlympUI.Assets.GetTexture($"icons/{install.Icon}")) {
+                                AutoW = 64,
+                                Layout = {
+                                    Layouts.Top(0.5f, -0.5f),
+                                },
+                            },
+                            new Group() {
+                                Clip = true,
+                                Layout = {
+                                    Layouts.Fill(1, 0),
+                                    Layouts.Column(),
+                                },
+                                Style = {
+                                    { Group.StyleKeys.Spacing, 4 },
+                                },
+                                Init = el => {
+                                    if (RenamingInstalls.Contains(install)) {
+                                        el.Add(new TextInput(install.Name) {
+                                            MaxLength = 50,
+                                            Placeholder = "Manual Installation",
+                                            ClickCallback = _ => panel.PreventNextClick(),
+                                            Style = {
+                                                { TextInput.StyleKeys.Placeholder, Color.Yellow}
+                                            }
+                                        });
+                                        el.Add(labelVersion = new Label("Scanning..."));
+                                        el.Add(new LabelSmall(install.Root));
+                                        return;
                                     }
-                                });
-                                el.Add(labelVersion = new Label("Scanning..."));
-                                el.Add(new LabelSmall(install.Root));
-                                return;
-                            }
-                            el.Add(new HeaderSmall(string.IsNullOrWhiteSpace(install.Name) ? "Manual Installation" : install.Name) {
-                                Wrap = true,
-                            });
-                            el.Add(labelVersion = new Label("Scanning..."));
-                            el.Add(new LabelSmall(install.Root));
-                        },
+                                    el.Add(new HeaderSmall(string.IsNullOrWhiteSpace(install.Name) ? "Manual Installation" : install.Name) {
+                                        Wrap = true,
+                                    });
+                                    el.Add(labelVersion = new Label("Scanning..."));
+                                    el.Add(new LabelSmall(install.Root));
+                                },
+                            },
+                        }
                     },
-                    
                 }
             };
             if (install.Type == Installation.InstallationType.Manual) {

@@ -341,15 +341,15 @@ namespace Olympus {
         public string? IconOverride;
 
         public string Icon => IconOverride?? Type switch {
-            InstallationType.Epic => "epic",
-            InstallationType.Itch => "itch",
-            InstallationType.Legendary => "legendary",
-            InstallationType.LutrisDatabase => "lutris",
-            InstallationType.LutrisYaml => "lutris",
-            InstallationType.Steam => "steam",
-            InstallationType.SteamShortcut => "steam_shortcut",
-            InstallationType.UWP => "uwp",
-            InstallationType.Manual => "manual",
+            InstallationType.Epic => "store/epic",
+            InstallationType.Itch => "store/itch",
+            InstallationType.Legendary => "store/legendary",
+            InstallationType.LutrisDatabase => "store/lutris",
+            InstallationType.LutrisYaml => "store/lutris",
+            InstallationType.Steam => "store/steam",
+            InstallationType.SteamShortcut => "store/steam_shortcut",
+            InstallationType.UWP => "store/uwp",
+            InstallationType.Manual => "store/manual",
             _ => throw new ArgumentOutOfRangeException()
         };
 
