@@ -161,10 +161,7 @@ public partial class TextInput : Panel {
         const char DELETE = (char)0x7F;
         const char HOME = (char)0x02;
         const char END = (char)0x03;
-        const char SYNCHRONOUS_IDLE = (char)0x16;
         
-        // Ctrl+V seems to trigger this for some reason..
-        if (chr == SYNCHRONOUS_IDLE) return;
         // Ignore enter (at least for now)
         if (chr == '\n' || chr == '\r') return;
         
@@ -212,7 +209,7 @@ public partial class TextInput : Panel {
             Cursor = Text.Length;
             AfterCursorMove(Action.MoveRight);
             InvalidatePaint();
-        } else {
+        } else if (char.IsLetterOrDigit(chr)) {
             BeforeCursorMove(Action.Edit);
             Text = Text.Insert(Cursor, chr.ToString());
             Cursor++;
@@ -233,6 +230,8 @@ public partial class TextInput : Panel {
         Vector2 dxy = e.XY.ToVector2() - ScreenXY - StylePadding.GetCurrent<Padding>().LT.ToVector2();
         Console.WriteLine(dxy);
         
+        bool shouldRedraw = false;
+        
         TextLabel.Style.GetCurrent(out DynamicSpriteFont font);
         Bounds bounds = new();
         //TODO: Optimize this somehow
@@ -241,9 +240,12 @@ public partial class TextInput : Panel {
             Cursor = i;
             Selection.Start = i;
             Selection.End = -1;
+            shouldRedraw = true;
             
             if (bounds.X2 > dxy.X) break;
         }
+        
+        if (shouldRedraw) InvalidatePaint();
     }
     private void OnDrag(MouseEvent.Drag e) {
         if (!Enabled) return;
@@ -251,15 +253,20 @@ public partial class TextInput : Panel {
     
         Vector2 dxy = e.XY.ToVector2() - ScreenXY - StylePadding.GetCurrent<Padding>().LT.ToVector2();
         
+        bool shouldRedraw = false;
+        
         TextLabel.Style.GetCurrent(out DynamicSpriteFont font);
         Bounds bounds = new();
         //TODO: Optimize this somehow
         for (int i = 0; i <= Text.Length; i++) {
             font.TextBounds(Text.Substring(0, i), Vector2.Zero, ref bounds, Vector2.One);
             Selection.End = i;
+            shouldRedraw = true;
             
             if (bounds.X2 > dxy.X) break;
         }
+        
+        if (shouldRedraw) InvalidatePaint();
     }
 
     private void OnFocus(FocusEvent.Focus e) {
@@ -330,7 +337,6 @@ public partial class TextInput : Panel {
         
         PlaceholderLabel.Visible = Text.Length == 0;
         Style.Apply(Enabled ? StyleKeys.Normal : StyleKeys.Disabled);
-        InvalidatePaint();
         
         base.Update(dt);
     }
