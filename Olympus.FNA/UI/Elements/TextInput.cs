@@ -26,26 +26,51 @@ public partial class TextInput : Panel {
             StyleKeys.Normal,
             new Style {
                 { Panel.StyleKeys.Background, new Color(0x30, 0x30, 0x30, 0xff) },
+                { Panel.StyleKeys.Shadow, 1f },
                 { StyleKeys.Foreground, new Color(0xe8, 0xe8, 0xe8, 0xff) },
                 { StyleKeys.Placeholder, new Color(0x88, 0x88, 0x88, 0xff) },
                 { StyleKeys.Cursor, new Color(0xe8, 0xe8, 0xe8, 0xff) },
                 { StyleKeys.Selection, new Color(0x00, 0x33, 0x55, 0x7f) },
-                { Panel.StyleKeys.Border, new Color(0x38, 0x38, 0x38, 0x80) },
-                { Panel.StyleKeys.Shadow, 0.5f },
+            }
+        },
+        {
+            StyleKeys.Hovered,
+            new Style {
+                { Panel.StyleKeys.Background, new Color(0x20, 0x20, 0x20, 0xff) },
+                { Panel.StyleKeys.Shadow, 2f },
+                { StyleKeys.Foreground, new Color(0xe8, 0xe8, 0xe8, 0xff) },
+                { StyleKeys.Placeholder, new Color(0x88, 0x88, 0x88, 0xff) },
+                { StyleKeys.Cursor, new Color(0xe8, 0xe8, 0xe8, 0xff) },
+                { StyleKeys.Selection, new Color(0x00, 0x33, 0x55, 0x7f) },
+            }
+        },
+        {
+            StyleKeys.Focused,
+            new Style {
+                { Panel.StyleKeys.Background, new Color(0x10, 0x10, 0x10, 0xff) },
+                { Panel.StyleKeys.Shadow, 3f },
+                { StyleKeys.Foreground, new Color(0xe8, 0xe8, 0xe8, 0xff) },
+                { StyleKeys.Placeholder, new Color(0x88, 0x88, 0x88, 0xff) },
+                { StyleKeys.Cursor, new Color(0xe8, 0xe8, 0xe8, 0xff) },
+                { StyleKeys.Selection, new Color(0x00, 0x33, 0x55, 0x7f) },
             }
         },
         {
             StyleKeys.Disabled,
             new Style {
-                { Panel.StyleKeys.Background, new Color(0x70, 0x70, 0x70, 0xff) },
-                { StyleKeys.Foreground, new Color(0x30, 0x30, 0x30, 0xff) },
-                { Panel.StyleKeys.Border, new Color(0x28, 0x28, 0x28, 0x70) },
-                { Panel.StyleKeys.Shadow, 0.2f },
+                { Panel.StyleKeys.Background, new Color(0x08, 0x08, 0x08, 0xd0) },
+                { Panel.StyleKeys.Shadow, 3f },
+                { StyleKeys.Foreground, new Color(0x98, 0x98, 0x98, 0xff) },
+                { StyleKeys.Placeholder, new Color(0x88, 0x88, 0x88, 0xff) },
+                { StyleKeys.Cursor, new Color(0xe8, 0xe8, 0xe8, 0xff) },
+                { StyleKeys.Selection, new Color(0x00, 0x33, 0x55, 0x7f) },
             }
         },
 
-        { Panel.StyleKeys.BorderSize, 1f },
-        { Panel.StyleKeys.Radius, 4f },
+        // { StyleKeys.Foreground, new Color(0xe8, 0xe8, 0xe8, 0xff) },
+        // { StyleKeys.Placeholder, new Color(0x88, 0x88, 0x88, 0xff) },
+        // { StyleKeys.Cursor, new Color(0xe8, 0xe8, 0xe8, 0xff) },
+        // { StyleKeys.Selection, new Color(0x00, 0x33, 0x55, 0x7f) },
     };
 
     protected Style.Entry StyleForeground = new(new ColorFader());
@@ -80,6 +105,7 @@ public partial class TextInput : Panel {
                 UI.Focusing = null;
             }
             _enabled = value;
+            InvalidatePaint();
         }
     }
 
@@ -95,12 +121,18 @@ public partial class TextInput : Panel {
     private Color PrevCursorColor = Color.Transparent;
     private Color PrevSelectionColor = Color.Transparent;
     
+    private Style.Key StyleState =>
+        !Enabled ? StyleKeys.Disabled :
+        Focused ? StyleKeys.Focused :
+        Hovered ? StyleKeys.Hovered :
+        StyleKeys.Normal;
+    
     public TextInput(string text, string placeholder = "") {
         CursorMesh = new BasicMesh(UI.Game) {
             Texture = Assets.White
         };
         
-        Style.Apply(Enabled ? StyleKeys.Normal : StyleKeys.Disabled);
+        Style.Apply(StyleState);
         
         Children.Add(TextLabel = new Label(text) {
             Style = {
@@ -336,7 +368,7 @@ public partial class TextInput : Panel {
         }
         
         PlaceholderLabel.Visible = Text.Length == 0;
-        Style.Apply(Enabled ? StyleKeys.Normal : StyleKeys.Disabled);
+        Style.Apply(StyleState);
         
         base.Update(dt);
     }
@@ -344,6 +376,7 @@ public partial class TextInput : Panel {
     public override void DrawContent() {
         StyleCursor.GetCurrent(out Color cursorColor);
         StyleSelection.GetCurrent(out Color selectionColor);
+        Console.WriteLine(cursorColor);
         
         if (PrevCursor != Cursor || Selection != PrevSelection || PrevCursorColor != cursorColor || PrevSelectionColor != selectionColor) {
             MeshShapes<MiniVertex> shapes = CursorMesh.Shapes;
@@ -381,7 +414,7 @@ public partial class TextInput : Panel {
         
         base.DrawContent();
         
-        if (Focused) {
+        if (Focused && Enabled) {
             UIDraw.Recorder.Add((CursorMesh, ScreenXY), static ((BasicMesh mesh, Vector2 xy) data) => {
                 UI.SpriteBatch.End();
 
@@ -400,6 +433,8 @@ public partial class TextInput : Panel {
 
     public new abstract partial class StyleKeys {
         public static readonly Style.Key Normal = new("Normal");
+        public static readonly Style.Key Hovered = new("Hovered");
+        public static readonly Style.Key Focused = new("Focused");
         public static readonly Style.Key Disabled = new("Disabled");
     }
 }
