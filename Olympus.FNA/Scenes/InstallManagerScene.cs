@@ -266,7 +266,7 @@ namespace Olympus {
                                 },
                                 Init = el => {
                                     if (RenamingInstalls.Contains(install)) {
-                                        el.Add(new TextInput(install.Name) {
+                                        el.Add(new TextInput(new HeaderSmall(install.Name), new HeaderSmall("")) {
                                             MaxLength = 50,
                                             Placeholder = "Manual Installation",
                                             ClickCallback = _ => panel.PreventNextClick(),

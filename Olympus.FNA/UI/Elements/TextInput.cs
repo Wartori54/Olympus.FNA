@@ -94,7 +94,7 @@ public partial class TextInput : Panel {
         get => PlaceholderLabel.Text;
         set => PlaceholderLabel.Text = value;
     }
-    
+
     private bool _enabled = true;
     public bool Enabled {
         get => _enabled;
@@ -127,26 +127,22 @@ public partial class TextInput : Panel {
         Hovered ? StyleKeys.Hovered :
         StyleKeys.Normal;
     
-    public TextInput(string text, string placeholder = "") {
+    public TextInput(Label text, Label placeholderLabel) {
         CursorMesh = new BasicMesh(UI.Game) {
             Texture = Assets.White
         };
         
         Style.Apply(StyleState);
         
-        Children.Add(TextLabel = new Label(text) {
-            Style = {
-                { Label.StyleKeys.Color, Style.GetLink(StyleKeys.Foreground) }
-            }
-        });
-        Children.Add(PlaceholderLabel = new Label(placeholder) {
-            Style = {
-                //FIXME: Using the StyleKey just doesnt work?
-                // { Label.StyleKeys.Color, Style.GetLink(StyleKeys.Placeholder) }
-                { Label.StyleKeys.Color, new Color(0x88, 0x88, 0x88, 0xff) }
-            },
-            Visible = text.Length == 0,
-        });
+        //FIXME: Using the Style.GetLink(StyleKey) just doesnt work?
+        text.Style.Add(Label.StyleKeys.Color, () => Style.GetCurrent<Color>(StyleKeys.Foreground));
+        TextLabel = text;
+        Children.Add(TextLabel);
+
+        //FIXME: Using the Style.GetLink(StyleKey) just doesnt work?
+        placeholderLabel.Style.Add(Label.StyleKeys.Color, () => Style.GetCurrent<Color>(StyleKeys.Placeholder));
+        PlaceholderLabel = placeholderLabel;
+        Children.Add(PlaceholderLabel);
         
         Cursor = Text.Length;
     }
