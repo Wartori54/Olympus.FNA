@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 using SDL2;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace OlympUI; 
@@ -16,9 +17,19 @@ public partial class TextInput : Panel {
         
         public int Min => Start < End ? Start : End;
         public int Max => Start < End ? End : Start;
-        public int Length => Max - Min; 
+        public int Length => Max - Min;
+
+        public SelectTarget SelectionTarget;
 
         public bool Active => Start >= 0 && End >= 0 && Start != End;
+
+        public enum SelectTarget {
+            Char,
+            Word,
+            Paragraph,
+            
+            Highest = Paragraph + 1, // Describes the total entries
+        }
     }
     
     public new static readonly Style DefaultStyle = new() {
@@ -108,6 +119,8 @@ public partial class TextInput : Panel {
             InvalidatePaint();
         }
     }
+
+    private readonly Dictionary<char, Rectangle> charSizes = new();
 
     public Action<TextInput>? ClickCallback;
     public Action<TextInput>? TextCallback;
@@ -254,7 +267,9 @@ public partial class TextInput : Panel {
     private void OnPress(MouseEvent.Press e) {
         if (!Enabled) return;
         ClickCallback?.Invoke(this);
-        Console.WriteLine(e.ConsecutiveClicks);
+
+        Selection.SelectionTarget = (SelectionArea.SelectTarget)
+            ((e.ConsecutiveClicks-1) % (int)SelectionArea.SelectTarget.Highest); // Woo funny casting!!
 
         Vector2 dxy = e.XY.ToVector2() - ScreenXY - StylePadding.GetCurrent<Padding>().LT.ToVector2();
         
@@ -262,14 +277,24 @@ public partial class TextInput : Panel {
         
         TextLabel.Style.GetCurrent(out DynamicSpriteFont font);
         Bounds bounds = new();
+        Func<int, int> inc = GetPositionIncrement(Selection.SelectionTarget, Text);
+        int prevI = 0;
         //TODO: Optimize this somehow
-        for (int i = 0; i <= Text.Length; i++) {
-            font.TextBounds(Text.Substring(0, i), Vector2.Zero, ref bounds, Vector2.One);
+        for (int i = 0; i <= Text.Length; i = inc(i)) {
+            font.TextBounds(Text[..i], Vector2.Zero, ref bounds, Vector2.One);
+            Console.WriteLine(i);
             Cursor = i;
             Selection.Start = i;
-            Selection.End = -1;
+            if (Selection.SelectionTarget == SelectionArea.SelectTarget.Char) // skip selection for chars
+                Selection.End = -1;
+            else {
+                if (char.IsWhiteSpace(Text[prevI])) prevI++; // prevI will point to the previous space, move it to the next char
+                Selection.End = prevI;
+            }
+
             shouldRedraw = true;
-            
+
+            prevI = i;
             if (bounds.X2 > dxy.X) break;
         }
         
@@ -424,6 +449,32 @@ public partial class TextInput : Panel {
         PrevSelection = Selection;
         PrevCursorColor = cursorColor;
         PrevSelectionColor = selectionColor;
+    }
+
+    public static Func<int, int> GetPositionIncrement(SelectionArea.SelectTarget selectTarget, string text) {
+        return selectTarget switch {
+            SelectionArea.SelectTarget.Char => i => i + 1,
+            SelectionArea.SelectTarget.Word => i => {
+                if (i >= text.Length) return i + 1; // if `i` was already outside, make sure it really is
+                if (char.IsWhiteSpace(text[i])) i++;
+                while (i < text.Length && !char.IsWhiteSpace(text[i])) i++;
+                return i;
+            },
+            SelectionArea.SelectTarget.Paragraph => i => {
+                // bool success = false;
+                // while (true) {
+                //     while (text[i] != Environment.NewLine[0]) i++;
+                //     for (int j = 1; j < Environment.NewLine.Length; j++) {
+                //         
+                //     }
+                // }
+                //
+                // TODO: figure out this
+                return i + 3;
+            },
+            SelectionArea.SelectTarget.Highest => i => throw new ArgumentOutOfRangeException(nameof(selectTarget), selectTarget, null),
+            _ => throw new ArgumentOutOfRangeException(nameof(selectTarget), selectTarget, null)
+        };
     }
 
     public new abstract partial class StyleKeys {

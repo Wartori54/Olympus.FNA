@@ -187,7 +187,8 @@ namespace OlympUI {
                             Hovering?.InvokeUp(new FocusEvent.Focus());
                             Hovering?.InvokeUp(new MouseEvent.Press() {
                                 Button = btn,
-                                Dragging = true
+                                Dragging = true,
+                                ConsecutiveClicks = FNAHooks.ConsecutiveClicks,
                             });
                         } else {
                             Hovering?.InvokeUp(new MouseEvent.Press() {

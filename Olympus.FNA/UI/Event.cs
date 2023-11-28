@@ -560,6 +560,7 @@ namespace OlympUI {
         }
 
         public class Press : ButtonEvent {
+            public int ConsecutiveClicks;
         }
 
         public class Release : ButtonEvent {
