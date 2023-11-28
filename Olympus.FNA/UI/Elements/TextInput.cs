@@ -237,7 +237,7 @@ public partial class TextInput : Panel {
             Cursor = Text.Length;
             AfterCursorMove(Action.MoveRight);
             InvalidatePaint();
-        } else if (char.IsLetterOrDigit(chr)) {
+        } else if (char.IsLetterOrDigit(chr) || char.IsPunctuation(chr) || char.IsSymbol(chr) || (chr == ' ')) {
             BeforeCursorMove(Action.Edit);
             Text = Text.Insert(Cursor, chr.ToString());
             Cursor++;
@@ -254,9 +254,9 @@ public partial class TextInput : Panel {
     private void OnPress(MouseEvent.Press e) {
         if (!Enabled) return;
         ClickCallback?.Invoke(this);
+        Console.WriteLine(e.ConsecutiveClicks);
 
         Vector2 dxy = e.XY.ToVector2() - ScreenXY - StylePadding.GetCurrent<Padding>().LT.ToVector2();
-        Console.WriteLine(dxy);
         
         bool shouldRedraw = false;
         
@@ -372,7 +372,6 @@ public partial class TextInput : Panel {
     public override void DrawContent() {
         StyleCursor.GetCurrent(out Color cursorColor);
         StyleSelection.GetCurrent(out Color selectionColor);
-        Console.WriteLine(cursorColor);
         
         if (PrevCursor != Cursor || Selection != PrevSelection || PrevCursorColor != cursorColor || PrevSelectionColor != selectionColor) {
             MeshShapes<MiniVertex> shapes = CursorMesh.Shapes;

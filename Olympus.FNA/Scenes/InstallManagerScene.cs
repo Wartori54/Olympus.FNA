@@ -301,7 +301,8 @@ namespace Olympus {
                     //TODO: Use a proper done icon
                     group.Add(new RenameButton("search", "Done", b => {
                         panel.PreventNextClick();
-                        install.Name = panel.FindChild<TextInput>()!.Text;
+                        // Make sure to trim it
+                        install.Name = panel.FindChild<TextInput>()!.Text.Trim();
                         RenamingInstalls.Remove(install);
                         UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
                     }));
