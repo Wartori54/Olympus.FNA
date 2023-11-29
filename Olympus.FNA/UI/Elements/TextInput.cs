@@ -26,9 +26,9 @@ public partial class TextInput : Panel {
         public enum SelectTarget {
             Char,
             Word,
-            Paragraph,
+            Line,
             
-            Highest = Paragraph + 1, // Describes the total entries
+            Highest = Line + 1, // Describes the total entries
         }
     }
     
@@ -282,12 +282,11 @@ public partial class TextInput : Panel {
         //TODO: Optimize this somehow
         for (int i = 0; i <= Text.Length; i = inc(i)) {
             font.TextBounds(Text[..i], Vector2.Zero, ref bounds, Vector2.One);
-            Console.WriteLine(i);
             Cursor = i;
             Selection.Start = i;
-            if (Selection.SelectionTarget == SelectionArea.SelectTarget.Char) // skip selection for chars
+            if (Selection.SelectionTarget == SelectionArea.SelectTarget.Char) {// skip selection for chars
                 Selection.End = -1;
-            else {
+            } else {
                 if (char.IsWhiteSpace(Text[prevI])) prevI++; // prevI will point to the previous space, move it to the next char
                 Selection.End = prevI;
             }
@@ -451,7 +450,7 @@ public partial class TextInput : Panel {
         PrevSelectionColor = selectionColor;
     }
 
-    public static Func<int, int> GetPositionIncrement(SelectionArea.SelectTarget selectTarget, string text) {
+    private static Func<int, int> GetPositionIncrement(SelectionArea.SelectTarget selectTarget, string text) {
         return selectTarget switch {
             SelectionArea.SelectTarget.Char => i => i + 1,
             SelectionArea.SelectTarget.Word => i => {
@@ -460,17 +459,9 @@ public partial class TextInput : Panel {
                 while (i < text.Length && !char.IsWhiteSpace(text[i])) i++;
                 return i;
             },
-            SelectionArea.SelectTarget.Paragraph => i => {
-                // bool success = false;
-                // while (true) {
-                //     while (text[i] != Environment.NewLine[0]) i++;
-                //     for (int j = 1; j < Environment.NewLine.Length; j++) {
-                //         
-                //     }
-                // }
-                //
-                // TODO: figure out this
-                return i + 3;
+            SelectionArea.SelectTarget.Line => i => {
+                while (i < text.Length && text[i] != Environment.NewLine[0]) i++;
+                return i + Environment.NewLine.Length - 1;
             },
             SelectionArea.SelectTarget.Highest => i => throw new ArgumentOutOfRangeException(nameof(selectTarget), selectTarget, null),
             _ => throw new ArgumentOutOfRangeException(nameof(selectTarget), selectTarget, null)
