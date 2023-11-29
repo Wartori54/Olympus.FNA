@@ -5,23 +5,19 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using NativeFileDialogSharp;
 using Microsoft.Xna.Framework.Graphics;
-using Olympus.NativeImpls;
 using Microsoft.Xna.Framework;
 
 namespace Olympus {
     public class InstallManagerScene : Scene {
-
         public override bool Alert => true;
 
-#pragma warning disable CS8618 // Generate runs before anything else.
-        private Group InstallsManaged;
-        private Group InstallsFound;
-        private Group InstallsManual;
-#pragma warning restore CS8618
+        // Generate runs before anything else.
+        private Group InstallsFound = null!;
+        private Group InstallsManual = null!;
 
         public static Installation? SelectedInstall;
 
-        private Group InstallsFoundLoading = new Group() {
+        private readonly Group InstallsFoundLoading = new() {
             Layout = {
                 Layouts.Left(0.5f, 0),
                 Layouts.Top(0.5f, 0),
@@ -37,9 +33,8 @@ namespace Olympus {
             }
         };
 
-        private List<Installation> InstallsFoundAdded = new();
-        
-        private HashSet<Installation> RenamingInstalls = new();
+        private readonly List<Installation> InstallsFoundAdded = new();
+        private readonly HashSet<Installation> RenamingInstalls = new();
 
         public enum InstallList {
             Found,
@@ -47,7 +42,7 @@ namespace Olympus {
         }
 
         public override Element Generate()
-            => new Group() {
+            => new Group {
                 Style = {
                     { Group.StyleKeys.Spacing, 16 },
                 },
@@ -57,19 +52,19 @@ namespace Olympus {
                 },
                 Children = {
                     new HeaderBig("Celeste Installations"),
-                    new Group() {
+                    new Group {
                         Clip = true,
                         ClipExtend = 16,
                         Layout = {
                             Layouts.Fill(1, 1, 0, LayoutConsts.Prev),
                         },
                         Children = {
-                            new ScrollBox() {
+                            new ScrollBox {
                                 Clip = false,
                                 Layout = {
                                     Layouts.Fill(),
                                 },
-                                Content = new Group() {
+                                Content = new Group {
                                     Style = {
                                         { Group.StyleKeys.Spacing, 16 },
                                     },
@@ -79,7 +74,7 @@ namespace Olympus {
                                         Layouts.Column()
                                     },
                                     Children = {
-                                        new Group() {
+                                        new Group {
                                             Style = {
                                                 { Group.StyleKeys.Spacing, 8 },
                                             },
@@ -89,7 +84,7 @@ namespace Olympus {
                                             },
                                             Children = {
                                                 new HeaderSmall("Found on this PC"),
-                                                new Group() {
+                                                new Group {
                                                     Clip = true,
                                                     ClipExtend = 8,
                                                     Style = {
@@ -104,7 +99,7 @@ namespace Olympus {
                                             }
                                         },
 
-                                        new Group() {
+                                        new Group {
                                             Style = {
                                                 { Group.StyleKeys.Spacing, 8 },
                                             },
@@ -123,7 +118,7 @@ namespace Olympus {
                                                         Layouts.Fill(1, 0),
                                                     },
                                                 },
-                                                new Group() {
+                                                new Group {
                                                     Clip = true,
                                                     ClipExtend = 8,
                                                     Style = {
@@ -189,7 +184,6 @@ namespace Olympus {
         }
 
         private void AddManualInstallation() {
-
             string filter;
 
             if (PlatformHelper.Is(Platform.Linux)) {
@@ -212,8 +206,9 @@ namespace Olympus {
             Installation newInstall = new(Installation.InstallationType.Manual, "", result.Path);
 
             if (!newInstall.FixPath()) { // Ignore for now
-                AppLogger.Log.Warning("Bad path: " + newInstall.Root);
-                return; // TODO: Give user a warning for invalid installation
+                AppLogger.Log.Warning($"Bad path: {newInstall.Root}");
+                MetaNotificationScene.PushNotification(new Notification { Message = $"Invalid Celeste install: {newInstall.Root}", Level = Notification.SeverityLevel.Warning});
+                return;
             }
             
             App.Instance.FinderManager.AddManualInstall(newInstall);
@@ -223,74 +218,47 @@ namespace Olympus {
         private Panel CreateEntry(Installation install) {
             Label? labelVersion = null;
             
-            InstallerSelectablePanel panel = null!; // Required to reference it inside the body
-            panel = new(install, b => {
-                SelectedInstall = install;
-                Config.Instance.Installation = install;
-                Config.Instance.Save();
-            }) {
-                Data = {
-                    { "Installation", install },
-                },
-                Clip = false,
-                Layout = {
-                    Layouts.Fill(1, 0),
-                },
-                Style = {
-                    { Group.StyleKeys.Spacing, 0 },
-                },
-                Children = {
-                    new Group {
-                        Layout = {
-                            Layouts.Fill(1, 0),
-                            Layouts.Row(),
-                        },
-                        Style = {
-                            { Group.StyleKeys.Spacing, 4 },
-                        },
-                        Children = {
-                            new Icon(OlympUI.Assets.GetTexture($"icons/{install.Icon}")) {
-                                AutoW = 64,
-                                Layout = {
-                                    Layouts.Top(0.5f, -0.5f),
-                                },
-                            },
-                            new Group() {
-                                Clip = true,
-                                Layout = {
-                                    Layouts.Fill(1, 0),
-                                    Layouts.Column(),
-                                },
-                                Style = {
-                                    { Group.StyleKeys.Spacing, 4 },
-                                },
-                                Init = el => {
-                                    if (RenamingInstalls.Contains(install)) {
-                                        el.Add(new TextInput(new HeaderSmall(install.Name), new HeaderSmall("")) {
-                                            MaxLength = 50,
-                                            Placeholder = "Manual Installation",
-                                            ClickCallback = _ => panel.PreventNextClick(),
-                                            Style = {
-                                                { TextInput.StyleKeys.Placeholder, Color.Yellow}
-                                            }
-                                        });
-                                        el.Add(labelVersion = new Label("Scanning..."));
-                                        el.Add(new LabelSmall(install.Root));
-                                        return;
-                                    }
-                                    el.Add(new HeaderSmall(string.IsNullOrWhiteSpace(install.Name) ? "Manual Installation" : install.Name) {
-                                        Wrap = true,
-                                    });
-                                    el.Add(labelVersion = new Label("Scanning..."));
-                                    el.Add(new LabelSmall(install.Root));
-                                },
-                            },
-                        }
+            void GeneratePanelContent(InstallerSelectablePanel panel) => UI.Run(() => {
+                panel.DisposeChildren();
+                
+                panel.Add(new Icon(OlympUI.Assets.GetTexture($"icons/{install.Icon}")) {
+                    AutoW = 64,
+                    Layout = {
+                        Layouts.Top(0.5f, -0.5f),
                     },
+                });
+
+                var textGroup = panel.Add(new Group() {
+                    Clip = true,
+                    Layout = {
+                        Layouts.Fill(1, 0), 
+                        Layouts.Column(),
+                    },
+                    Style = {
+                        { Group.StyleKeys.Spacing, 4 },
+                    },
+                });
+                if (RenamingInstalls.Contains(install)) {
+                    textGroup.Add(new TextInput(new HeaderSmall(install.Name), new HeaderSmall("")) {
+                        MaxLength = 50,
+                        Placeholder = "Manual Installation",
+                        ClickCallback = _ => panel.PreventNextClick(),
+                        TextCallback = _ => panel.InvalidateFullDown(),
+                        Style = {
+                            { TextInput.StyleKeys.Placeholder, Color.Yellow}
+                        }
+                    });
+                } else {
+                    textGroup.Add(new HeaderSmall(string.IsNullOrWhiteSpace(install.Name) ? "Manual Installation" : install.Name) {
+                        Wrap = true,
+                    });
                 }
-            };
-            if (install.Type == Installation.InstallationType.Manual) {
-                var group = panel.Add(new Group {
+                textGroup.Add(labelVersion ??= new Label("Scanning..."));
+                textGroup.Add(new LabelSmall(install.Root));
+
+                // if (install.Type != Installation.InstallationType.Manual) return;
+
+                var buttonGroup = panel.Add(new Group {
                     Layout = {
                         Layouts.Top(0.5f, -0.5f),
                         Layouts.Right(8),
@@ -299,33 +267,46 @@ namespace Olympus {
                 });
                 if (RenamingInstalls.Contains(install)) {
                     //TODO: Use a proper done icon
-                    group.Add(new RenameButton("search", "Done", b => {
+                    buttonGroup.Add(new RenameButton("search", "Done", b => {
                         panel.PreventNextClick();
                         // Make sure to trim it
                         install.Name = panel.FindChild<TextInput>()!.Text.Trim();
                         RenamingInstalls.Remove(install);
-                        UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
+                        GeneratePanelContent(panel);
                     }));
-                    group.Add(new RenameButton("close", "Cancel", b => {
+                    buttonGroup.Add(new RenameButton("close", "Cancel", b => {
                         panel.PreventNextClick();
                         RenamingInstalls.Remove(install);
-                        UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
+                        GeneratePanelContent(panel);
                     })); 
                 } else {
                     //TODO: Use a proper edit icon
-                    group.Add(new RenameButton("search", "Rename", b => {
+                    buttonGroup.Add(new RenameButton("search", "Rename", b => {
                         panel.PreventNextClick();
                         RenamingInstalls.Add(install);
-                        UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
+                        GeneratePanelContent(panel);
                     }));                    
                 }
-                
-                group.Add(new RemoveButton("delete", "Delete", b => {
+
+                buttonGroup.Add(new RemoveButton("delete", "Delete", b => {
                     panel.PreventNextClick();
                     App.FinderManager.RemoveInstallation(install);
-                    UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
+                    GeneratePanelContent(panel);
                 }));
-            }
+            });
+            
+            InstallerSelectablePanel panel = null!;
+            panel = new(install) {
+                Clip = false,
+                Layout = {
+                    Layouts.Fill(1, 0),
+                    Layouts.Row(resize: false),
+                },
+                Style = {
+                    { Group.StyleKeys.Spacing, 4 },
+                },
+                Init = el => GeneratePanelContent((InstallerSelectablePanel)el), 
+            };
 
             Task.Run(() => {
                 (bool Modifiable, string Full, Version? Version, string? Framework, string? ModName, Version? ModVersion) version = install.ScanVersion(true);
@@ -337,8 +318,8 @@ namespace Olympus {
 
             return panel;
         }
-        
-        public class RemoveButton : MetaMainScene.SidebarButton {
+
+        private class RemoveButton : MetaMainScene.SidebarButton {
             public new static readonly Style DefaultStyle = new() {
                 {
                     StyleKeys.Hovered,
@@ -366,8 +347,8 @@ namespace Olympus {
                 WH = new(64, 64);
             }
         }
-        
-        public class RenameButton : MetaMainScene.SidebarButton {
+
+        private class RenameButton : MetaMainScene.SidebarButton {
             public new static readonly Style DefaultStyle = new() {
                 {
                     StyleKeys.Hovered,
@@ -396,17 +377,8 @@ namespace Olympus {
             }
         }
 
-        public partial class InstallerSelectablePanel : Panel { // TODO: merge this with the other SelectablePanel
-
-            public static readonly new Style DefaultStyle = new() { // TODO: selected on dark mode looks awful
-                {
-                    StyleKeys.Normal,
-                    new Style() {
-                        { Panel.StyleKeys.Background, new Color(0x08, 0x08, 0x08, 0xd0) },
-                        { Panel.StyleKeys.Border, new Color(0x08, 0x08, 0x08, 0xd0) },
-                    }
-                },
-
+        private class InstallerSelectablePanel : SelectablePanel {
+            public new static readonly Style DefaultStyle = new() { // TODO: selected on dark mode looks awful
                 {
                     StyleKeys.Hovered,
                     new Style() {
@@ -414,7 +386,6 @@ namespace Olympus {
                         { Panel.StyleKeys.Border, new Color(0x08, 0x08, 0x08, 0xd0) },
                     }
                 },
-
                 {
                     StyleKeys.Selected,
                     new Style() {
@@ -424,26 +395,15 @@ namespace Olympus {
                 },
             };
 
-            public bool Selected = false;
-
             private bool preventNextClick = false;
-
-            private Action<InstallerSelectablePanel> callback;
-            private Installation install;
+            private readonly Installation install;
             
-            public InstallerSelectablePanel(Installation install, Action<InstallerSelectablePanel> cb)
-            : base() {
-                this.callback = cb;
+            public InstallerSelectablePanel(Installation install) : base(_ => false) {
                 this.install = install;
             }
 
             public override void Update(float dt) {
-                Selected = install.Equals(SelectedInstall);
-
-                Style.Apply(Selected ? StyleKeys.Selected : 
-                            Hovered  ? StyleKeys.Hovered :
-                                       StyleKeys.Normal);
-
+                Selected = Equals(install, SelectedInstall);
                 base.Update(dt);
             }
 
@@ -452,21 +412,15 @@ namespace Olympus {
                     preventNextClick = false;
                     return;
                 }
-                callback.Invoke(this);
+
+                SelectedInstall = install;
+                Config.Instance.Installation = install;
+                Config.Instance.Save();
             }
 
             public void PreventNextClick() {
                 preventNextClick = true;
             }
-
-            public new abstract partial class StyleKeys {
-
-                public static readonly Style.Key Normal = new("Normal");
-                public static readonly Style.Key Selected = new("Selected");
-                public static readonly Style.Key Hovered = new("Hovered");
-            }
         }
-
     }
-
 }
