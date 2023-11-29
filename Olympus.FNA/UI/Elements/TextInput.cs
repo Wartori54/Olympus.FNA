@@ -277,24 +277,37 @@ public partial class TextInput : Panel {
         
         TextLabel.Style.GetCurrent(out DynamicSpriteFont font);
         Bounds bounds = new();
-        Func<int, int> inc = GetPositionIncrement(Selection.SelectionTarget, Text);
-        int prevI = 0;
-        //TODO: Optimize this somehow
-        for (int i = 0; i <= Text.Length; i = inc(i)) {
-            font.TextBounds(Text[..i], Vector2.Zero, ref bounds, Vector2.One);
-            Cursor = i;
-            Selection.Start = i;
-            if (Selection.SelectionTarget == SelectionArea.SelectTarget.Char) {// skip selection for chars
-                Selection.End = -1;
-            } else {
-                if (char.IsWhiteSpace(Text[prevI])) prevI++; // prevI will point to the previous space, move it to the next char
-                Selection.End = prevI;
+        
+        if (UIInput.Down(Keys.LeftShift) || UIInput.Down(Keys.RightShift)) {
+            if (!Selection.Active) Selection.Start = Cursor;
+            //TODO: Optimize this somehow
+            for (int i = 0; i <= Text.Length; i++) {
+                font.TextBounds(Text[..i], Vector2.Zero, ref bounds, Vector2.One);
+                Selection.End = i;
+
+                shouldRedraw = true;
+                if (bounds.X2 > dxy.X) break;
             }
-
-            shouldRedraw = true;
-
-            prevI = i;
-            if (bounds.X2 > dxy.X) break;
+        } else {
+            Func<int, int> inc = GetPositionIncrement(Selection.SelectionTarget, Text);
+            int prevI = 0;
+            //TODO: Optimize this somehow
+            for (int i = 0; i <= Text.Length; i = inc(i)) {
+                font.TextBounds(Text[..i], Vector2.Zero, ref bounds, Vector2.One);
+                Cursor = i;
+                Selection.Start = i;
+                if (Selection.SelectionTarget == SelectionArea.SelectTarget.Char) { // Skip selection for chars
+                    Selection.End = -1;
+                } else {
+                    if (char.IsWhiteSpace(Text[prevI])) prevI++; // prevI will point to the previous space, move it to the next char
+                    Selection.End = prevI;
+                }
+    
+                shouldRedraw = true;
+    
+                prevI = i;
+                if (bounds.X2 > dxy.X) break;
+            }
         }
         
         if (shouldRedraw) InvalidatePaint();
