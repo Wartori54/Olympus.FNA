@@ -192,7 +192,7 @@ namespace OlympUI {
                     CurrentCursorStyle = cursorStyle;
                     CurrentCursorPtr = SDL.SDL_CreateSystemCursor(CurrentCursorStyle switch {
                         CursorStyle.Normal => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_ARROW,
-                        CursorStyle.Pointer => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_CROSSHAIR,
+                        CursorStyle.Pointer => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_HAND,
                         CursorStyle.Text => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_IBEAM,
                         CursorStyle.Loading => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_WAIT,
                         CursorStyle.LoadingSmall => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_WAITARROW,
