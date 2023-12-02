@@ -245,6 +245,7 @@ namespace Olympus {
                         ClickCallback = _ => panel.PreventNextClick(),
                         TextCallback = _ => panel.InvalidateFullDown(),
                         ConfirmCallback = input => {
+                            if (UI.Focusing == input) UI.Run(() => UI.SetFocused(null));
                             install.NameOverride = input.Text.Trim();
                             RenamingInstalls.Remove(install);
                             GeneratePanelContent(panel);
@@ -280,8 +281,10 @@ namespace Olympus {
                         WH = new(ButtonSize, ButtonSize),
                         Callback = _ => {
                             panel.PreventNextClick();
+                            var input = panel.FindChild<TextInput>();
+                            if (UI.Focusing == input) UI.Run(() => UI.SetFocused(null));
                             // Make sure to trim it
-                            install.NameOverride = panel.FindChild<TextInput>()!.Text.Trim();
+                            install.NameOverride = input!.Text.Trim();
                             RenamingInstalls.Remove(install);
                             GeneratePanelContent(panel);
                             // Re-set value to re-fire the event
@@ -292,6 +295,8 @@ namespace Olympus {
                         WH = new(ButtonSize, ButtonSize),
                         Callback = _ => {
                             panel.PreventNextClick();
+                            var input = panel.FindChild<TextInput>();
+                            if (UI.Focusing == input) UI.Run(() => UI.SetFocused(null));
                             RenamingInstalls.Remove(install);
                             GeneratePanelContent(panel);
                         },
