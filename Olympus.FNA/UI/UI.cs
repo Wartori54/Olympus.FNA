@@ -90,14 +90,18 @@ namespace OlympUI {
                 MultiSampleCount = MultiSampleCount
             };
         }
+        
+        public static void SetFocused(Element? element) {
+            if (element != Focusing) {
+                Focusing?.InvokeUp(new FocusEvent.Unfocus());
+                Focusing = element;
+                Focusing?.InvokeUp(new FocusEvent.Focus());
+            }
+        }
 
         private static void OnFastClick(int x, int y, MouseButtons btn) {
             Element? el = UIInput.MouseFocus ? Root.GetInteractiveChildAt(UIInput.Mouse.ToPoint()) : null;
-            if (el != Focusing) {
-                el?.InvokeUp(new FocusEvent.Unfocus());
-                Focusing = el;
-                el?.InvokeUp(new FocusEvent.Focus());
-            }
+            SetFocused(el);
             el?.InvokeUp(new MouseEvent.Click() {
                 Button = btn,
                 Dragging = false
@@ -181,10 +185,8 @@ namespace OlympUI {
                 for (MouseButtons btn = MouseButtons.First; btn <= MouseButtons.Last; btn = (MouseButtons) ((int) btn << 1)) {
                     if (UIInput.Pressed(btn)) {
                         if (Dragging is null || Dragging == Hovering) {
-                            Focusing?.InvokeUp(new FocusEvent.Unfocus());
+                            SetFocused(Hovering);
                             Dragging = Hovering;
-                            Focusing = Hovering;
-                            Hovering?.InvokeUp(new FocusEvent.Focus());
                             Hovering?.InvokeUp(new MouseEvent.Press() {
                                 Button = btn,
                                 Dragging = true,
@@ -397,6 +399,5 @@ namespace OlympUI {
             batch.Draw(Assets.White.Value, new Rectangle(rect.Left + 1, rect.Top, rect.Width - 2, 1), color);
             batch.Draw(Assets.White.Value, new Rectangle(rect.Left + 1, rect.Bottom - 1, rect.Width - 2, 1), color);
         }
-
     }
 }

@@ -38,7 +38,7 @@ namespace Olympus.Finders {
                     data.TryGetValue("game", out object? gameRaw) && gameRaw is Dictionary<string, object> game &&
                     game.TryGetValue("exe", out object? exeRaw) && exeRaw is string exe &&
                     IsDir(Path.GetDirectoryName(exe)) is string path) {
-                    yield return new(InstallationType, "Lutris (YML)", path);
+                    yield return new(InstallationType, path);
                     yield break;
                 }
             }

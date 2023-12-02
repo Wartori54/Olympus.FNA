@@ -182,7 +182,7 @@ namespace Olympus.Finders {
             foreach (string library in FindLibraries()) {
                 string? path = IsDir(Combine(library, GameID));
                 if (!string.IsNullOrEmpty(path))
-                    yield return new Installation(Installation.InstallationType.Steam, "Steam", path);
+                    yield return new Installation(Installation.InstallationType.Steam, path);
             }
 
             // This will add *all* shortcutted games and their startup dirs, but eh.
@@ -205,10 +205,12 @@ namespace Olympus.Finders {
 
                 if (!string.IsNullOrEmpty(path)) {
                     if (shortcut.TryGetValue("appname", out object? appnameRaw) && appnameRaw is string appname) {
-                        yield return new Installation(Installation.InstallationType.SteamShortcut, $"Steam Shortcut: {appname}", path);
+                        var install = new Installation(Installation.InstallationType.SteamShortcut, path);
+                        install.NameOverride = $"{install.DefaultName}: {appname}";
+                        yield return install;
 
                     } else {
-                        yield return new Installation(Installation.InstallationType.SteamShortcut, "Steam Shortcut", path);
+                        yield return new Installation(Installation.InstallationType.SteamShortcut, path);
                     }
                 }
             }

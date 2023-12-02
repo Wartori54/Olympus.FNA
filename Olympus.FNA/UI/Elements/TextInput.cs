@@ -112,8 +112,7 @@ public partial class TextInput : Panel {
         set {
             // Unfocus ourselves when disabled
             if (value == false && Focused) {
-                OnUnfocus(new FocusEvent.Unfocus());
-                UI.Focusing = null;
+                UI.SetFocused(null);
             }
             _enabled = value;
             InvalidatePaint();

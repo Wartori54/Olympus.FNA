@@ -44,7 +44,7 @@ namespace Olympus.Finders {
                 if (data is not null &&
                     data.TryGetValue("AppName", out object? nameRaw) && nameRaw as string == "Salt" &&
                     data.TryGetValue("InstallLocation", out object? pathRaw) && pathRaw is string path) {
-                    yield return new(InstallationType, "Epic Games Store", path);
+                    yield return new(InstallationType, path);
                     yield break;
                 }
             }

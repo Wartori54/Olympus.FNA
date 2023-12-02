@@ -30,7 +30,7 @@ namespace Olympus.Finders {
             if (db is not null &&
                 db.TryGetValue("Salt", out object? dataRaw) && dataRaw is Dictionary<string, object> data &&
                 data.TryGetValue("install_path", out object? pathRaw) && pathRaw is string path) {
-                yield return new(InstallationType, "Legendary", path);
+                yield return new(InstallationType, path);
                 yield break;
             }
         }

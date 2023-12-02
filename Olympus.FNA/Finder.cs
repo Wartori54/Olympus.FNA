@@ -335,12 +335,27 @@ namespace Olympus {
         }
 
         public InstallationType Type;
-        public string Name;
         public string Root;
 
+        public string? NameOverride;
         public string? IconOverride;
 
-        public string Icon => IconOverride?? Type switch {
+        public string Name => string.IsNullOrWhiteSpace(NameOverride) ? DefaultName : NameOverride;
+        public string Icon => string.IsNullOrWhiteSpace(IconOverride) ? DefaultIcon : IconOverride;
+        
+        public string DefaultName => Type switch {
+            InstallationType.Epic => "Epic Games Store",
+            InstallationType.Itch => "itch.io",
+            InstallationType.Legendary => "Legendary",
+            InstallationType.LutrisDatabase => "Lutris (DB)",
+            InstallationType.LutrisYaml => "Lutris (YML)",
+            InstallationType.Steam => "Steam",
+            InstallationType.SteamShortcut => "Steam Shortcut",
+            InstallationType.UWP => "Microsoft Store",
+            InstallationType.Manual => "Manual Installation",
+            _ => throw new ArgumentOutOfRangeException()
+        };
+        public string DefaultIcon => Type switch {
             InstallationType.Epic => "store/epic",
             InstallationType.Itch => "store/itch",
             InstallationType.Legendary => "store/legendary",
@@ -383,9 +398,8 @@ namespace Olympus {
             }
         }
 
-        public Installation(InstallationType type, string name, string root) {
+        public Installation(InstallationType type, string root) {
             Type = type;
-            Name = name;
             Root = root;
             MainBlacklist = new Blacklist(Path.Combine(Root, "Mods", "blacklist.txt"));
             UpdateBlacklist = new Blacklist(Path.Combine(Root, "Mods", "updaterblacklist.txt"));

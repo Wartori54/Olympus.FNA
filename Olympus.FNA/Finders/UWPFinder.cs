@@ -76,7 +76,7 @@ namespace Olympus.Finders {
                 buffer = IntPtr.Zero;
 
 
-                return Result(new(InstallationType, "Microsoft Store", package));
+                return Result(new(InstallationType, package));
 
             } catch {
                 return Result();

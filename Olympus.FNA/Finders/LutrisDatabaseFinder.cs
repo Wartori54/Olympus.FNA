@@ -41,7 +41,7 @@ namespace Olympus.Finders {
             }
 
             if (!string.IsNullOrEmpty(path)) {
-                yield return new(InstallationType, "Lutris (DB)", path);
+                yield return new(InstallationType, path);
                 yield break;
             }
         }

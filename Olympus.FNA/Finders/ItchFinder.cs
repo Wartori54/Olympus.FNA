@@ -64,7 +64,7 @@ namespace Olympus.Finders {
 
             if (data is not null &&
                 data.TryGetValue("basePath", out object? pathRaw) && pathRaw is string path) {
-                yield return new(InstallationType, "itch.io", path);
+                yield return new(InstallationType, path);
                 yield break;
             }
         }

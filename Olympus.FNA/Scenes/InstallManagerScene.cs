@@ -203,7 +203,7 @@ namespace Olympus {
                 return;
             }
 
-            Installation newInstall = new(Installation.InstallationType.Manual, "", result.Path);
+            Installation newInstall = new(Installation.InstallationType.Manual, result.Path);
 
             if (!newInstall.FixPath()) { // Ignore for now
                 AppLogger.Log.Warning($"Bad path: {newInstall.Root}");
@@ -239,29 +239,28 @@ namespace Olympus {
                     },
                 });
                 if (RenamingInstalls.Contains(install)) {
-                    textGroup.Add(new TextInput(new HeaderSmall(install.Name), new HeaderSmall("")) {
+                    textGroup.Add(new TextInput(new HeaderSmall(install.NameOverride ?? string.Empty), new HeaderSmall(install.DefaultName)) {
                         MaxLength = 50,
-                        Placeholder = "Manual Installation",
                         ClickCallback = _ => panel.PreventNextClick(),
                         TextCallback = _ => panel.InvalidateFullDown(),
                         ConfirmCallback = input => {
-                            install.Name = input.Text.Trim();
+                            install.NameOverride = input.Text.Trim();
                             RenamingInstalls.Remove(install);
                             GeneratePanelContent(panel);
+                            // Re-set value to re-fire the event
+                            Config.Instance.Installation = SelectedInstall; 
                         },
                         Style = {
                             { TextInput.StyleKeys.Placeholder, Color.Yellow}
                         }
                     });
                 } else {
-                    textGroup.Add(new HeaderSmall(string.IsNullOrWhiteSpace(install.Name) ? "Manual Installation" : install.Name) {
+                    textGroup.Add(new HeaderSmall(install.Name) {
                         Wrap = true,
                     });
                 }
                 textGroup.Add(labelVersion ??= new Label("Scanning..."));
                 textGroup.Add(new LabelSmall(install.Root));
-
-                // if (install.Type != Installation.InstallationType.Manual) return;
 
                 var buttonGroup = panel.Add(new Group {
                     Layout = {
@@ -275,9 +274,11 @@ namespace Olympus {
                     buttonGroup.Add(new RenameButton("search", "Done", b => {
                         panel.PreventNextClick();
                         // Make sure to trim it
-                        install.Name = panel.FindChild<TextInput>()!.Text.Trim();
+                        install.NameOverride = panel.FindChild<TextInput>()!.Text.Trim();
                         RenamingInstalls.Remove(install);
                         GeneratePanelContent(panel);
+                        // Re-set value to re-fire the event
+                        Config.Instance.Installation = SelectedInstall;
                     }));
                     buttonGroup.Add(new RenameButton("close", "Cancel", b => {
                         panel.PreventNextClick();
@@ -290,15 +291,17 @@ namespace Olympus {
                         panel.PreventNextClick();
                         RenamingInstalls.Add(install);
                         GeneratePanelContent(panel);
-                        UI.Run(() => UI.Focusing = panel.FindChild<TextInput>());
+                        UI.Run(() => UI.SetFocused(panel.FindChild<TextInput>()));
                     }));                    
                 }
 
-                buttonGroup.Add(new RemoveButton("delete", "Delete", b => {
-                    panel.PreventNextClick();
-                    App.FinderManager.RemoveInstallation(install);
-                    GeneratePanelContent(panel);
-                }));
+                if (install.Type == Installation.InstallationType.Manual) {
+                    buttonGroup.Add(new RemoveButton("delete", "Delete", b => {
+                        panel.PreventNextClick();
+                        App.FinderManager.RemoveInstallation(install);
+                        GeneratePanelContent(panel);
+                    }));
+                }
             });
             
             InstallerSelectablePanel panel = null!;
