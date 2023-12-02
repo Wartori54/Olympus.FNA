@@ -71,51 +71,58 @@ namespace Olympus {
         public float Overlay;
 
         public static string GetDefaultDir() {
+            string? path = null;
             if (PlatformHelper.Is(Platform.MacOS)) {
                 string? home = Environment.GetEnvironmentVariable("HOME");
                 if (!string.IsNullOrEmpty(home)) {
-                    return System.IO.Path.Combine(home, "Library", "Application Support", App.Name);
+                    path ??= System.IO.Path.Combine(home, "Library", "Application Support", App.Name);
                 }
             }
 
             if (PlatformHelper.Is(Platform.Unix)) {
                 string? config = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
                 if (!string.IsNullOrEmpty(config)) {
-                    return System.IO.Path.Combine(config, App.Name);
+                    path ??= System.IO.Path.Combine(config, App.Name);
                 }
                 string? home = Environment.GetEnvironmentVariable("HOME");
                 if (!string.IsNullOrEmpty(home)) {
-                    return System.IO.Path.Combine(home, ".config", App.Name);
+                    path ??= System.IO.Path.Combine(home, ".config", App.Name);
                 }
             }
 
-            return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), App.Name);
+            path ??= System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), App.Name);
+            if (!Directory.Exists(path)) Directory.CreateDirectory(path);
+            return path;
         }
 
+        // This file will be created when needed, not here
         public static string GetDefaultConfigFilePath() {
             return System.IO.Path.Combine(GetDefaultDir(), "config.json");
         }
 
         public static string GetCacheDir() {
+            string? path = null;
             if (PlatformHelper.Is(Platform.MacOS)) {
                 string? home = Environment.GetEnvironmentVariable("HOME");
                 if (!string.IsNullOrEmpty(home)) {
-                    return System.IO.Path.Combine(home, "Library", "Caches", App.Name);
+                    path ??= System.IO.Path.Combine(home, "Library", "Caches", App.Name);
                 }
             }
 
             if (PlatformHelper.Is(Platform.Unix)) {
                 string? config = Environment.GetEnvironmentVariable("XDG_CACHE_HOME");
                 if (!string.IsNullOrEmpty(config)) {
-                    return System.IO.Path.Combine(config, App.Name);
+                    path ??= System.IO.Path.Combine(config, App.Name);
                 }
                 string? home = Environment.GetEnvironmentVariable("HOME");
                 if (!string.IsNullOrEmpty(home)) {
-                    return System.IO.Path.Combine(home, ".cache", App.Name);
+                    path ??= System.IO.Path.Combine(home, ".cache", App.Name);
                 }
             }
 
-            return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), App.Name);
+            path ??= System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), App.Name);
+            if (!Directory.Exists(path)) Directory.CreateDirectory(path);
+            return path;
         }
 
         public void Load() {
