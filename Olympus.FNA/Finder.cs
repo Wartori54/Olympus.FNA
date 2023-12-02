@@ -22,14 +22,10 @@ namespace Olympus {
 
         public virtual int Priority => 0;
 
-        protected readonly string FinderTypeDefault;
+        protected abstract Installation.InstallationType InstallationType { get; }
 
         public Finder(FinderManager manager) {
             Manager = manager;
-            FinderTypeDefault = GetType().Name;
-            if (FinderTypeDefault.EndsWith("Finder")) {
-                FinderTypeDefault = FinderTypeDefault[..^"Finder".Length];
-            }
         }
 
         protected string? IsDir(string? path) {
@@ -68,7 +64,7 @@ namespace Olympus {
         }
 
         public virtual bool Owns(Installation i) {
-            return i.Type == FinderTypeDefault;
+            return i.Type == InstallationType;
         }
 
         public abstract IAsyncEnumerable<Installation> FindCandidates();
@@ -326,14 +322,51 @@ namespace Olympus {
     }
 
     public class Installation {
+        public enum InstallationType {
+            Epic,
+            Itch,
+            Legendary,
+            LutrisDatabase,
+            LutrisYaml,
+            Steam,
+            SteamShortcut,
+            UWP,
+            Manual
+        }
 
-        public string Type; // TODO: Make this an enum
-        public string Name;
+        public InstallationType Type;
         public string Root;
 
+        public string? NameOverride;
         public string? IconOverride;
 
-        public string Icon => IconOverride ?? Type;
+        public string Name => string.IsNullOrWhiteSpace(NameOverride) ? DefaultName : NameOverride;
+        public string Icon => string.IsNullOrWhiteSpace(IconOverride) ? DefaultIcon : IconOverride;
+        
+        public string DefaultName => Type switch {
+            InstallationType.Epic => "Epic Games Store",
+            InstallationType.Itch => "itch.io",
+            InstallationType.Legendary => "Legendary",
+            InstallationType.LutrisDatabase => "Lutris (DB)",
+            InstallationType.LutrisYaml => "Lutris (YML)",
+            InstallationType.Steam => "Steam",
+            InstallationType.SteamShortcut => "Steam Shortcut",
+            InstallationType.UWP => "Microsoft Store",
+            InstallationType.Manual => "Manual Installation",
+            _ => throw new ArgumentOutOfRangeException()
+        };
+        public string DefaultIcon => Type switch {
+            InstallationType.Epic => "store/epic",
+            InstallationType.Itch => "store/itch",
+            InstallationType.Legendary => "store/legendary",
+            InstallationType.LutrisDatabase => "store/lutris",
+            InstallationType.LutrisYaml => "store/lutris",
+            InstallationType.Steam => "store/steam",
+            InstallationType.SteamShortcut => "store/steam_shortcut",
+            InstallationType.UWP => "store/uwp",
+            InstallationType.Manual => "store/manual",
+            _ => throw new ArgumentOutOfRangeException()
+        };
 
         [NonSerialized]
         public Finder? Finder;
@@ -365,9 +398,8 @@ namespace Olympus {
             }
         }
 
-        public Installation(string type, string name, string root) {
+        public Installation(InstallationType type, string root) {
             Type = type;
-            Name = name;
             Root = root;
             MainBlacklist = new Blacklist(Path.Combine(Root, "Mods", "blacklist.txt"));
             UpdateBlacklist = new Blacklist(Path.Combine(Root, "Mods", "updaterblacklist.txt"));

@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using OlympUI.MegaCanvas;
 using Olympus;
+using SDL2;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -67,6 +68,8 @@ namespace OlympUI {
         private static readonly AutoRotatingPool<List<Action>> RunLateListPool = new(8);
         private static List<Action> RunLateList = RunLateListPool.Next();
         private static HashSet<Action> RunOnceList = new();
+        private static CursorStyle CurrentCursorStyle = CursorStyle.Normal;
+        private static IntPtr? CurrentCursorPtr = null;
 
         private static Point WHPrev;
 
@@ -90,9 +93,18 @@ namespace OlympUI {
                 MultiSampleCount = MultiSampleCount
             };
         }
+        
+        public static void SetFocused(Element? element) {
+            if (element != Focusing) {
+                Focusing?.InvokeUp(new FocusEvent.Unfocus());
+                Focusing = element;
+                Focusing?.InvokeUp(new FocusEvent.Focus());
+            }
+        }
 
         private static void OnFastClick(int x, int y, MouseButtons btn) {
             Element? el = UIInput.MouseFocus ? Root.GetInteractiveChildAt(UIInput.Mouse.ToPoint()) : null;
+            SetFocused(el);
             el?.InvokeUp(new MouseEvent.Click() {
                 Button = btn,
                 Dragging = false
@@ -172,24 +184,46 @@ namespace OlympUI {
                         Dragging?.InvokeUp(new MouseEvent.Drag());
                     }
                 }
+                
+                var cursorStyle = Hovering?.CursorStyle ?? CursorStyle.Normal;
+                if (cursorStyle != CurrentCursorStyle) {
+                    if (CurrentCursorPtr != null) SDL.SDL_FreeCursor((IntPtr)CurrentCursorPtr);
+                    
+                    CurrentCursorStyle = cursorStyle;
+                    CurrentCursorPtr = SDL.SDL_CreateSystemCursor(CurrentCursorStyle switch {
+                        CursorStyle.Normal => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_ARROW,
+                        CursorStyle.Pointer => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_HAND,
+                        CursorStyle.Text => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_IBEAM,
+                        CursorStyle.Loading => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_WAIT,
+                        CursorStyle.LoadingSmall => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_WAITARROW,
+                        CursorStyle.Crosshair => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_CROSSHAIR,
+                        CursorStyle.ResizeN_S => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_SIZENS,
+                        CursorStyle.ResizeW_E => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_SIZEWE,
+                        CursorStyle.ResizeNW_SE => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_SIZENWSE,
+                        CursorStyle.ResizeNE_SW => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_SIZENESW,
+                        CursorStyle.ResizeN_S_W_E => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_SIZEALL,
+                        CursorStyle.Disabled => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_NO,
+                        _ => throw new ArgumentOutOfRangeException()
+                    });
+                    SDL.SDL_SetCursor((IntPtr)CurrentCursorPtr);
+                }
 
                 for (MouseButtons btn = MouseButtons.First; btn <= MouseButtons.Last; btn = (MouseButtons) ((int) btn << 1)) {
                     if (UIInput.Pressed(btn)) {
                         if (Dragging is null || Dragging == Hovering) {
+                            SetFocused(Hovering);
                             Dragging = Hovering;
-                            // Focusing?.InvokeUp(TODO: UNFOCUS);
                             Hovering?.InvokeUp(new MouseEvent.Press() {
                                 Button = btn,
-                                Dragging = true
+                                Dragging = true,
+                                ConsecutiveClicks = FNAHooks.ConsecutiveClicks,
                             });
-
                         } else {
                             Hovering?.InvokeUp(new MouseEvent.Press() {
                                 Button = btn,
                                 Dragging = false
                             });
                         }
-
                     } else if (UIInput.Released(btn)) {
                         if (UIInput.MousePresses == 0) {
                             Element? dragging = Dragging;
@@ -204,7 +238,6 @@ namespace OlympUI {
                                     Dragging = false
                                 });
                             }
-
                         } else {
                             Dragging?.InvokeUp(new MouseEvent.Release() {
                                 Button = btn,
@@ -392,6 +425,5 @@ namespace OlympUI {
             batch.Draw(Assets.White.Value, new Rectangle(rect.Left + 1, rect.Top, rect.Width - 2, 1), color);
             batch.Draw(Assets.White.Value, new Rectangle(rect.Left + 1, rect.Bottom - 1, rect.Width - 2, 1), color);
         }
-
     }
 }

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace Olympus.Finders {
     public class EpicFinder : Finder {
+        protected override Installation.InstallationType InstallationType => Installation.InstallationType.Epic;
 
         public EpicFinder(FinderManager manager)
             : base(manager) {
@@ -43,7 +44,7 @@ namespace Olympus.Finders {
                 if (data is not null &&
                     data.TryGetValue("AppName", out object? nameRaw) && nameRaw as string == "Salt" &&
                     data.TryGetValue("InstallLocation", out object? pathRaw) && pathRaw is string path) {
-                    yield return new(FinderTypeDefault, "Epic Games Store", path);
+                    yield return new(InstallationType, path);
                     yield break;
                 }
             }
