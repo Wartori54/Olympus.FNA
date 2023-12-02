@@ -129,10 +129,15 @@ public partial class TextInput : Panel {
     private readonly Label PlaceholderLabel;
     private readonly BasicMesh CursorMesh;
 
+    private static readonly TimeSpan CursorBlinkSpeed = TimeSpan.FromSeconds(0.5f);
+    private TimeSpan CursorBlinkTimer = TimeSpan.Zero;
+    private bool CursorBlinkState = true;
+    
     private int PrevCursor = -1;
     private SelectionArea PrevSelection = new() { Start = -1 };
     private Color PrevCursorColor = Color.Transparent;
     private Color PrevSelectionColor = Color.Transparent;
+    private bool PrevCursorBlinkState = false;
     
     private Style.Key StyleState =>
         !Enabled ? StyleKeys.Disabled :
@@ -403,6 +408,13 @@ public partial class TextInput : Panel {
         PlaceholderLabel.Visible = Text.Length == 0;
         Style.Apply(StyleState);
         
+        CursorBlinkTimer += TimeSpan.FromSeconds(dt);
+        if (CursorBlinkTimer > CursorBlinkSpeed) {
+            CursorBlinkTimer -= CursorBlinkSpeed;
+            CursorBlinkState = !CursorBlinkState;
+            InvalidatePaint();
+        }
+        
         base.Update(dt);
     }
     
@@ -410,7 +422,7 @@ public partial class TextInput : Panel {
         StyleCursor.GetCurrent(out Color cursorColor);
         StyleSelection.GetCurrent(out Color selectionColor);
         
-        if (PrevCursor != Cursor || Selection != PrevSelection || PrevCursorColor != cursorColor || PrevSelectionColor != selectionColor) {
+        if (PrevCursor != Cursor || Selection != PrevSelection || PrevCursorColor != cursorColor || PrevSelectionColor != selectionColor || PrevCursorBlinkState != CursorBlinkState) {
             MeshShapes<MiniVertex> shapes = CursorMesh.Shapes;
             shapes.Clear();
 
@@ -429,7 +441,7 @@ public partial class TextInput : Panel {
                     XY2 = new(TextLabel.RealX + selEndBounds.X2 + Margin, TextLabel.RealY + TextLabel.H + Margin),
                     Radius = 5f,
                 });
-            } else {
+            } else if (CursorBlinkState) {
                 Bounds cursorBounds = new();
                 font.TextBounds(Text.Substring(0, Cursor), Vector2.Zero, ref cursorBounds, Vector2.One);
         
@@ -461,6 +473,7 @@ public partial class TextInput : Panel {
         PrevSelection = Selection;
         PrevCursorColor = cursorColor;
         PrevSelectionColor = selectionColor;
+        PrevCursorBlinkState = CursorBlinkState;
     }
 
     private static Func<int, int> GetPositionIncrement(SelectionArea.SelectTarget selectTarget, string text) {
