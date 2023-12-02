@@ -12,7 +12,9 @@ namespace Olympus {
         private Skin? SkinDark;
         private Skin? SkinLight;
 
+#if DEBUG
         private Label DebugLabel;
+#endif
 
         private bool AlwaysRepaint;
 
@@ -23,22 +25,7 @@ namespace Olympus {
             SkinLight = Skin.CreateLight();
 
             UI.Initialize(App, Native, App);
-            UI.Root.Children.Add(Scener.Get<MetaMainScene>().Root);
-            UI.Root.Children.Add(Scener.Get<MetaAlertScene>().Generate());
-#if DEBUG
-            UI.Root.Children.Add(Scener.Get<MetaDebugScene>().Generate());
-#endif
-            UI.Root.Children.Add(DebugLabel = new Label("") {
-                Style = {
-                    Color.Red,
-                    OlympUI.Assets.FontMonoOutlined,
-                },
-#if DEBUG
-                Visible = true,
-#else
-                Visible = false,
-#endif
-            });
+            AddMetaScenes();
             Scener.Push<HomeScene>();
 
             App.FinderManager.Refresh();
@@ -48,12 +35,29 @@ namespace Olympus {
             App.VSync = true;
 #endif
         }
+        
+        private void AddMetaScenes() {
+            UI.Root.Children.Add(Scener.Get<MetaMainScene>().Root);
+            UI.Root.Children.Add(Scener.Get<MetaAlertScene>().Root);
+            UI.Root.Children.Add(Scener.Get<MetaNotificationScene>().Root);
+#if DEBUG
+            UI.Root.Children.Add(Scener.Get<MetaDebugScene>().Root);
+            UI.Root.Children.Add(DebugLabel = new Label("") {
+                Style = {
+                    Color.Red,
+                    OlympUI.Assets.FontMonoOutlined,
+                },
+            });
+#endif
+        }
 
         protected override void LoadContent() {
             UI.LoadContent();
 
+#if DEBUG
             // Otherwise it keeps fooling itself.
             DebugLabel.CachePool = new(UI.MegaCanvas, false);
+#endif
 
             base.LoadContent();
         }
@@ -78,7 +82,17 @@ namespace Olympus {
                 }
             }
 
-            if (UIInput.Pressed(Keys.F3) && Scener.Front != null) {
+            if (UIInput.Pressed(Keys.F3) && UIInput.Down(Keys.LeftShift)) {
+                UI.Root.InvalidateCollect();
+                UI.Root.InvalidateForce();
+                UI.Root.InvalidatePaintDown();
+                UI.Root.InvalidateFullDown();
+                UI.Root.InvalidateCachedTextureDown();
+            
+                UI.Root.Clear();
+                Scener.RefreshAll();
+                AddMetaScenes();
+            } else if (UIInput.Pressed(Keys.F3) && Scener.Front != null) {
                 Type sceneType = Scener.Front.GetType();
                 try {
                     Scener.PopFront();
@@ -87,6 +101,12 @@ namespace Olympus {
                     AppLogger.Log.Error($"Failed to reload scene: {sceneType.Name}");
                     AppLogger.Log.Error(ex, ex.Message);
                 }
+            }
+
+            if (UIInput.Pressed(Keys.F4)) {
+                MetaNotificationScene.PushNotification(new() { Message = "Information", Level = Notification.SeverityLevel.Information });
+                MetaNotificationScene.PushNotification(new() { Message = "Warning", Level = Notification.SeverityLevel.Warning });
+                MetaNotificationScene.PushNotification(new() { Message = "Error", Level = Notification.SeverityLevel.Error });
             }
 
             if (UIInput.Pressed(Keys.F5)) {
@@ -124,7 +144,7 @@ namespace Olympus {
                 // Run debug code that prints to stdout here
                 UI.Root.InvalidateForce();
             }
-
+            
             if (UIInput.Pressed(Keys.F10)) {
                 AlwaysRepaint = !AlwaysRepaint;
                 App.VSync = !AlwaysRepaint;
@@ -155,24 +175,24 @@ namespace Olympus {
             // Im not sure why removing pixels for height is needed in the first place -wartori
             UI.Root.WH = new(App.Width, App.Height);
 
-            if (DebugLabel.Visible) {
-                DebugLabel.Text =
-                    $"FPS: {App.FPS}\n" +
-                    $"Repaint Mode: {(AlwaysRepaint ? "always (debug)" : "on demand")}\n" +
-                    $"Mouse: {UIInput.Mouse}\n" +
-                    $"Root Size: {UI.Root.WH.X} x {UI.Root.WH.Y}\n" +
-                    $"App Size: {App.Width} x {App.Height} ({(Native.IsMaximized ? "maximized" : "windowed")})\n" +
-                    $"Reloadable Texture2D Used: {TextureTracker.Instance.UsedCount} / {TextureTracker.Instance.TotalCount}\n" +
-                    $"Reloadable Texture2D Memory: {GetHumanFriendlyBytes(TextureTracker.Instance.UsedMemory)} / {GetHumanFriendlyBytes(TextureTracker.Instance.TotalMemory)}\n" +
-                    $"Pool MAIN Available: {UI.MegaCanvas.Pool.EntriesAlive}\n" +
-                    $"Pool MAIN Used: {UI.MegaCanvas.Pool.Used.Count}\n" +
-                    $"Pool MAIN Memory: {GetHumanFriendlyBytes(UI.MegaCanvas.Pool.UsedMemory)} / {GetHumanFriendlyBytes(UI.MegaCanvas.Pool.TotalMemory)} \n" +
-                    $"Pool MSAA Available: {UI.MegaCanvas.PoolMSAA.EntriesAlive}\n" +
-                    $"Pool MSAA Used: {UI.MegaCanvas.PoolMSAA.Used.Count}\n" +
-                    $"Pool MSAA Memory: {GetHumanFriendlyBytes(UI.MegaCanvas.PoolMSAA.UsedMemory)} / {GetHumanFriendlyBytes(UI.MegaCanvas.PoolMSAA.TotalMemory)} \n" +
-                    $"Atlas Pages: {UI.MegaCanvas.Pages.Count} x {GetHumanFriendlyBytes(UI.MegaCanvas.PageSize * UI.MegaCanvas.PageSize * 4)} \n" +
-                    $"Element: {UI.Hovering}, WH: {UI.Hovering?.WH}";
-            }
+#if DEBUG
+            DebugLabel.Text =
+                $"FPS: {App.FPS}\n" +
+                $"Repaint Mode: {(AlwaysRepaint ? "always (debug)" : "on demand")}\n" +
+                $"Mouse: {UIInput.Mouse}\n" +
+                $"Root Size: {UI.Root.WH.X} x {UI.Root.WH.Y}\n" +
+                $"App Size: {App.Width} x {App.Height} ({(Native.IsMaximized ? "maximized" : "windowed")})\n" +
+                $"Reloadable Texture2D Used: {TextureTracker.Instance.UsedCount} / {TextureTracker.Instance.TotalCount}\n" +
+                $"Reloadable Texture2D Memory: {GetHumanFriendlyBytes(TextureTracker.Instance.UsedMemory)} / {GetHumanFriendlyBytes(TextureTracker.Instance.TotalMemory)}\n" +
+                $"Pool MAIN Available: {UI.MegaCanvas.Pool.EntriesAlive}\n" +
+                $"Pool MAIN Used: {UI.MegaCanvas.Pool.Used.Count}\n" +
+                $"Pool MAIN Memory: {GetHumanFriendlyBytes(UI.MegaCanvas.Pool.UsedMemory)} / {GetHumanFriendlyBytes(UI.MegaCanvas.Pool.TotalMemory)} \n" +
+                $"Pool MSAA Available: {UI.MegaCanvas.PoolMSAA.EntriesAlive}\n" +
+                $"Pool MSAA Used: {UI.MegaCanvas.PoolMSAA.Used.Count}\n" +
+                $"Pool MSAA Memory: {GetHumanFriendlyBytes(UI.MegaCanvas.PoolMSAA.UsedMemory)} / {GetHumanFriendlyBytes(UI.MegaCanvas.PoolMSAA.TotalMemory)} \n" +
+                $"Atlas Pages: {UI.MegaCanvas.Pages.Count} x {GetHumanFriendlyBytes(UI.MegaCanvas.PageSize * UI.MegaCanvas.PageSize * 4)} \n" +
+                $"Element: {UI.Hovering}, WH: {UI.Hovering?.WH}";
+#endif
 
             Scener.Update(dt);
             UI.Update(dt);

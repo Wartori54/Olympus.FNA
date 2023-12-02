@@ -112,6 +112,7 @@ namespace Olympus {
                                     } catch (Exception e) {
                                         AppLogger.Log.Error("Failed downloading featured entries:");
                                         AppLogger.Log.Error(e, e.Message);
+                                        MetaNotificationScene.PushNotification(new Notification{ Message = "Failed downloading featured entries", Level = Notification.SeverityLevel.Warning });
                                         await UI.Run(() => {
                                             el.DisposeChildren();
                                             el.Add(new Group() {
@@ -645,6 +646,7 @@ namespace Olympus {
                                                 } catch (Exception e) {
                                                     AppLogger.Log.Error("Failed to obtain news");
                                                     AppLogger.Log.Error(e, e.Message);
+                                                    MetaNotificationScene.PushNotification(new Notification{ Message = "Failed to obtain news", Level = Notification.SeverityLevel.Warning });
                                                     UI.Run(() => {
                                                         el.DisposeChildren();
                                                         el.Add(new Group() {
