@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using NativeFileDialogSharp;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
+using System.Linq;
 
 namespace Olympus {
     public class InstallManagerScene : Scene {
@@ -301,6 +302,31 @@ namespace Olympus {
                         App.FinderManager.RemoveInstallation(install);
                         GeneratePanelContent(panel);
                     }));
+                    buttonGroup.Add(new Group {
+                        Layout = {
+                            Layouts.Column(8),
+                        },
+                        Children = {
+                            new UpDownButton("arrow_up", _ => {
+                                panel.PreventNextClick();
+                                int idx = App.Instance.FinderManager.Added.IndexOf(install);
+                                App.Instance.FinderManager.Added.RemoveAt(idx);
+                                App.Instance.FinderManager.Added.Insert(idx - 1, install);
+                                UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
+                            }) {
+                                Enabled = !Equals(App.Instance.FinderManager.Added.First(), install),
+                            },
+                            new UpDownButton("arrow_down", _ => {
+                                panel.PreventNextClick();
+                                int idx = App.Instance.FinderManager.Added.IndexOf(install);
+                                App.Instance.FinderManager.Added.RemoveAt(idx);
+                                App.Instance.FinderManager.Added.Insert(idx + 1, install);
+                                UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
+                            }) {
+                                Enabled = !Equals(App.Instance.FinderManager.Added.Last(), install),
+                            },
+                        }
+                    });
                 }
             });
             
@@ -383,6 +409,36 @@ namespace Olympus {
                 : base(icon, text) {
                 Callback += cb;
                 WH = new(64, 64);
+            }
+        }
+        
+        private class UpDownButton : MetaMainScene.SidebarButton {
+            public new static readonly Style DefaultStyle = new() {
+                {
+                    StyleKeys.Hovered,
+                    new Style() {
+                        { Panel.StyleKeys.Background, new Color(0xff, 0x30, 0x30, 0xff) },
+                        { StyleKeys.Foreground, new Color(0xff, 0xff, 0xff, 0xff) },
+                        { Panel.StyleKeys.Shadow, 0f },
+                    }
+                },
+                {
+                    StyleKeys.Pressed,
+                    new Style() {
+                        { Panel.StyleKeys.Background, new Color(0xc3, 0x00, 0x00, 0xc0) },
+                        { StyleKeys.Foreground, new Color(0xff, 0xff, 0xff, 0xff) },
+                        { Panel.StyleKeys.Shadow, 0f },
+                    }
+                },
+            };
+
+            public UpDownButton(string icon, Action<Button> cb)
+                : this(OlympUI.Assets.GetTexture($"icons/{icon}"), string.Empty, cb) { }
+            public UpDownButton(IReloadable<Texture2D, Texture2DMeta> icon, string text, Action<Button> cb)
+                : base(icon, text) {
+                Callback += cb;
+                WH = new(28, 28);
+                Icon.AutoW = 28/2;
             }
         }
 
