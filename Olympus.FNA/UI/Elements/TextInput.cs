@@ -123,7 +123,8 @@ public partial class TextInput : Panel {
 
     public Action<TextInput>? ClickCallback;
     public Action<TextInput>? TextCallback;
-    public Action<TextInput>? ConfirmCallback;
+    // Handles pressing enter. If it returns false, the input will not be passed to the text.
+    public Func<TextInput, bool>? EnterCallback;
     
     private readonly Label TextLabel;
     private readonly Label PlaceholderLabel;
@@ -211,11 +212,12 @@ public partial class TextInput : Panel {
         const char HOME = (char)0x02;
         const char END = (char)0x03;
         
-        if (chr == '\n' || chr == '\r') {
-            ConfirmCallback?.Invoke(this);
+        if (chr == '\n' || chr == '\r' && 
+            EnterCallback != null && !EnterCallback(this)) {
+            // Enter already got handled
             return;
-        }
-        
+        } 
+
         if (chr == BACKSPACE) {
             BeforeCursorMove(Action.Edit);
             if (Cursor <= 0) {

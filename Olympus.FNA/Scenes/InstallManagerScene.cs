@@ -244,13 +244,14 @@ namespace Olympus {
                         MaxLength = 50,
                         ClickCallback = _ => panel.PreventNextClick(),
                         TextCallback = _ => panel.InvalidateFullDown(),
-                        ConfirmCallback = input => {
+                        EnterCallback = input => {
                             if (UI.Focusing == input) UI.Run(() => UI.SetFocused(null));
                             install.NameOverride = input.Text.Trim();
                             RenamingInstalls.Remove(install);
                             GeneratePanelContent(panel);
                             // Re-set value to re-fire the event
-                            Config.Instance.Installation = SelectedInstall; 
+                            Config.Instance.Installation = SelectedInstall;
+                            return false;
                         },
                         Style = {
                             { TextInput.StyleKeys.Placeholder, Color.Yellow}
