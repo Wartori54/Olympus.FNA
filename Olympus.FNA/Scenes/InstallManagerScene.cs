@@ -263,67 +263,89 @@ namespace Olympus {
                 textGroup.Add(labelVersion ??= new Label("Scanning..."));
                 textGroup.Add(new LabelSmall(install.Root));
 
+                const int ButtonSize = 64;
+                const int Spacing = 8;
+                const int SmallButtonSize = ButtonSize / 2 - Spacing / 2; 
+                const int SmallIconSize = SmallButtonSize / 2;
+                
                 var buttonGroup = panel.Add(new Group {
                     Layout = {
                         Layouts.Top(0.5f, -0.5f),
-                        Layouts.Right(8),
-                        Layouts.Row(8, resize: false),
+                        Layouts.Right(Spacing),
+                        Layouts.Row(Spacing, resize: false),
                     },
                 });
                 if (RenamingInstalls.Contains(install)) {
-                    //TODO: Use a proper done icon
-                    buttonGroup.Add(new RenameButton("search", "Done", b => {
-                        panel.PreventNextClick();
-                        // Make sure to trim it
-                        install.NameOverride = panel.FindChild<TextInput>()!.Text.Trim();
-                        RenamingInstalls.Remove(install);
-                        GeneratePanelContent(panel);
-                        // Re-set value to re-fire the event
-                        Config.Instance.Installation = SelectedInstall;
-                    }));
-                    buttonGroup.Add(new RenameButton("close", "Cancel", b => {
-                        panel.PreventNextClick();
-                        RenamingInstalls.Remove(install);
-                        GeneratePanelContent(panel);
-                    })); 
+                    buttonGroup.Add(new MetaMainScene.SidebarButton("done", "Done") {
+                        WH = new(ButtonSize, ButtonSize),
+                        Callback = _ => {
+                            panel.PreventNextClick();
+                            // Make sure to trim it
+                            install.NameOverride = panel.FindChild<TextInput>()!.Text.Trim();
+                            RenamingInstalls.Remove(install);
+                            GeneratePanelContent(panel);
+                            // Re-set value to re-fire the event
+                            Config.Instance.Installation = SelectedInstall;
+                        }
+                    });
+                    buttonGroup.Add(new MetaMainScene.SidebarButton("cancel", "Cancel") {
+                        WH = new(ButtonSize, ButtonSize),
+                        Callback = _ => {
+                            panel.PreventNextClick();
+                            RenamingInstalls.Remove(install);
+                            GeneratePanelContent(panel);
+                        },
+                    }); 
                 } else {
-                    //TODO: Use a proper edit icon
-                    buttonGroup.Add(new RenameButton("search", "Rename", b => {
-                        panel.PreventNextClick();
-                        RenamingInstalls.Add(install);
-                        GeneratePanelContent(panel);
-                        UI.Run(() => UI.SetFocused(panel.FindChild<TextInput>()));
-                    }));                    
+                    buttonGroup.Add(new MetaMainScene.SidebarButton("edit", "Rename") {
+                        WH = new(ButtonSize, ButtonSize),
+                        Callback = _ => {
+                            panel.PreventNextClick();
+                            RenamingInstalls.Add(install);
+                            GeneratePanelContent(panel);
+                            UI.Run(() => UI.SetFocused(panel.FindChild<TextInput>()));
+                        },
+                    });                    
                 }
 
                 if (install.Type == Installation.InstallationType.Manual) {
-                    buttonGroup.Add(new RemoveButton("delete", "Delete", b => {
+                    buttonGroup.Add(new RemoveButton("delete", "Delete", _ => {
                         panel.PreventNextClick();
                         App.FinderManager.RemoveInstallation(install);
                         GeneratePanelContent(panel);
-                    }));
+                    }) {
+                        WH = new(ButtonSize, ButtonSize),
+                    });
                     buttonGroup.Add(new Group {
                         Layout = {
                             Layouts.Column(8),
                         },
                         Children = {
-                            new UpDownButton("arrow_up", _ => {
-                                panel.PreventNextClick();
-                                int idx = App.Instance.FinderManager.Added.IndexOf(install);
-                                App.Instance.FinderManager.Added.RemoveAt(idx);
-                                App.Instance.FinderManager.Added.Insert(idx - 1, install);
-                                UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
-                            }) {
+                            new MetaMainScene.SidebarButton("arrow_up", string.Empty) {
                                 Enabled = !Equals(App.Instance.FinderManager.Added.First(), install),
+                                WH = new(SmallButtonSize, SmallButtonSize),
+                                Init = el => ((MetaMainScene.SidebarButton) el).Icon.AutoW = SmallIconSize,
+                                Callback = _ => {
+                                    panel.PreventNextClick();
+                                    int idx = App.Instance.FinderManager.Added.IndexOf(install);
+                                    App.Instance.FinderManager.Added.RemoveAt(idx);
+                                    App.Instance.FinderManager.Added.Insert(idx - 1, install);
+                                    UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
+                                    InstallsManual.InvalidateFullDown();
+                                },
                             },
-                            new UpDownButton("arrow_down", _ => {
-                                panel.PreventNextClick();
-                                int idx = App.Instance.FinderManager.Added.IndexOf(install);
-                                App.Instance.FinderManager.Added.RemoveAt(idx);
-                                App.Instance.FinderManager.Added.Insert(idx + 1, install);
-                                UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
-                            }) {
+                            new MetaMainScene.SidebarButton("arrow_down", string.Empty) {
                                 Enabled = !Equals(App.Instance.FinderManager.Added.Last(), install),
+                                WH = new(SmallButtonSize, SmallButtonSize),
+                                Init = el => ((MetaMainScene.SidebarButton) el).Icon.AutoW = SmallIconSize,
+                                Callback = _ => {
+                                    panel.PreventNextClick();
+                                    int idx = App.Instance.FinderManager.Added.IndexOf(install);
+                                    App.Instance.FinderManager.Added.RemoveAt(idx);
+                                    App.Instance.FinderManager.Added.Insert(idx + 1, install);
+                                    UpdateInstallList(FinderUpdateState.Manual, App.Instance.FinderManager.Added, InstallList.Added);
+                                    InstallsManual.InvalidateFullDown();
+                                },
                             },
                         }
                     });
@@ -379,66 +401,6 @@ namespace Olympus {
             public RemoveButton(IReloadable<Texture2D, Texture2DMeta> icon, string text, Action<Button> cb)
                 : base(icon, text) {
                 Callback += cb;
-                WH = new(64, 64);
-            }
-        }
-
-        private class RenameButton : MetaMainScene.SidebarButton {
-            public new static readonly Style DefaultStyle = new() {
-                {
-                    StyleKeys.Hovered,
-                    new Style() {
-                        { Panel.StyleKeys.Background, new Color(0xff, 0x30, 0x30, 0xff) },
-                        { StyleKeys.Foreground, new Color(0xff, 0xff, 0xff, 0xff) },
-                        { Panel.StyleKeys.Shadow, 0f },
-                    }
-                },
-                {
-                    StyleKeys.Pressed,
-                    new Style() {
-                        { Panel.StyleKeys.Background, new Color(0xc3, 0x00, 0x00, 0xc0) },
-                        { StyleKeys.Foreground, new Color(0xff, 0xff, 0xff, 0xff) },
-                        { Panel.StyleKeys.Shadow, 0f },
-                    }
-                },
-            };
-
-            public RenameButton(string icon, string text, Action<Button> cb)
-                : this(OlympUI.Assets.GetTexture($"icons/{icon}"), text, cb) { }
-            public RenameButton(IReloadable<Texture2D, Texture2DMeta> icon, string text, Action<Button> cb)
-                : base(icon, text) {
-                Callback += cb;
-                WH = new(64, 64);
-            }
-        }
-        
-        private class UpDownButton : MetaMainScene.SidebarButton {
-            public new static readonly Style DefaultStyle = new() {
-                {
-                    StyleKeys.Hovered,
-                    new Style() {
-                        { Panel.StyleKeys.Background, new Color(0xff, 0x30, 0x30, 0xff) },
-                        { StyleKeys.Foreground, new Color(0xff, 0xff, 0xff, 0xff) },
-                        { Panel.StyleKeys.Shadow, 0f },
-                    }
-                },
-                {
-                    StyleKeys.Pressed,
-                    new Style() {
-                        { Panel.StyleKeys.Background, new Color(0xc3, 0x00, 0x00, 0xc0) },
-                        { StyleKeys.Foreground, new Color(0xff, 0xff, 0xff, 0xff) },
-                        { Panel.StyleKeys.Shadow, 0f },
-                    }
-                },
-            };
-
-            public UpDownButton(string icon, Action<Button> cb)
-                : this(OlympUI.Assets.GetTexture($"icons/{icon}"), string.Empty, cb) { }
-            public UpDownButton(IReloadable<Texture2D, Texture2DMeta> icon, string text, Action<Button> cb)
-                : base(icon, text) {
-                Callback += cb;
-                WH = new(28, 28);
-                Icon.AutoW = 28/2;
             }
         }
 
