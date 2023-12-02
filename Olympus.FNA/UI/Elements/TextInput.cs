@@ -124,6 +124,7 @@ public partial class TextInput : Panel {
 
     public Action<TextInput>? ClickCallback;
     public Action<TextInput>? TextCallback;
+    public Action<TextInput>? ConfirmCallback;
     
     private readonly Label TextLabel;
     private readonly Label PlaceholderLabel;
@@ -208,8 +209,10 @@ public partial class TextInput : Panel {
         const char HOME = (char)0x02;
         const char END = (char)0x03;
         
-        // Ignore enter (at least for now)
-        if (chr == '\n' || chr == '\r') return;
+        if (chr == '\n' || chr == '\r') {
+            ConfirmCallback?.Invoke(this);
+            return;
+        }
         
         if (chr == BACKSPACE) {
             BeforeCursorMove(Action.Edit);

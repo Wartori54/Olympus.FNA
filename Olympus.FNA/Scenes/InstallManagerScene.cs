@@ -244,6 +244,11 @@ namespace Olympus {
                         Placeholder = "Manual Installation",
                         ClickCallback = _ => panel.PreventNextClick(),
                         TextCallback = _ => panel.InvalidateFullDown(),
+                        ConfirmCallback = input => {
+                            install.Name = input.Text.Trim();
+                            RenamingInstalls.Remove(install);
+                            GeneratePanelContent(panel);
+                        },
                         Style = {
                             { TextInput.StyleKeys.Placeholder, Color.Yellow}
                         }
