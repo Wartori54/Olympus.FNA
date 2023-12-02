@@ -285,6 +285,7 @@ namespace Olympus {
                         panel.PreventNextClick();
                         RenamingInstalls.Add(install);
                         GeneratePanelContent(panel);
+                        UI.Run(() => UI.Focusing = panel.FindChild<TextInput>());
                     }));                    
                 }
 
