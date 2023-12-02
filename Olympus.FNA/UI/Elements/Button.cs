@@ -54,6 +54,8 @@ namespace OlympUI {
 
         protected Style.Entry StyleForeground = new(new ColorFader());
 
+        public override CursorStyle CursorStyle => Enabled ? CursorStyle = CursorStyle.Pointer : CursorStyle.Normal;
+
         public string Text {
             get => GetChild<Label>()?.Text ?? "";
             set => _ = GetChild<Label>() is Label label ? label.Text = value : null;
@@ -67,7 +69,6 @@ namespace OlympUI {
 
         public Button() {
             Interactive = InteractiveMode.Process;
-            CursorStyle = CursorStyle.Pointer;
         }
 
         public Button(string text)
