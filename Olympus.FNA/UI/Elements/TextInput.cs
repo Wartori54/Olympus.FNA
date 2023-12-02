@@ -88,7 +88,7 @@ public partial class TextInput : Panel {
     protected Style.Entry StylePlaceholder = new(new ColorFader());
     protected Style.Entry StyleSelection = new(new ColorFader());
     protected Style.Entry StyleCursor = new(new ColorFader());
-    
+
     public int Cursor = 0;
     public SelectionArea Selection = new() { Start = -1 };
 
@@ -149,6 +149,7 @@ public partial class TextInput : Panel {
         CursorMesh = new BasicMesh(UI.Game) {
             Texture = Assets.White
         };
+        CursorStyle = CursorStyle.Text;
         
         Style.Apply(StyleState);
         

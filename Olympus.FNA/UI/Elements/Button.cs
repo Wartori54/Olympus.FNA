@@ -67,6 +67,7 @@ namespace OlympUI {
 
         public Button() {
             Interactive = InteractiveMode.Process;
+            CursorStyle = CursorStyle.Pointer;
         }
 
         public Button(string text)

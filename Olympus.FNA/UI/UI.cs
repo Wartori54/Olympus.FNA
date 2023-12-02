@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using OlympUI.MegaCanvas;
 using Olympus;
+using SDL2;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -67,6 +68,8 @@ namespace OlympUI {
         private static readonly AutoRotatingPool<List<Action>> RunLateListPool = new(8);
         private static List<Action> RunLateList = RunLateListPool.Next();
         private static HashSet<Action> RunOnceList = new();
+        private static CursorStyle CurrentCursorStyle = CursorStyle.Normal;
+        private static IntPtr? CurrentCursorPtr = null;
 
         private static Point WHPrev;
 
@@ -180,6 +183,29 @@ namespace OlympUI {
                     if (UIInput.MouseDXY != default) {
                         Dragging?.InvokeUp(new MouseEvent.Drag());
                     }
+                }
+                
+                var cursorStyle = Hovering?.CursorStyle ?? CursorStyle.Normal;
+                if (cursorStyle != CurrentCursorStyle) {
+                    if (CurrentCursorPtr != null) SDL.SDL_FreeCursor((IntPtr)CurrentCursorPtr);
+                    
+                    CurrentCursorStyle = cursorStyle;
+                    CurrentCursorPtr = SDL.SDL_CreateSystemCursor(CurrentCursorStyle switch {
+                        CursorStyle.Normal => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_ARROW,
+                        CursorStyle.Pointer => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_CROSSHAIR,
+                        CursorStyle.Text => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_IBEAM,
+                        CursorStyle.Loading => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_WAIT,
+                        CursorStyle.LoadingSmall => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_WAITARROW,
+                        CursorStyle.Crosshair => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_CROSSHAIR,
+                        CursorStyle.ResizeN_S => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_SIZENS,
+                        CursorStyle.ResizeW_E => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_SIZEWE,
+                        CursorStyle.ResizeNW_SE => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_SIZENWSE,
+                        CursorStyle.ResizeNE_SW => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_SIZENESW,
+                        CursorStyle.ResizeN_S_W_E => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_SIZEALL,
+                        CursorStyle.Disabled => SDL.SDL_SystemCursor.SDL_SYSTEM_CURSOR_NO,
+                        _ => throw new ArgumentOutOfRangeException()
+                    });
+                    SDL.SDL_SetCursor((IntPtr)CurrentCursorPtr);
                 }
 
                 for (MouseButtons btn = MouseButtons.First; btn <= MouseButtons.Last; btn = (MouseButtons) ((int) btn << 1)) {
