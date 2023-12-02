@@ -196,6 +196,8 @@ public partial class TextInput : Panel {
     }
     private void AfterCursorMove(Action action) {
         Cursor = Math.Clamp(Cursor, 0, Text.Length);
+        CursorBlinkState = true;
+        CursorBlinkTimer = TimeSpan.Zero;
 
         if ((UIInput.Down(Keys.LeftShift) || UIInput.Down(Keys.RightShift)) && action != Action.Edit) {
             Selection.End = Cursor;
