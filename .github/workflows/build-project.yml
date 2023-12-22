@@ -32,7 +32,7 @@ jobs:
         run: dotnet build --no-restore -c Debug -r ${{ matrix.arch.dotnet_runtime }} --no-self-contained
       - name: Build Release
         working-directory: ./Olympus.FNA
-        run: dotnet publish --no-restore -c Release --self-contained -r ${{ matrix.arch.dotnet_runtime }}
+        run: dotnet publish --no-restore -c Release -r ${{ matrix.arch.dotnet_runtime }} --no-self-contained
       # Debug artifact cannot be uploaded, since it is not portable
       - name: Upload release artifact
         uses: actions/upload-artifact@v3
