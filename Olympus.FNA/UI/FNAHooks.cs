@@ -2,6 +2,7 @@
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;
 using MonoMod.RuntimeDetour;
@@ -21,6 +22,7 @@ namespace OlympUI {
         public static bool RenderTargetDiscardClear = false;
 #endif
         public static event Action<Game>? ExposeEvent;
+        public static int ConsecutiveClicks { get; private set; }
 
         public static string? FNA3DDriver;
         public static FNA3DDeviceInfo? FNA3DDevice;
@@ -28,12 +30,15 @@ namespace OlympUI {
 
         private static ILHook? ApplyWindowChangesPatch;
         private static ILHook? DebugFNA3DPatch;
-        public static ILHook? RedrawWindowPatch;
+        private static ILHook? RedrawWindowPatch;
+        private static ILHook? DoubleClickPatch;
 #if FNAHOOKS_RENDERTARGETDISCARDCLEAR
         private static ILHook? DisableRenderTargetDiscardClearPatch;
 #endif
 
         private static Action<RenderTarget2D, RenderTargetUsage>? _SetRenderTargetUsage;
+        
+        private static MethodInfo m_ToXNAKey;
 
         public static void Apply() {
             Undo();
@@ -120,6 +125,27 @@ namespace OlympUI {
                 }
             );
 
+            DoubleClickPatch = new ILHook(
+                t_SDL2_FNAPlatform.GetMethod("PollEvents", BindingFlags.Static | BindingFlags.Public)
+                ?? throw new Exception("FNA without SDL2_FNAPlatform.PollEvents?"),
+                il => {
+                    ILCursor c = new(il);
+                    c.GotoNext(i =>
+                        i.MatchCall(typeof(Mouse).GetMethod("INTERNAL_onClicked",
+                                        BindingFlags.Static | BindingFlags.NonPublic)
+                                    ?? throw new Exception("FNA without Mouse.INTERNAL_onClicked?")));
+                    c.GotoNext();
+                    c.Emit(OpCodes.Nop);
+                    c.Emit(OpCodes.Ldloc_0);
+                    c.Emit(OpCodes.Call,
+                        il.Import(t_FNAHooks.GetMethod(nameof(DoubleClickPatch_MouseDownEvent),
+                            BindingFlags.NonPublic | BindingFlags.Static)));
+                }
+            );
+
+            m_ToXNAKey = t_SDL2_FNAPlatform.GetMethod("ToXNAKey", BindingFlags.Static | BindingFlags.NonPublic) 
+                         ?? throw new Exception("FNA without SDL2_FNAPlatform.ToXNAKey?");
+            
             FNALoggerEXT.LogInfo += OnLogInfo;
         }
 
@@ -133,6 +159,10 @@ namespace OlympUI {
             FNALoggerEXT.LogInfo -= OnLogInfo;
         }
 
+        public static Keys ToXNAKey(ref SDL.SDL_Keysym key) {
+            return (Keys)m_ToXNAKey.Invoke(null, new object[] { key })!;
+        }
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SetRenderTargetUsage(this RenderTarget2D self, RenderTargetUsage value) {
             _SetRenderTargetUsage!.Invoke(self, value);
@@ -162,6 +192,12 @@ namespace OlympUI {
 
         private static void RedrawWindowPatch_RedrawWindow(Game game) {
             ExposeEvent?.Invoke(game);
+        }
+
+        private static void DoubleClickPatch_MouseDownEvent(SDL.SDL_Event mouseButtonEvent) {
+            if (mouseButtonEvent.type != SDL.SDL_EventType.SDL_MOUSEBUTTONDOWN) 
+                throw new Exception("FNAHooks: got sent a wrong SDL_Event!!!");
+            ConsecutiveClicks = mouseButtonEvent.button.clicks;
         }
 
         private static void OnLogInfo(string line) {

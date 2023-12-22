@@ -560,6 +560,7 @@ namespace OlympUI {
         }
 
         public class Press : ButtonEvent {
+            public int ConsecutiveClicks;
         }
 
         public class Release : ButtonEvent {
@@ -577,6 +578,11 @@ namespace OlympUI {
             }
 
         }
-
+    }
+    
+    [AutoInteractiveEvent]
+    public class FocusEvent : Event {
+        public class Focus : FocusEvent { }
+        public class Unfocus : FocusEvent { }
     }
 }

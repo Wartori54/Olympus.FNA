@@ -171,6 +171,8 @@ namespace OlympUI {
                 InvalidateFull();
             }
         }
+        
+        public virtual CursorStyle CursorStyle { get; set; } = CursorStyle.Normal;
 
         #endregion
 
