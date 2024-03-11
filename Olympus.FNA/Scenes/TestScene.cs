@@ -161,7 +161,9 @@ namespace Olympus {
                                             Children = {
                                             new Label("text"),
                                             }
-                                        }
+                                        },
+                                        new TestElement() {
+                                        },
                                     },
                                 }
                             }

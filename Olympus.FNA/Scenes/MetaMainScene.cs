@@ -369,7 +369,7 @@ namespace Olympus {
             public SidebarNavButton(IReloadable<Texture2D, Texture2DMeta> icon, string text, Scene scene)
                 : base(icon, text) {
                 Scene = scene;
-                Add(new SidebarNavButtonIndicator(this) {
+                Add(new SidebarNavButtonIndicator(() => Current) {
                     X = 4,
                     W = 4,
                     Layout = {
@@ -408,7 +408,8 @@ namespace Olympus {
                 },
             };
 
-            public readonly SidebarNavButton Button;
+            public readonly Func<bool> IsCurrent;
+            public bool IsHorizontal = false;
 
             protected Style.Entry StyleColor = new(new ColorFader());
             protected Style.Entry StyleScale = new(new FloatFader());
@@ -420,16 +421,16 @@ namespace Olympus {
 
             protected override bool IsComposited => false;
 
-            public SidebarNavButtonIndicator(SidebarNavButton button) {
+            public SidebarNavButtonIndicator(Func<bool> isCurrent) {
                 Cached = false;
-                Button = button;
+                IsCurrent = isCurrent;
                 Mesh = new BasicMesh(UI.Game) {
                     Texture = OlympUI.Assets.GradientQuadY
                 };
             }
 
             public override void Update(float dt) {
-                Style.Apply(Button.Current ? StyleKeys.Active : StyleKeys.Normal);
+                Style.Apply(IsCurrent() ? StyleKeys.Active : StyleKeys.Normal);
 
                 base.Update(dt);
             }
@@ -446,12 +447,21 @@ namespace Olympus {
                     shapes.Clear();
 
                     if (color != default) {
-                        shapes.Add(new MeshShapes.Rect() {
-                            Color = color,
-                            XY1 = new(0f, wh.Y * (0.5f - 0.5f * scale)),
-                            Size = new(wh.X, wh.Y * scale),
-                            Radius = Math.Min(wh.X, wh.Y * scale) * 0.5f,
-                        });
+                        if (!IsHorizontal) {
+                            shapes.Add(new MeshShapes.Rect() {
+                                Color = color,
+                                XY1 = new(0f, wh.Y * (0.5f - 0.5f * scale)),
+                                Size = new(wh.X, wh.Y * scale),
+                                Radius = Math.Min(wh.X, wh.Y * scale) * 0.5f,
+                            });
+                        } else {
+                            shapes.Add(new MeshShapes.Rect() {
+                                Color = color,
+                                XY1 = new(wh.X * (0.5f - 0.5f * scale), 0f),
+                                Size = new(wh.X * scale, wh.Y),
+                                Radius = Math.Min(wh.X * scale, wh.Y) * 0.5f,
+                            });
+                        }
                     }
 
                     // Fix UVs manually as we're using a gradient texture.

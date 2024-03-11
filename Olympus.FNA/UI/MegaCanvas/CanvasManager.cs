@@ -18,17 +18,18 @@ namespace OlympUI.MegaCanvas {
 
         public readonly CanvasPool Pool;
         public readonly CanvasPool PoolMSAA;
+        public CanvasPool DefaultPool => PoolMSAA;
 
         public readonly List<AtlasPage> Pages = new();
 
         private readonly BasicMesh BlitMesh;
         private readonly ReloadableSlot<Texture2D, Texture2DMeta> BlitTextureSlot = new();
 
-        private readonly Queue<Action> Queued = new();
+        private readonly Queue<Action> Queued = new(); // TODO: replace this with a delayed dispose, since its only used for that
 
         public CanvasManager(Game game) {
             Game = game;
-            BlitMesh = new(game) {
+            BlitMesh = new BasicMesh(game) {
                 MSAA = false,
                 Texture = BlitTextureSlot,
                 BlendState = BlendState.Opaque,
@@ -130,6 +131,12 @@ namespace OlympUI.MegaCanvas {
         public RenderTarget2DRegion? GetPacked(RenderTarget2D old)
             => GetPacked(old, new(0, 0, old.Width, old.Height));
 
+        /// <summary>
+        /// Obtains a region from any atlas with the specified bounds and copies the data to it.
+        /// </summary>
+        /// <param name="old">The region from where the data should be copied from.</param>
+        /// <param name="oldBounds">The bounds of that region to copy.</param>
+        /// <returns>A new region with the data.</returns>
         public RenderTarget2DRegion? GetPacked(RenderTarget2D old, Rectangle oldBounds) {
             RenderTarget2DRegion? packed = GetPackedRegion(oldBounds);
             if (packed is null)
@@ -142,6 +149,14 @@ namespace OlympUI.MegaCanvas {
         public RenderTarget2DRegion? GetPackedAndFree(RenderTarget2DRegion old)
             => GetPackedAndFree(old, old.Region);
 
+        /// <summary>
+        /// Obtains a new region from any atlas with the specified bounds and disposes the old one.
+        /// <br />
+        /// Basically a migrate to atlas one liner.
+        /// </summary>
+        /// <param name="old">The region to copy and delete.</param>
+        /// <param name="oldBounds">Its bounds.</param>
+        /// <returns>A new region in the atlas with the old data.</returns>
         public RenderTarget2DRegion? GetPackedAndFree(RenderTarget2DRegion old, Rectangle oldBounds) {
             RenderTarget2DRegion? packed = GetPacked(old.RT, oldBounds);
             if (packed is null)
@@ -151,21 +166,24 @@ namespace OlympUI.MegaCanvas {
             return packed;
         }
 
+        /// <summary>
+        /// Obtains a region from any atlas.
+        /// </summary>
+        /// <param name="want">The region to obtain.</param>
+        /// <returns>A region in the atlas or null if the operation fails.</returns>
         public RenderTarget2DRegion? GetPackedRegion(Rectangle want) {
             if (want.Width > MaxPackedSize || want.Height > MaxPackedSize)
                 return null;
 
-            {
-                foreach (AtlasPage page in Pages)
-                    if (page.GetRegion(want) is RenderTarget2DRegion rtrg)
-                        return rtrg;
-            }
-
-            {
-                AtlasPage page = new(this);
-                Pages.Add(page);
-                return page.GetRegion(want);
-            }
+            // Get a region from an existing page
+            foreach (AtlasPage page in Pages)
+                if (page.GetRegion(want) is { } rtrg)
+                    return rtrg;
+            
+            // Or create a new page and obtain a region from there
+            AtlasPage newPage = CreateNewPage();
+            return newPage.GetRegion(want) ?? throw new Exception("Failed to obtain region from newly born atlas!?");
+            
         }
 
         public void Dump(string dir) {
@@ -211,14 +229,16 @@ namespace OlympUI.MegaCanvas {
                 ("main", Pool),
                 ("msaa", PoolMSAA),
             }) {
+                pool.Pool.Dump(dir, pool.Name);
                 for (int i = pool.Pool.Entries.Length - 1; i >= 0; --i) {
-                    CanvasPool.Entry entry = pool.Pool.Entries[i];
+                    CanvasPool.RenderTarget2DWrapper entry = pool.Pool.Entries[i];
                     if (entry.IsDisposed)
                         continue;
                     using FileStream fs = new(Path.Combine(dir, $"pooled_{pool.Name}_{i}.png"), FileMode.Create);
-                    entry.RT.SaveAsPng(fs, entry.RT.Width, entry.RT.Height);
+                    // RT nullability is handled in `IsDisposed`
+                    entry.RT!.SaveAsPng(fs, entry.RT.Width, entry.RT.Height);
                 }
-
+                
                 {
                     int i = 0;
                     foreach (RenderTarget2D rt in pool.Pool.Used) {
@@ -229,6 +249,23 @@ namespace OlympUI.MegaCanvas {
                 }
             }
         }
+
+        private AtlasPage CreateNewPage() {
+            AtlasPage newPage = new(this);
+            Pages.Add(newPage);
+            return newPage;
+        }
+        
+#if DEBUG
+        public bool IsOnAtlas(RenderTarget2DRegion region) {
+            foreach (AtlasPage page in Pages) {
+                if (page.Taken.Contains(region))
+                    return true;
+            }
+            return false;
+        }
+        
+#endif
 
     }
 }

@@ -13,21 +13,23 @@ namespace OlympUI {
             (gd, _) => new MiniEffect(gd)
         );
 
-        protected EffectParameter TransformParam;
-        protected bool TransformValid;
-        protected Matrix TransformValue = Matrix.Identity;
-        public Matrix Transform {
-            get => TransformValue;
-            set => _ = (TransformValue = value, TransformValid = false);
-        }
+        public MiniEffectParam<Matrix> TransformParam { get; private set; }
+        // protected EffectParameter TransformParam;
+        // protected bool TransformValid;
+        // protected Matrix TransformValue = Matrix.Identity;
+        // public Matrix Transform {
+            // get => TransformValue;
+            // set => _ = (TransformValue = value, TransformValid = false);
+        // }
 
-        protected EffectParameter ColorParam;
-        protected bool ColorValid;
-        protected Vector4 ColorValue = new(1f, 1f, 1f, 1f);
-        public Vector4 Color {
-            get => ColorValue;
-            set => _ = (ColorValue = value, ColorValid = false);
-        }
+        public MiniEffectParam<Vector4> ColorParam { get; private set;  }
+        // protected EffectParameter ColorParam;
+        // protected bool ColorValid;
+        // protected Vector4 ColorValue = new(1f, 1f, 1f, 1f);
+        // public Vector4 Color {
+            // get => ColorValue;
+            // set => _ = (ColorValue = value, ColorValid = false);
+        // }
 
         public MiniEffect(GraphicsDevice graphicsDevice)
             : base(graphicsDevice, Cache.GetData()) {
@@ -53,20 +55,14 @@ namespace OlympUI {
         [MemberNotNull(nameof(TransformParam))]
         [MemberNotNull(nameof(ColorParam))]
         private void SetupParams() {
-            TransformParam = Parameters[0];
-            ColorParam = Parameters[1];
+            TransformParam = new MiniEffectParam<Matrix>(Parameters[0], Matrix.Identity);
+            ColorParam = new MiniEffectParam<Vector4>(Parameters[1], new Vector4(1f, 1f, 1f, 1f));
         }
 
         protected override void OnApply() {
-            if (!TransformValid) {
-                TransformValid = true;
-                TransformParam.SetValue(TransformValue);
-            }
+            TransformParam.Apply();
 
-            if (!ColorValid) {
-                ColorValid = true;
-                ColorParam.SetValue(ColorValue);
-            }
+            ColorParam.Apply();
         }
 
     }
@@ -125,5 +121,90 @@ namespace OlympUI {
 
         public abstract IReloadable<MiniEffect, NullMeta> GetEffect(Func<GraphicsDevice> gd, T arg);
 
+    }
+
+    public class MiniEffectParam<T> {
+        public EffectParameter EffectParameter { get; private set; }
+        private bool effectDirty = true;
+        private T effectValue;
+
+        public T Value {
+            get => effectValue;
+            set {
+                effectValue = value;
+                effectDirty = true;
+            }
+        }
+
+        public MiniEffectParam(EffectParameter effectParameter, T defaultValue) {
+            EffectParameter = effectParameter;
+            Value = defaultValue;
+        }
+
+        public void Apply() {
+            if (!effectDirty) return;
+            effectDirty = false;
+            // I am so sorry
+            switch (effectValue) {
+                case bool value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case bool[] value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case int value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case int[] value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case Matrix value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case Matrix[] value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case Quaternion value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case Quaternion[] value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case float value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case float[] value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case string value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case Texture value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case Vector2 value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case Vector2[] value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case Vector3 value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case Vector3[] value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case Vector4 value:
+                    EffectParameter.SetValue(value);
+                    break;
+                case Vector4[] value:
+                    EffectParameter.SetValue(value);
+                    break;
+                default:
+                    throw new NotImplementedException();
+                    
+            }
+        }
+        
     }
 }

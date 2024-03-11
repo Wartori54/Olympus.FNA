@@ -24,18 +24,22 @@ namespace OlympUI {
             }
         }
 
-        public EventStatus Status { get; set; }
+        public EventStatus Status { get; private set; }
 
         public long Extra { get; set; }
 
-        public void End() {
+        public virtual void End() {
             if (Status < EventStatus.Finished)
                 Status = EventStatus.Finished;
         }
 
-        public void Cancel() {
+        public virtual void Cancel() {
             if (Status < EventStatus.Cancelled)
                 Status = EventStatus.Cancelled;
+        }
+        
+        public virtual void Reset() {
+            Status = EventStatus.Normal;
         }
 
     }
@@ -151,7 +155,7 @@ namespace OlympUI {
 
         public T Invoke<T>(T e) where T : Event {
             for (Type? type = typeof(T); type is not null && type != typeof(object); type = type.BaseType) {
-                e.Status = EventStatus.Normal;
+                e.Reset();
                 foreach (EventHandler handler in GetHandlers(type)) {
                     e.Element = Owner;
                     handler.Callback(e);
@@ -198,6 +202,9 @@ namespace OlympUI {
             Subpass = subpass;
         }
 
+        public override void Cancel() {
+            throw new InvalidOperationException("LayoutEvents cannot be canceled!");
+        }
     }
 
     public enum LayoutForce {
@@ -270,7 +277,7 @@ namespace OlympUI {
 
         public LayoutHandlers(Element owner) {
             Owner = owner;
-            Scan(owner.GetType());
+            AddAttributeHandlers();
         }
 
         public void Clear() {
@@ -280,116 +287,69 @@ namespace OlympUI {
 
         public void Reset() {
             Clear();
-            Scan(Owner.GetType());
+            AddAttributeHandlers();
         }
 
-        internal void Scan(Type startingType) {
-            // FIXME: Cache!
-            object[] registerArgs = new object[1];
-            for (Type? parentType = startingType; parentType is not null && parentType != typeof(object); parentType = parentType.BaseType) {
-                foreach (MethodInfo method in parentType.GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)) {
-                    if (!method.Name.StartsWith("Layout") ||
-                        method.ReturnType != typeof(void) || method.GetParameters() is not ParameterInfo[] args ||
-                        args.Length != 1 || args[0].ParameterType is not Type paramType ||
-                        !typeof(LayoutEvent).IsAssignableFrom(paramType))
-                        continue;
-                    int indexOfSplit = method.Name.LastIndexOf('_');
-                    if (!Enum.TryParse(
-                            method.Name == "Layout" ? "Normal" :
-                            indexOfSplit != -1 ? method.Name.Substring("Layout".Length, indexOfSplit - "Layout".Length) :
-                            method.Name.Substring("Layout".Length),
-                            out LayoutPass pass
-                        ))
-                        pass = LayoutPass.Normal;
-                    if (indexOfSplit != -1) {
-                        if (method.Name[indexOfSplit + 1] == 'P' && int.TryParse(method.Name.Substring(indexOfSplit + 2), out int offs)) {
-                            pass += offs;
-                        } else if (method.Name[indexOfSplit + 1] == 'M' && int.TryParse(method.Name.Substring(indexOfSplit + 2), out offs)) {
-                            pass -= offs;
-                        }
-                    }
-                    LayoutSubpass subpass = LayoutSubpass.AfterChildren;
-                    if (method.GetCustomAttribute<LayoutPassAttribute>() is LayoutPassAttribute attrib) {
-                        pass = attrib.Pass ?? pass;
-                        subpass = attrib.Subpass ?? subpass;
-                    }
-                    Add(pass, subpass, method.CreateDelegate<Action<LayoutEvent>>(Owner));
-                }
+        private void AddAttributeHandlers() {
+            Type type = GetType();
+            foreach ((LayoutPassAttribute? layoutPassAttribute, MethodInfo member) entry in type.GetMethods()
+                         .Select(member => (member.GetCustomAttribute<LayoutPassAttribute>(), member))) {
+                if (entry.layoutPassAttribute != null)
+                    Add(entry.layoutPassAttribute.Pass ?? LayoutPass.Normal, 
+                        entry.layoutPassAttribute.Subpass ?? LayoutSubpass.AfterChildren, 
+                        entry.member.CreateDelegate<Action<LayoutEvent>>(Owner));
             }
         }
-
-        internal HandlerList GetHandlers(LayoutPass pass) {
-            if (!HandlerMap.TryGetValue(pass, out HandlerList? list)) {
-                HandlerMap[pass] = list = new(pass);
-                int min = 0;
-                int max = Handlers.Count;
-                int index = 0;
-                if (max >= 0) {
-                    while (max - min > 1) {
-                        int mid = min + (int) Math.Ceiling((max - min) / 2D);
-                        LayoutPass midPass = Handlers[mid].Pass;
-                        if (pass <= midPass) {
-                            max = mid;
-                        } else {
-                            min = mid;
-                            index = mid + 1;
-                        }
-                    }
-                    if (max == 1) {
-                        if (pass <= Handlers[0].Pass) {
-                            index = 0;
-                        } else {
-                            index = 1;
-                        }
-                    }
-                }
-                Handlers.Insert(index, list);
-            }
+        
+        /// <summary>
+        /// Obtains the HandlerList associated with a certain pass.
+        /// </summary>
+        private HandlerList GetHandlers(LayoutPass pass) {
+            if (HandlerMap.TryGetValue(pass, out HandlerList? list)) return list;
+            // Does not exist yet, add it in.
+            HandlerMap[pass] = list = new HandlerList(pass);
+            int index = MathUtil.BinarySearch(0, Handlers.Count, i => pass >= Handlers[i].Pass);
+            Handlers.Insert(index, list);
             return list;
         }
 
-        public List<Action<LayoutEvent>> GetHandlers(LayoutPass pass, LayoutSubpass subpass) {
+        /// <summary>
+        /// Obtains the HandlerSubList associated with ta certain pass and subpass.
+        /// </summary>
+        /// <param name="pass"></param>
+        /// <param name="subpass"></param>
+        /// <returns></returns>
+        private List<Action<LayoutEvent>> GetHandlers(LayoutPass pass, LayoutSubpass subpass) {
             HandlerList main = GetHandlers(pass);
-            if (!main.HandlerMap.TryGetValue(subpass, out HandlerSublist? list)) {
-                main.HandlerMap[subpass] = list = new(subpass);
-                int min = 0;
-                int max = main.Handlers.Count;
-                int index = 0;
-                if (max >= 0) {
-                    while (max - min > 1) {
-                        int mid = min + (int) Math.Ceiling((max - min) / 2D);
-                        LayoutSubpass midPass = main.Handlers[mid].Pass;
-                        if (subpass <= midPass) {
-                            max = mid;
-                        } else {
-                            min = mid;
-                            index = mid + 1;
-                        }
-                    }
-                    if (max == 1) {
-                        if (subpass <= main.Handlers[0].Pass) {
-                            index = 0;
-                        } else {
-                            index = 1;
-                        }
-                    }
-                }
-                main.Handlers.Insert(index, list);
-            }
+            if (main.HandlerMap.TryGetValue(subpass, out HandlerSublist? list)) return list.Handlers;
+            // Does not exist yet, add it in.
+            main.HandlerMap[subpass] = list = new HandlerSublist(subpass);
+            int index = MathUtil.BinarySearch(0, 
+                main.Handlers.Count, 
+                i => subpass >= main.Handlers[i].Pass);
+            main.Handlers.Insert(index, list);
             return list.Handlers;
         }
 
+        /// <summary>
+        /// Adds a handler to the default pass
+        /// </summary>
         public void Add(Action<LayoutEvent> handler)
             => Add(LayoutPass.Normal, LayoutSubpass.AfterChildren, handler);
+        
+        /// <summary>
+        /// Adds a handler to a pass and default subpass
+        /// </summary>
         public void Add(LayoutPass pass, Action<LayoutEvent> handler)
             => Add(pass, LayoutSubpass.AfterChildren, handler);
+        
+        // Handy tuple version
+        public void Add((LayoutPass Pass, LayoutSubpass Subpass, Action<LayoutEvent> Handler) args)
+            => Add(args.Pass, args.Subpass, args.Handler);
+        
         public void Add(LayoutPass pass, LayoutSubpass subpass, Action<LayoutEvent> handler) {
             List<Action<LayoutEvent>> list = GetHandlers(pass, subpass);
             list.Add(handler);
-        }
-        public void Add((LayoutPass Pass, LayoutSubpass Subpass, Action<LayoutEvent> Handler) args) {
-            List<Action<LayoutEvent>> list = GetHandlers(args.Pass, args.Subpass);
-            list.Add(args.Handler);
         }
         
         public void AddUnique((LayoutPass Pass, LayoutSubpass Subpass, Action<LayoutEvent> Handler) args) {
@@ -408,7 +368,8 @@ namespace OlympUI {
         public LayoutEvent InvokeAll(LayoutEvent e) {
             foreach (HandlerList handlers in Handlers) {
                 foreach (HandlerSublist subhandlers in handlers.Handlers) {
-                    e.Status = EventStatus.Normal;
+                    e.Reset();
+                    e.Pass = handlers.Pass;
                     e.Subpass = subhandlers.Pass;
                     foreach (Action<LayoutEvent> handler in subhandlers.Handlers) {
                         e.Target = Owner;
@@ -423,37 +384,32 @@ namespace OlympUI {
                             case EventStatus.Cancelled:
                                 // This shouldn't EVER occur... right?
                                 // Cancelling layout events - especially recursive ones! - would be really fatal.
-                                e.Status = EventStatus.Finished;
+                                e.Cancel();
                                 return e;
                         }
                     }
                 }
             }
 
-            // Cancelling layout events - especially recursive ones! - would be really fatal.
-            e.Status = EventStatus.Normal;
+            // Done!
+            e.Reset();
             return e;
         }
 
         public LayoutEvent Invoke(LayoutEvent e) {
             if (!HandlerMap.TryGetValue(e.Pass, out HandlerList? handlers)) {
-                if (e.Recursive) {
-                    foreach (Element child in e.Element.Children) {
-                        child.Invoke(e);
-                        if (e.Status == EventStatus.Cancelled)
-                            return e;
-                    }
-                }
+                // No passes registered currently, pass the event to the children if required
+                RecurseToChildren(e);
                 return e;
             }
 
-            int i;
-            for (i = 0; i < handlers.Handlers.Count; i++) {
-                HandlerSublist subhandlers = handlers.Handlers[i];
-                if (subhandlers.Pass >= LayoutSubpass.AfterChildren)
-                    break;
+            // Iterate on the current pass
+            foreach (HandlerSublist subhandlers in handlers.Handlers) {
+                if (subhandlers.Pass >= LayoutSubpass.AfterChildren) { // AfterChildren is a special case, we've hit the first one, so invoke on children now
+                    RecurseToChildren(e);
+                }
 
-                e.Status = EventStatus.Normal;
+                e.Reset();
                 e.Subpass = subhandlers.Pass;
                 foreach (Action<LayoutEvent> handler in subhandlers.Handlers) {
                     e.Target = Owner;
@@ -468,47 +424,23 @@ namespace OlympUI {
                         case EventStatus.Cancelled:
                             // This shouldn't EVER occur... right?
                             // Cancelling layout events - especially recursive ones! - would be really fatal.
-                            e.Status = EventStatus.Finished;
+                            e.Cancel();
                             return e;
                     }
                 }
             }
 
-            if (e.Recursive) {
-                foreach (Element child in e.Element.Children) {
-                    child.Invoke(e);
-                    if (e.Status == EventStatus.Cancelled)
-                        return e;
-                }
-            }
-
-            for (; i < handlers.Handlers.Count; i++) {
-                HandlerSublist subhandlers = handlers.Handlers[i];
-
-                e.Status = EventStatus.Normal;
-                e.Subpass = subhandlers.Pass;
-                foreach (Action<LayoutEvent> handler in subhandlers.Handlers) {
-                    e.Target = Owner;
-                    e.Element = Owner;
-                    handler(e);
-                    switch (e.Status) {
-                        case EventStatus.Normal:
-                        default:
-                            continue;
-                        case EventStatus.Finished:
-                            break;
-                        case EventStatus.Cancelled:
-                            // This shouldn't EVER occur... right?
-                            // Cancelling layout events - especially recursive ones! - would be really fatal.
-                            e.Status = EventStatus.Finished;
-                            return e;
-                    }
-                }
-            }
-
-            // Cancelling layout events - especially recursive ones! - would be really fatal.
-            e.Status = EventStatus.Normal;
+            e.Reset();
             return e;
+        }
+
+        private static void RecurseToChildren(LayoutEvent e) {
+            if (!e.Recursive) return;
+            foreach (Element child in e.Element.Children) {
+                child.Invoke(e);
+                if (e.Status == EventStatus.Cancelled)
+                    return;
+            }
         }
 
         IEnumerator IEnumerable.GetEnumerator()

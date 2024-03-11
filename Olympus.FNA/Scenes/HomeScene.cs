@@ -313,7 +313,8 @@ namespace Olympus {
                                                     if (bgs.Length == 0)
                                                         bgs = colors[0].IsDark ? new Color[] { Color.Black, Color.White } : new Color[] { Color.White, Color.Black };
                                                     fg =
-                                                        colors[0].IsDark ? new(
+                                                        colors[0].IsDark ? 
+                                                        new(
                                                             fg.R / 255f + 0.3f,
                                                             fg.G / 255f + 0.3f,
                                                             fg.B / 255f + 0.3f
@@ -323,6 +324,7 @@ namespace Olympus {
                                                             fg.G / 255f * 0.3f,
                                                             fg.B / 255f * 0.3f
                                                         );
+                                                    Console.WriteLine("Using main bg color: " + 0.3f + bgs[0]*0.1f);
                                                     panel.Style.Add(Panel.StyleKeys.Background, colors[0].Color);
                                                     foreach (Element child in tints) {
                                                         child.Style.Update(0f); // Force faders to be non-fresh.
@@ -348,7 +350,7 @@ namespace Olympus {
                             { Group.StyleKeys.Spacing, 8 },
                         },
                         Layout = {
-                            Layouts.Fill(0.7f, 0.6f, 32, 0),
+                            Layouts.Fill(2/3f, 0.6f, 32, 0),
                             Layouts.Bottom(),
                             Layouts.Left(),
                             Layouts.Column(false),
@@ -587,7 +589,7 @@ namespace Olympus {
                             { Group.StyleKeys.Spacing, 16 },
                         },
                         Layout = {
-                            Layouts.Fill(0.3f, 0.6f, 0, 0),
+                            Layouts.Fill(1/3f, 0.6f, 0, 0),
                             Layouts.Bottom(),
                             Layouts.Right(),
                             Layouts.Column(false),

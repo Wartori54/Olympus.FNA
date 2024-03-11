@@ -287,14 +287,12 @@ public partial class TextInput : Panel {
         
         bool shouldRedraw = false;
         
-        TextLabel.Style.GetCurrent(out DynamicSpriteFont font);
-        Bounds bounds = new();
-        
+        Bounds bounds;
         if (UIInput.Down(Keys.LeftShift) || UIInput.Down(Keys.RightShift)) {
             if (!Selection.Active) Selection.Start = Cursor;
             //TODO: Optimize this somehow
             for (int i = 0; i <= Text.Length; i++) {
-                font.TextBounds(Text[..i], Vector2.Zero, ref bounds, Vector2.One);
+                bounds = TextLabel.GetTextBounds(Text[..i]); 
                 Selection.End = i;
 
                 shouldRedraw = true;
@@ -305,7 +303,7 @@ public partial class TextInput : Panel {
             int prevI = 0;
             //TODO: Optimize this somehow
             for (int i = 0; i <= Text.Length; i = inc(i)) {
-                font.TextBounds(Text[..i], Vector2.Zero, ref bounds, Vector2.One);
+                bounds = TextLabel.GetTextBounds(Text[..i]); 
                 Cursor = i;
                 Selection.Start = i;
                 if (Selection.SelectionTarget == SelectionArea.SelectTarget.Char) { // Skip selection for chars
@@ -332,11 +330,9 @@ public partial class TextInput : Panel {
         
         bool shouldRedraw = false;
         
-        TextLabel.Style.GetCurrent(out DynamicSpriteFont font);
-        Bounds bounds = new();
         //TODO: Optimize this somehow
         for (int i = 0; i <= Text.Length; i++) {
-            font.TextBounds(Text.Substring(0, i), Vector2.Zero, ref bounds, Vector2.One);
+            Bounds bounds = TextLabel.GetTextBounds(Text[..i]); 
             Selection.End = i;
             shouldRedraw = true;
             
@@ -433,13 +429,9 @@ public partial class TextInput : Panel {
             MeshShapes<MiniVertex> shapes = CursorMesh.Shapes;
             shapes.Clear();
 
-            TextLabel.Style.GetCurrent(out DynamicSpriteFont font);
-            
             if (Selection.Active) {
-                Bounds selStartBounds = new();
-                Bounds selEndBounds = new();
-                font.TextBounds(Text.Substring(0, Selection.Min), Vector2.Zero, ref selStartBounds, Vector2.One);
-                font.TextBounds(Text.Substring(0, Selection.Max), Vector2.Zero, ref selEndBounds, Vector2.One);
+                Bounds selStartBounds = TextLabel.GetTextBounds(Text[0..Selection.Min]);
+                Bounds selEndBounds = TextLabel.GetTextBounds(Text[0..Selection.Max]);
                 
                 const float Margin = 1f;
                 shapes.Add(new MeshShapes.Rect() {
@@ -449,8 +441,7 @@ public partial class TextInput : Panel {
                     Radius = 5f,
                 });
             } else if (CursorBlinkState) {
-                Bounds cursorBounds = new();
-                font.TextBounds(Text.Substring(0, Cursor), Vector2.Zero, ref cursorBounds, Vector2.One);
+                Bounds cursorBounds = TextLabel.GetTextBounds(Text[0..Cursor]);
         
                 shapes.Add(new MeshShapes.Rect() {
                     Color = cursorColor,

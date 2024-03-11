@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace OlympUI {
     public sealed partial class Root : Element {
@@ -38,18 +39,52 @@ namespace OlympUI {
             for (int i = all.Count - 1; i >= 0; --i) {
                 Element hit = all[i];
                 if (!hit.Contains(xy))
-                    goto Next;
+                    continue;
 
                 for (Element? el = hit.Parent; el is not null; el = el.Parent)
                     if (el.Clip && !el.Contains(xy))
-                        goto Next;
+                        continue;
                 return hit;
 
-                Next:
-                continue;
             }
 
             return null;
+        }
+
+        public Element? GetSmallestChildAt(Point xy) {
+            List<Element> all = AllOnScreen;
+            if (all.Count == 0) return null;
+            Element smallest = all[^1];
+            for (int i = all.Count - 1; i >= 0; i--) { // Iterate in reverse order because its more likely that the smaller ones are at the bottom
+                Element hit = all[i];
+
+                if (hit.Contains(xy)) {
+                    if (hit.WH.GetArea() <= smallest.WH.GetArea())
+                        smallest = hit;
+                }
+            }
+            return smallest;
+        }
+
+        public List<Element> GetAllChildrenAt(Point xy) {
+            List<Element> hits = new();
+            ObservableCollection<Element> target = Children;
+            Element? targetChild = this;
+            while (targetChild != null) {
+                targetChild = null;
+                foreach (Element child in target) {
+                    if (!child.Contains(xy)) continue;
+                    targetChild = child;
+                    break;
+                }
+
+                if (targetChild != null) {
+                    hits.Add(targetChild);
+                    target = targetChild.Children;
+                } 
+            }
+
+            return hits;
         }
 
         public void InvalidateForce() {

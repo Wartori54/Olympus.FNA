@@ -85,14 +85,23 @@ namespace OlympUI {
 
         private sealed class ActionCmdList : CmdList {
             private readonly List<Action> List = new();
+#if DEBUG && false
+            private readonly List<StackTrace> Traces = new();
+#endif
 
             public int Add(Action a) {
                 List.Add(a);
+#if DEBUG && false
+                Traces.Add(new StackTrace(true));
+#endif
                 return List.Count - 1;
             }
 
             public override void Clear() {
                 List.Clear();
+#if DEBUG && false
+                Traces.Clear();
+#endif
             }
 
             public override void Run(int id) {
@@ -102,14 +111,24 @@ namespace OlympUI {
 
         private sealed class ActionCmdList<T> : CmdList where T : struct {
             private readonly List<(T data, Action<T> a)> List = new();
+#if DEBUG && false
+            private readonly List<StackTrace> Traces = new();
+#endif
+
 
             public int Add(in T data, Action<T> a) {
                 List.Add((data, a));
+#if DEBUG && false
+                Traces.Add(new StackTrace(true));
+#endif
                 return List.Count - 1;
             }
 
             public override void Clear() {
                 List.Clear();
+#if DEBUG && false
+                Traces.Clear();
+#endif
             }
 
             public override void Run(int id) {
@@ -120,14 +139,24 @@ namespace OlympUI {
 
         private sealed class DataCmdList<T> : CmdList where T : IRecorderCmd {
             private readonly List<T> List = new();
+#if DEBUG && false
+            private readonly List<StackTrace> Traces = new();
+#endif
 
             public int Add(in T data) {
                 List.Add(data);
+#if DEBUG && false
+                Traces.Add(new StackTrace(true));
+#endif
                 return List.Count - 1;
             }
 
             public override void Clear() {
                 List.Clear();
+                
+#if DEBUG && false
+                Traces.Clear();
+#endif
             }
 
             public override void Run(int id) {

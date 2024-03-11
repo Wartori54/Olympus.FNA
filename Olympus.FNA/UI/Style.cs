@@ -275,6 +275,13 @@ namespace OlympUI {
 
         public static void UpdateTypeStyles(float dt) {
             foreach (Style style in TypeStyles) {
+                if (style == null) {
+#if DEBUG
+                    Console.WriteLine($"Style encountered a null TypeStyle in {nameof(UpdateTypeStyles)}");
+#endif
+                    continue; // FIXME/TODO: this was null once somehow??
+                }
+
                 style.Update(dt);
             }
         }

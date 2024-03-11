@@ -1,9 +1,11 @@
 ﻿using Microsoft.Xna.Framework;
+using OlympUI.MegaCanvas;
 using System;
 using System.Collections.Specialized;
 
 namespace OlympUI {
     public partial class ScrollBox : Group {
+        public override bool Clip => true;
 
         public Element Content {
             get => this[0];
@@ -29,10 +31,11 @@ namespace OlympUI {
 
         private bool stuckBottom;
 
-        public Vector2 ScrollDXY;
-        private Vector2 ScrollDXYPrev;
-        private Vector2 ScrollDXYMax;
-        private float ScrollDXYTime;
+        public Vector2 ScrollDXY = Vector2.Zero;
+        private Vector2 ScrollDXYPrev = Vector2.Zero;
+        private Vector2 TargetScrollDXY = Vector2.Zero;
+
+        private const int ScrollSpeed = 32; // arbitrary value, fells good, TODO: config for this?
 
         protected Style.Entry StyleBarPadding = new(4);
 
@@ -46,6 +49,7 @@ namespace OlympUI {
             stuckBottom = BottomSticky;
         }
 
+        // TODO: Scrolling speed is dependent on dt, the higher it is the slower it is
         public override void Update(float dt) {
             int index;
             if ((index = Children.IndexOf(ScrollHandleX)) != 1) {
@@ -59,29 +63,30 @@ namespace OlympUI {
                 Children.Insert(2, ScrollHandleY);
             }
 
-            if (ScrollDXY != default) {
+            if (ScrollDXY != TargetScrollDXY) {
+                ScrollDXY += (TargetScrollDXY - ScrollDXY) * 0.25f;
+                if ((ScrollDXY - TargetScrollDXY).LengthSquared() < 0.01*0.01) {
+                    ScrollDXY = TargetScrollDXY;
+                }
+                
                 if (ScrollDXY != ScrollDXYPrev) {
-                    ScrollDXYMax = ScrollDXY * 0.1f;
-                    ScrollDXYTime = 0f;
                     if (BottomSticky && stuckBottom && ScrollDXY.Y < ScrollDXYPrev.Y) {
                         stuckBottom = false;
                     }
                 }
-                ScrollDXYTime += dt * 4f;
-                if (ScrollDXYTime > 1f)
-                    ScrollDXYTime = 1f;
-                ScrollDXYPrev = ScrollDXY = ScrollDXYMax * (1f - Ease.CubeOut(ScrollDXYTime));
 
                 if (Math.Abs(ScrollDXY.X) < 1f)
                     ScrollDXY.X = 0f;
                 if (Math.Abs(ScrollDXY.Y) < 1f)
                     ScrollDXY.Y = 0f;
 
-                ForceScroll(ScrollDXY.ToPoint());
+                ForceScroll(TargetScrollDXY-ScrollDXY);
+                ScrollDXYPrev = ScrollDXY;
+                
             }
             
             if (stuckBottom)
-                ForceScroll(new Point(0, int.MaxValue));
+                ForceScroll(new Vector2(0, int.MaxValue));
 
             Element content = Content;
             Vector2 origXY = content.XY;
@@ -111,13 +116,13 @@ namespace OlympUI {
             ScrollHandleY.InvalidatePaint();
             ScrollHandleY.ForceFullReflow();
 #else
-            Content.InvalidateFull();
+            // Content.InvalidateFull();
             ScrollHandleX.InvalidateFull();
             ScrollHandleY.InvalidateFull();
 #endif
         }
 
-        public void ForceScroll(Point dxy) {
+        public void ForceScroll(Vector2 dxy) {
             if (dxy == default)
                 return;
 
@@ -126,7 +131,7 @@ namespace OlympUI {
             Vector2 wh = content.WH.ToVector2();
             Vector2 boxWH = WH.ToVector2();
 
-            xy += dxy.ToVector2();
+            xy += dxy;
 
             if (xy.X < 0) {
                 xy.X = 0;
@@ -153,11 +158,10 @@ namespace OlympUI {
 
             Point dxy = e.ScrollDXY;
             dxy = new(
-                dxy.X * -32,
-                dxy.Y * -32
+                (int)(dxy.X * -ScrollSpeed),
+                (int)(dxy.Y * -ScrollSpeed)
             );
-            ScrollDXY += dxy.ToVector2();
-            ForceScroll(dxy);
+            TargetScrollDXY += dxy.ToVector2();
             e.Cancel();
         }
 
@@ -174,6 +178,41 @@ namespace OlympUI {
             }
         }
 
+        // Apparently caching this is really expensive and not worth it???? TODO: figure out this
+        protected override void PaintContent(bool paintToCache, bool paintToScreen, Padding padding) {
+            if (CachedTexture?.IsValid ?? false) {
+                CachedTexture.Dispose();
+                CachedTexture = null;
+            }
+            
+            DrawContent();
+            return;
+            Element content = Content;
+            // Simply fall back if its not reflowed yet
+            if (content.WH.X < UI.MegaCanvas.MinSize || content.WH.Y < UI.MegaCanvas.MinSize ||
+                content.WH.X + padding.W > UI.MegaCanvas.MaxSize || content.WH.Y + padding.H > UI.MegaCanvas.MaxSize) {
+                Console.WriteLine(this + " is fallbacking");
+                base.PaintContent(paintToCache, paintToScreen, padding);
+            }
+            Point prevWH = WH;
+            // Fake the WH to the total size, cache will be big
+            WH = content.WH;
+            base.PaintContent(true, false, padding);
+            WH = prevWH;
+            // Reset the "hack"
+            // Finally let the paintContent method draw to screen if necessary
+            if (paintToCache) {
+                RenderTarget2DRegion cachedTexture = CachedTexture?.ValueValid ?? throw new Exception("ScrollBox could not generate cache!");
+                DrawCachedTexture(
+                    cachedTexture,
+                    ScreenXY,
+                    padding,
+                    WH + padding.WH
+                );
+            }
+
+            base.PaintContent(paintToCache, paintToScreen, padding);
+        }
     }
 
     public enum ScrollAxis {

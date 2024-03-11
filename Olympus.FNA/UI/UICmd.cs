@@ -1,6 +1,7 @@
 ﻿using FontStashSharp;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using System;
 
 namespace OlympUI {
     public static class UICmd {
@@ -61,8 +62,9 @@ namespace OlympUI {
             public void Invoke() => UI.SpriteBatch.DrawDebugRect(Color, Rectangle);
         }
 
-        public record struct Text(DynamicSpriteFont Font, string Value, Vector2 Position, Color Color) : IRecorderCmd {
-            public void Invoke() => UI.SpriteBatch.DrawString(Font, Value, Position, Color);
+        public record struct Text(DynamicSpriteFont Font, string Value, Vector2 Position, Color Color, 
+            FontSystemEffect effect = FontSystemEffect.None, int effectAmount = 0) : IRecorderCmd {
+            public void Invoke() => UI.SpriteBatch.DrawString(Font, Value, Position, Color, effect: effect, effectAmount: effectAmount);
         }
 
     }

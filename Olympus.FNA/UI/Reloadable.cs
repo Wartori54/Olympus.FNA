@@ -37,6 +37,19 @@ namespace OlympUI {
 
             return TemporaryContext?.MarkTemporary(reloadable) ?? reloadable;
         }
+        
+        public static IReloadable<TValue, TMeta> Permanent<TValue, TMeta>(TMeta meta, Func<TValue?> loader, Action<TValue?> unloader) where TMeta : struct {
+            Reloadable<TValue, TMeta> reloadable = new(null, meta, loader, unloader);
+
+#if DEBUG
+            if (TemporaryContext is null && Debugger.IsAttached) {
+                Debugger.Break();
+            }
+#endif
+
+            return reloadable;
+        }
+        
 
     }
 
@@ -50,9 +63,17 @@ namespace OlympUI {
     }
 
     public interface IReloadable<TValue> : IReloadable {
-
+        /// <summary>
+        /// Returns a valid value for this reloadable, or default if none is.
+        /// </summary>
         TValue? ValueValid { get; }
+        /// <summary>
+        /// Lazily loads a value for this reloadable. Expensiveness warning.
+        /// </summary>
         TValue? ValueLazy { get; }
+        /// <summary>
+        /// Returns the value stored in this reloadable, can throw if not valid.
+        /// </summary>
         TValue Value { get; }
 
     }
@@ -203,7 +224,7 @@ namespace OlympUI {
         }
 
         public void LifeBump() {
-            Lifespan = 8;
+            Lifespan = 32;
         }
 
     }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using System;
+using System.Linq;
 
 namespace OlympUI {
     public static class Layouts {
@@ -74,7 +75,7 @@ namespace OlympUI {
                 case LayoutConsts.Prev:
                     {
                         value = 0;
-                            if (!p.Style.TryGetCurrent(Group.StyleKeys.Spacing, out int spacing))
+                        if (!p.Style.TryGetCurrent(Group.StyleKeys.Spacing, out int spacing))
                             spacing = 0;
                         foreach (Element sibling in p.Children) {
                             if (sibling == el)
@@ -272,6 +273,28 @@ namespace OlympUI {
                 }
             }
         );
+        public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) FitChildren(bool horizontally, bool vertically) => (
+            LayoutPass.Post, LayoutSubpass.AfterChildren,
+            (LayoutEvent e) => {
+                Element el = e.Element;
+                Point wh = new();
+                if (!horizontally)
+                    wh.X = el.WH.X;
+                if (!vertically)
+                    wh.Y = el.WH.Y;
+                foreach (Element child in el.Children) {
+                    if (horizontally && child.X + child.W > wh.X) {
+                        wh.X = child.X + child.W;
+                    }
+
+                    if (vertically && child.Y + child.H > wh.Y) {
+                        wh.Y = child.Y + child.H;
+                    }
+                }
+
+                el.WH = wh;
+            }
+        );
 
         public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) Fill(float fractX = 1f, float fractY = 1f, int offsX = 0, int offsY = 0) => (
             LayoutPass.Normal, LayoutSubpass.Pre + 1,
@@ -280,20 +303,30 @@ namespace OlympUI {
                 Element? p = el.Parent;
                 if (p is null)
                     return;
-                offsX = ResolveConstsX(el, p, offsX);
-                offsY = ResolveConstsY(el, p, offsY);
+                bool print = offsX == LayoutConsts.Next;
+                int roffsX = ResolveConstsX(el, p, offsX);
+                offsX = roffsX;
+                if (el.ID == "DescLabelCont" && print) {
+                    Console.WriteLine(roffsX + " " + el + " " + p.Children.Count);
+                    if (p.Children.Count == 2) {
+                        Console.WriteLine(p.Children[1] + " " + p.Children[1].WH);
+                        Console.WriteLine(p.Children[1].Children[0] + " " + p.Children[1].Children[0].WH);
+                    }
+                }
+
+                int roffsY = ResolveConstsY(el, p, offsY);
                 if (fractX > 0f && fractY > 0f) {
                     el.XY = new(0, 0);
                     el.RealXY = p.Padding.LT.ToVector2();
-                    el.WH = (p.InnerWH.ToVector2() * new Vector2(fractX, fractY)).ToPoint() - new Point(offsX, offsY);
+                    el.WH = (p.InnerWH.ToVector2() * new Vector2(fractX, fractY)).ToPoint() - new Point(roffsX, roffsY);
                 } else if (fractX > 0f) {
                     el.XY.X = 0;
                     el.RealXY = new(p.Padding.L, el.RealXY.Y);
-                    el.WH.X = (int) (p.InnerWH.X * fractX) - offsX;
+                    el.WH.X = (int) (p.InnerWH.X * fractX) - roffsX;
                 } else if (fractY > 0f) {
                     el.XY.Y = 0;
                     el.RealXY = new(el.RealXY.X, p.Padding.T);
-                    el.WH.Y = (int) (p.InnerWH.Y * fractY) - offsY;
+                    el.WH.Y = (int) (p.InnerWH.Y * fractY) - roffsY;
                 }
             }
         );

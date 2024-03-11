@@ -27,7 +27,6 @@ namespace Olympus.Utils {
                     await server.WaitForConnectionAsync(ct);
                     using (StreamReader sr = new(server)) {
                         string buf = await sr.ReadToEndAsync(ct);
-                        Console.WriteLine($"Received IPC text: {buf}");
                         IPCCommandsManager.RunCommand(buf);
                     }
                 }

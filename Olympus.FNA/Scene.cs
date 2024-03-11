@@ -9,8 +9,8 @@ namespace Olympus {
         protected Element? _Root;
         public Element Root => _Root ??= PostGenerate(Generate());
 
-        public readonly List<Action> Refreshes = new();
-        private readonly Dictionary<Element, Task> Refreshing = new();
+        protected readonly List<Action> Refreshes = new();
+        protected readonly Dictionary<Element, Task> Refreshing = new();
 
         public App App => App.Instance;
 

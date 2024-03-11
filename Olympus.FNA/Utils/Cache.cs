@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 
 namespace Olympus.Utils {
@@ -20,8 +21,12 @@ namespace Olympus.Utils {
         public T Value {
             get {
                 mut.WaitOne();
-                if (!IsValid()) {
-                    Regenerate();
+                if (!IsValid() && !Frozen) {
+                    try {
+                        Regenerate();
+                    } catch (Exception ex) {
+                        AppLogger.Log.Error(ex, "Failed regenerating cache!");
+                    }
                 }
 
                 mut.ReleaseMutex();
@@ -29,6 +34,8 @@ namespace Olympus.Utils {
                 return InternalCache;
             }
         }
+
+        public bool Frozen { get; set; }
 
         public abstract bool IsValid();
 
@@ -49,7 +56,12 @@ namespace Olympus.Utils {
 
         public override void Regenerate() {
             InternalCache = generator(Sender);
-            Valid = true;
+            if (InternalCache == null) AppLogger.Log.Information("Null cache at " + new StackTrace());
+            if (InternalCache != null || Nullable.GetUnderlyingType(typeof(T)) != null) {
+                Valid = true;
+            } else {
+                AppLogger.Log.Warning("Regenerating cache returned null!");
+            }
         }
 
         public void Invalidate() {
@@ -71,9 +83,8 @@ namespace Olympus.Utils {
         }
 
         public override void Regenerate() {
-            InternalCache = generator(Sender);
+            base.Regenerate();
             lastCache = DateTime.Now;
-            Valid = true;
         }
     }
 }

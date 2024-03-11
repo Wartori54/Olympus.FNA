@@ -127,7 +127,7 @@ namespace Olympus {
                                             el.Content.Add(new VersionEntry(
                                                 $"{version.Branch}: {version.version}" +
                                                 (version.version == ModVersion?.Minor ? " (Current)" : "") +
-                                                (version.Branch.IsNonNative ? " (Non-native)" : ""),
+                                                (version.Branch.IsNonNative ? " (.NET Framework)" : ""),
                                                 version.date.ToShortDateString() + " " +
                                                 version.date.ToShortTimeString(),
                                                 desc,

@@ -3,6 +3,7 @@ using System;
 
 // Thanks to the Monocle Engine for having this ready to be borrowed!
 namespace OlympUI {
+    // TODO: remove magic numbers
     public static class Ease {
 
         public delegate float Easer(float t);

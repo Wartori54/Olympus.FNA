@@ -92,7 +92,7 @@ namespace OlympUI {
                     data.blurred.RT.SetRenderTargetUsage(RenderTargetUsage.PlatformContents);
                     gd.SetRenderTarget(data.blurred.RT);
                     data.blurrer.Axis = data.axis;
-                    data.blurrer.Transform = UI.CreateTransform(-UI.TransformOffset);
+                    data.blurrer.TransformParam.Value = UI.CreateTransform(-UI.TransformOffset);
                     data.blurred.RT.SetRenderTargetUsage(RenderTargetUsage.PreserveContents);
 
                     spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.LinearClamp, DepthStencilState.None, RasterizerState.CullCounterClockwise, data.blurrer);
@@ -145,7 +145,7 @@ namespace OlympUI {
 
                             data.noised.RT.SetRenderTargetUsage(RenderTargetUsage.PlatformContents);
                             gd.SetRenderTarget(data.noised.RT);
-                            data.noiser.Transform = UI.CreateTransform(-UI.TransformOffset);
+                            data.noiser.TransformParam.Value = UI.CreateTransform(-UI.TransformOffset);
                             data.noised.RT.SetRenderTargetUsage(RenderTargetUsage.PreserveContents);
                             spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.LinearClamp, DepthStencilState.None, RasterizerState.CullCounterClockwise, data.noiser);
                             spriteBatch.Draw(data.blurred.RT, data.dest, data.src, Color.White);

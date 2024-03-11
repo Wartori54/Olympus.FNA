@@ -10,6 +10,8 @@ namespace OlympUI {
 
         protected Style.Entry StyleColor = new(new ColorFader(0xe8, 0xe8, 0xe8, 0xff));
         protected Style.Entry StyleFont = new(Assets.Font);
+        protected Style.Entry StyleFontEffect = new(FontSystemEffect.None);
+        protected Style.Entry StyleFontEffectAmount = new(0);
 
         private string _Text;
         private string _TextDrawn = "";
@@ -45,19 +47,23 @@ namespace OlympUI {
         }
 
         public override void DrawContent() {
-            UIDraw.Recorder.Add(new UICmd.Text(StyleFont.GetCurrent<DynamicSpriteFont>(), _TextDrawn, ScreenXY, StyleColor.GetCurrent<Color>()));
+            UIDraw.Recorder.Add(new UICmd.Text(StyleFont.GetCurrent<DynamicSpriteFont>(), _TextDrawn, ScreenXY, 
+                StyleColor.GetCurrent<Color>(), StyleFontEffect.GetCurrent<FontSystemEffect>(), 
+                StyleFontEffectAmount.GetCurrent<int>()));
         }
 
+        [LayoutPass(LayoutPass.Normal)]
         private void LayoutNormal(LayoutEvent e) {
             // FIXME: FontStashSharp can't even do basic font maximum size precomputations...
 
             DynamicSpriteFont font = StyleFont.GetCurrent<DynamicSpriteFont>();
+            FontSystemEffect effect = StyleFontEffect.GetCurrent<FontSystemEffect>();
+            int effectAmount = StyleFontEffectAmount.GetCurrent<int>();
 
-            Bounds bounds = new();
             string text = _Text;
             _TextDrawn = text;
-            font.TextBounds(text, new(0f, 0f), ref bounds, new(1f, 1f));
-            if (Wrap && Parent?.InnerWH.X is int max && bounds.X2 >= max) {
+            Bounds bounds = GetTextBounds(text, font, effect, effectAmount);
+            if (Wrap && Parent?.InnerWH.X is { } max && bounds.X2 >= max) {
                 StringBuilder full = new((int) (text.Length * 1.2f));
                 StringBuilder line = new(text.Length);
                 ReadOnlySpan<char> part;
@@ -75,7 +81,7 @@ namespace OlympUI {
                         iSplit = full.Length;
                         full.Append(' ').Append(part);
                         line.Append(' ').Append(part);
-                        font.TextBounds(line, new(0f, 0f), ref bounds, new(1f, 1f));
+                        bounds = font.TextBounds(line, Vector2.Zero, Vector2.One, 0F, 0F, effect, effectAmount);
                         if (bounds.X2 >= max) {
                             full[iSplit] = '\n';
                             line.Clear().Append(part);
@@ -87,21 +93,21 @@ namespace OlympUI {
                     iSplit = full.Length;
                     full.Append(' ').Append(part);
                     line.Append(' ').Append(part);
-                    font.TextBounds(line, new(0f, 0f), ref bounds, new(1f, 1f));
+                    bounds = font.TextBounds(line, Vector2.Zero, Vector2.One, 0F, 0F, effect, effectAmount);
                     if (bounds.X2 >= max) {
                         full[iSplit] = '\n';
                         line.Clear().Append(part);
                     }
                 }
                 _TextDrawn = text = full.ToString();
-                font.TextBounds(text, new(0f, 0f), ref bounds, new(1f, 1f));
+                bounds = GetTextBounds(text, font, effect, effectAmount);
             }
 
             WH = new((int) MathF.Round(bounds.X2), (int) MathF.Round(bounds.Y2));
 
             DynamicData fontExtra = new(font);
             if (!fontExtra.TryGet("MaxHeight", out int? maxHeight)) {
-                font.TextBounds("The quick brown fox jumps over the lazy dog.", new(0f, 0f), ref bounds, new(1f, 1f));
+                bounds = GetTextBounds(font: font, effectAmount: effectAmount, effect: effect);
                 maxHeight = (int) MathF.Round(bounds.Y2);
                 fontExtra.Set("MaxHeight", maxHeight);
             }
@@ -109,11 +115,13 @@ namespace OlympUI {
             WH.Y = Math.Max(WH.Y, maxHeight ?? 0);
         }
 
-        public Bounds GetTextBounds(string text = "The quick brown fox jumps over the lazy dog.") {
-            Bounds bounds = new();
-            DynamicSpriteFont font = StyleFont.GetCurrent<DynamicSpriteFont>();
-            font.TextBounds(text, new(0f, 0f), ref bounds, new(1f, 1f));
-            return bounds;
+        public Bounds GetTextBounds(string text = "The quick brown fox jumps over the lazy dog.", 
+            DynamicSpriteFont? font = null, FontSystemEffect? effect = null, int? effectAmount = null) {
+            font ??= StyleFont.GetCurrent<DynamicSpriteFont>();
+            effect ??= StyleFontEffect.GetCurrent<FontSystemEffect>();
+            effectAmount ??= StyleFontEffectAmount.GetCurrent<int>();
+            return font.TextBounds(text, Vector2.Zero, Vector2.One, 0F, 0F,
+                effect.Value, effectAmount.Value);
         }
 
     }

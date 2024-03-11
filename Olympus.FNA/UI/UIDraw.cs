@@ -72,6 +72,8 @@ namespace OlympUI {
         public static void AddDependency(RenderTarget2DRegion rt) {
             Current.Dependencies.Add(rt.UniqueID);
         }
+        
+        public static List<uint> GetDeps() => Current.Dependencies;
 
         private static void DrawEntry(RecorderEntry entry) {
             if (entry.DrawID == DrawID)

@@ -81,8 +81,7 @@ namespace OlympUI {
                     // FontResolutionFactor = 2f,
                     KernelWidth = 1,
                     KernelHeight = 1,
-                    Effect = FontSystemEffect.Stroked,
-                    EffectAmount = 1
+                    GlyphRenderer = CustomGlyphRenderer.Custom
                 });
                 font.AddFonts("fonts/Perfect DOS VGA 437");
                 return font.GetFont(16);
@@ -92,6 +91,13 @@ namespace OlympUI {
         public static readonly Reloadable<Texture2D, Texture2DMeta> White = Get("White", new Texture2DMeta(1, 1, () => _WhiteData), () => {
             Texture2D tex = new(UI.Game.GraphicsDevice, 1, 1, false, SurfaceFormat.Color);
             tex.SetData(_WhiteData);
+            return tex;
+        });
+
+        private static readonly Color[] _BlackData = { Color.Black };
+        public static readonly Reloadable<Texture2D, Texture2DMeta> Black = Get("Black", new Texture2DMeta(1, 1, () => _BlackData), () => {
+            Texture2D tex = new(UI.Game.GraphicsDevice, 1, 1, false, SurfaceFormat.Color);
+            tex.SetData(_BlackData);
             return tex;
         });
 
@@ -260,7 +266,8 @@ namespace OlympUI {
                 PremultiplyAlpha = true,
                 // FontResolutionFactor = 2f,
                 KernelWidth = 1,
-                KernelHeight = 1
+                KernelHeight = 1,
+                GlyphRenderer = CustomGlyphRenderer.Custom
             });
             font.AddFonts(paths);
             return font;

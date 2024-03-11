@@ -40,16 +40,18 @@ namespace OlympUI {
             set => _ = (StrengthValue = value, OffsetsWeightsValid = false);
         }
 
-        private EffectParameter MinMaxParam;
-        private bool MinMaxValid;
-        private Vector4 MinMaxValue = new(0f, 0f, 1f, 1f);
+
+        private MiniEffectParam<Vector4> MinMaxParam;
+        // private EffectParameter MinMaxParam;
+        // private bool MinMaxValid;
+        // private Vector4 MinMaxValue = new(0f, 0f, 1f, 1f);
         public Vector2 Min {
-            get => new(MinMaxValue.X, MinMaxValue.Y);
-            set => _ = (MinMaxValue.X = value.X, MinMaxValue.Y = value.Y, MinMaxValid = false);
+            get => new(MinMaxParam.Value.X, MinMaxParam.Value.Y);
+            set => MinMaxParam.Value = new Vector4(value.X, value.Y, MinMaxParam.Value.Z, MinMaxParam.Value.W);
         }
         public Vector2 Max {
-            get => new(MinMaxValue.Z, MinMaxValue.W);
-            set => _ = (MinMaxValue.Z = value.X, MinMaxValue.W = value.Y, MinMaxValid = false);
+            get => new(MinMaxParam.Value.Z, MinMaxParam.Value.W);
+            set => MinMaxParam.Value = new Vector4(MinMaxParam.Value.X, MinMaxParam.Value.Y, value.X, value.Y);
         }
 
         private float TextureSizeValue;
@@ -77,7 +79,8 @@ namespace OlympUI {
         [MemberNotNull(nameof(MinMaxParam))]
         private void SetupParams() {
             OffsetsWeightsParam = Parameters[MiniEffectParamCount + 0];
-            MinMaxParam = Parameters[MiniEffectParamCount + 1];
+            MinMaxParam = new MiniEffectParam<Vector4>(Parameters[MiniEffectParamCount + 1], 
+                new Vector4(0, 0, 1, 1));
         }
 
         public override Effect Clone()
@@ -167,10 +170,7 @@ namespace OlympUI {
                 OffsetsWeightsParam.SetValue(values);
             }
 
-            if (!MinMaxValid) {
-                MinMaxValid = true;
-                MinMaxParam.SetValue(MinMaxValue);
-            }
+            MinMaxParam.Apply();
         }
 
     }

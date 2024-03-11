@@ -33,9 +33,9 @@ namespace OlympUI.MegaCanvas {
 
             gd.SetRenderTarget(RT);
             using SpriteBatch sb = new(gd);
-            sb.Begin(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.PointWrap, DepthStencilState.Default, UI.RasterizerStateCullCounterClockwiseScissoredNoMSAA);
+            sb.Begin(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.PointWrap, DepthStencilState.Default, UI.RasterizerStateCullCounterClockwiseUnscissoredNoMSAA);
             sb.Draw(
-                Assets.DebugUnused,
+                Assets.DebugUnused.Value,
                 new Vector2(0f, 0f),
                 new Rectangle(0, 0, RT.Width, RT.Height),
                 Color.White,
@@ -68,7 +68,13 @@ namespace OlympUI.MegaCanvas {
             }
         }
 
+        /// <summary>
+        /// Obtains a free region in the atlas.
+        /// </summary>
+        /// <param name="want">The size of the region.</param>
+        /// <returns>A region of the specified size, or null if no space is available.</returns>
         public RenderTarget2DRegion? GetRegion(Rectangle want) {
+            // Find best candidate
             Rectangle space = default;
             int index = -1;
             for (int i = Spaces.Count - 1; i >= 0; --i) {
@@ -85,12 +91,15 @@ namespace OlympUI.MegaCanvas {
                 }
             }
 
+            // No space left 
             if (index == -1)
                 return null;
 
-            Rectangle taken = new(space.X, space.Y, want.Width, want.Height);
+            // Since the found usable space is likely to be a lot larger than the size it was asked for
+            // just split the extra parts into new spaces.
+            Rectangle taken = new(space.X, space.Y, want.Width, want.Height); // How much does the request take
             RenderTarget2DRegion rtrg = new(this, RT, taken, taken);
-            bool replace = true;
+            bool replace = true; // We can replace a single region on the spaces array
             if (taken.Width < taken.Height) {
                 /*
                     +-----------+-----------+
@@ -160,7 +169,7 @@ namespace OlympUI.MegaCanvas {
                 }
             }
 
-            if (replace)
+            if (replace) // if we did not replace any region remove it since, otherwise theres going to be a hole
                 Spaces.RemoveAt(index);
 
             Taken.Add(rtrg);
@@ -183,9 +192,9 @@ namespace OlympUI.MegaCanvas {
 
             gd.SetRenderTarget(RT);
             using SpriteBatch sb = new(gd);
-            sb.Begin(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.PointWrap, DepthStencilState.Default, UI.RasterizerStateCullCounterClockwiseScissoredNoMSAA);
+            sb.Begin(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.PointWrap, DepthStencilState.Default, UI.RasterizerStateCullCounterClockwiseUnscissoredNoMSAA);
             sb.Draw(
-                Assets.DebugDisposed,
+                Assets.DebugDisposed.Value,
                 new Vector2(rtrg.Region.X, rtrg.Region.Y),
                 new Rectangle(0, 0, rtrg.Region.Width, rtrg.Region.Height),
                 Color.White,

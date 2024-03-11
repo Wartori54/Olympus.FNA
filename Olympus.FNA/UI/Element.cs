@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -94,11 +95,14 @@ namespace OlympUI {
 
         protected uint CachedPaintID;
 
-        protected uint ConsecutiveCachedPaints;
-        protected uint ConsecutiveUncachedPaints;
-        protected uint EffectiveCachedPaints;
+        protected uint ConsecutiveCachedPaints; // Paints that the element should have been drawn from cache
+        protected uint ConsecutiveUncachedPaints; // Paints that the element was not drawn from cache
+        protected uint EffectiveCachedPaints; // Paints that the element actually *was* drawn from cache
 
-        protected IReloadable<RenderTarget2DRegion, RenderTarget2DRegionMeta>? CachedTexture;
+        public const uint MaxConsecutiveUncachedPaints = 32; // How long before we throw out cache buffer
+        public const uint MaxConsecutiveCachedPaints = 32; // How long before we actually get a cache in place
+
+        protected IReloadable<RenderTarget2DRegion, RenderTarget2DRegionMeta>? CachedTexture; // TODO: abstract cache operations to methods
 
 
         internal bool Awakened;
@@ -400,6 +404,10 @@ namespace OlympUI {
             }
         }
 
+        public override string ToString() {
+            return _IDFallback + $" ({_ID})";
+        }
+
         #region Recursion
 
         public Element Add(Element child) {
@@ -645,130 +653,167 @@ namespace OlympUI {
             }
         }
 
+        // TODO: cacheTextures may be dying too often
+        // This renders to cache or not depending if its worth it and if its allowed
+        // For elements with `Clip` enabled, they will be cached aggressively since that the only way to render with clip
         protected virtual void PaintContent(bool paintToCache, bool paintToScreen, Padding padding) {
-            Point whTexture = WH + padding.WH;
-            bool? cached = paintToCache ? true : (Cached ?? (_ModifiersDraw.Count != 0 ? true : null));
+            Point textureSize = WH + padding.WH;
             RenderTarget2DRegion? cachedTexture = CachedTexture?.ValueValid;
-
-            if (cached == null && IsComposited && !Clip)
+            // If this is set to not be cacheable do not do it, and no op if we are not going to paint to screen either
+            bool? cached = paintToCache ? true : (Cached ?? (_ModifiersDraw.Count != 0 ? true : null));
+            cached = UI.ForceDisableCache ? false : cached;
+            if (cached == null && IsComposited && !Clip) // Composited entities avoid cache if clip is not required
                 cached = false;
 
+            bool cacheJustCreated = false;
+            
             bool repainting = Repainting;
             Repainting = false;
+            
+            if (!repainting) {
+                ConsecutiveUncachedPaints = 0;
+                ConsecutiveCachedPaints++;
+            } else {
+                ConsecutiveUncachedPaints++;
+                ConsecutiveCachedPaints = 0;
+            }
 
-            if (cached == false /* and not null */ || (!paintToCache && UI.ForceDisableCache)) {
-                CachedTexture?.Dispose();
-                CachedTexture = null;
-                cachedTexture = null;
+            // Save memory here if we are not going to use the cache anyways
+            if (cachedTexture != null && ConsecutiveUncachedPaints > MaxConsecutiveUncachedPaints) {
+                DeleteCache();
+            }
+            
+            // Do not cache before some time has passed, clip is cached asap
+            if (ConsecutiveCachedPaints < MaxConsecutiveCachedPaints / 2 && !Clip && !paintToCache) {
+                if (cachedTexture?.Page != null) { // This texture was on atlas, we dont want to repaint in there
+                    DeleteCache();
+                }
                 if (paintToScreen)
                     DrawContent();
                 return;
             }
 
-            bool pack = false;
 
-            if (!repainting) {
-                ConsecutiveUncachedPaints = 0;
-                if (ConsecutiveCachedPaints < 32) {
-                    ConsecutiveCachedPaints++;
-                    if (ConsecutiveCachedPaints < 16 && cached is null && !Clip) {
-                        if (paintToScreen)
-                            DrawContent();
-                        return;
-                    }
-
-                } else {
-                    pack = true;
-                }
-
-            } else {
-                if (ConsecutiveUncachedPaints < 8) {
-                    ConsecutiveUncachedPaints++;
-
-                } else if (cached is null && !Clip) {
-                    CachedTexture?.Dispose();
-                    CachedTexture = null;
-                    cachedTexture = null;
-                }
-
-                if (cachedTexture is null && (cached is null && !Clip)) {
+            // No cache is in place (for one of the following reasons)
+            if (cachedTexture == null) {
+                // This element should not be cached, draw to screen if necessary, except if it has clip :P
+                if (cached == false /* and not null*/ && !Clip) {
                     if (paintToScreen)
                         DrawContent();
                     return;
+                } 
+                // Element has to be cached, get it on the cache pool now
+                CacheToPool();
+               
+                repainting = true; // Reminder: cache is empty
+            } else { // Cache exists
+                if (cached == false && !Clip) { // If its not cached it doesnt deserve to be :P
+                    DeleteCache();
+                } else if (cachedTexture.IsDisposed) { // Safe check
+                    DeleteCache();
+                } else if (cachedTexture.RT.Width < textureSize.X || cachedTexture.RT.Height < textureSize.Y) { // Safe check
+                    DeleteCache();
+                } else if ((repainting || UI.GlobalDrawDebug) && cachedTexture.Page != null) { // We do not like to repaint on the atlas, get it out of there!
+                    DeleteCache();
                 }
-            }
 
-            if (cachedTexture is not null && (cachedTexture.RT.IsDisposed || cachedTexture.RT.Width < whTexture.X || cachedTexture.RT.Height < whTexture.Y)) {
-                CachedTexture?.Dispose();
-                CachedTexture = null;
-                cachedTexture = null;
-            }
-
-            if ((repainting || UI.GlobalDrawDebug) && cachedTexture is not null && cachedTexture.Page is not null) {
-                CachedTexture?.Dispose();
-                CachedTexture = null;
-                cachedTexture = null;
-            }
-
-            if (cachedTexture is null) {
-                if (CachedTexture is not null) {
-                    cachedTexture = CachedTexture.ValueLazy;
-                    if (cachedTexture is null)
-                        CachedTexture = null;
+                if (cachedTexture == null) { // Cache was bad and its gone
+                    if (!Clip && !paintToCache) { 
+                        if (paintToScreen)
+                            DrawContent();
+                        return;
+                    } else { // We have clip, we must get a new one and render to that
+                        CacheToPool();
+                        repainting = true;
+                    }
                 }
-                if (cachedTexture is null) {
-                    if (CachedTexture is null)
-                        CachedTexture = Reloadable.Temporary(default(RenderTarget2DRegionMeta), () => (CachePool ?? UI.MegaCanvas.PoolMSAA).Get(whTexture.X, whTexture.Y), true);
-                    cachedTexture = CachedTexture.Value;
-                }
-                EffectiveCachedPaints = 0;
-                ConsecutiveCachedPaints = 0;
-                repainting = true;
-            }
 
-            if (cachedTexture is null) {
-                if (paintToScreen)
-                    DrawContent();
-                return;
-            }
-
-            Debug.Assert(CachedTexture is not null);
-
-            if (EffectiveCachedPaints < 16) { 
-                EffectiveCachedPaints++;
-                if (EffectiveCachedPaints == 16 && (CachePool ?? UI.MegaCanvas.PoolMSAA) is { } cachePool &&
-                    (cachedTexture.UsedRegion.GetArea() >= (whTexture + new Point(cachePool.Padding, cachePool.Padding)).GetArea() * 1.2f)) {
-                    CachedTexture.Dispose();
-                    CachedTexture = Reloadable.Temporary(default(RenderTarget2DRegionMeta), () => cachePool.Get(whTexture.X, whTexture.Y), true);
-                    cachedTexture = CachedTexture.Value;
+                // Element just got out of non cache frames
+                if (ConsecutiveCachedPaints == MaxConsecutiveCachedPaints / 2) {
                     repainting = true;
                 }
+                
+                if (cachedTexture!.Pool != null && !repainting && !UI.GlobalDrawDebug)
+                    if (ConsecutiveCachedPaints > MaxConsecutiveCachedPaints) {
+                        // Enough time has passed, migrate to atlas
+                        MigrateToAtlas();
+                        // Note: after this it is impossible to repaint
+                    }
+
             }
+            
+            Debug.Assert(cachedTexture != null);
 
+            // Handle rendering to/from cache
             Vector2 xy = ScreenXY;
-            if (repainting || UI.GlobalDrawDebug) {
+            if (repainting || UI.GlobalDrawDebug) { // Debug draw intentionally repaints on each frame
+                // We are repainting first paint to the cache
                 CachedPaintID++;
-
+                
                 UIDraw.Push(cachedTexture, -xy + padding.LT.ToVector2());
-
+                
                 DrawContent();
 
                 UIDraw.Pop();
-
-            } else if (!repainting && pack && cachedTexture.Page is null) {
-                RenderTarget2DRegion? packed = UI.MegaCanvas.GetPackedAndFree(cachedTexture, new(0, 0, whTexture.X, whTexture.Y));
-                if (packed is not null) {
-                    CachedTexture = Reloadable.Temporary(new RenderTarget2DRegionMeta(), () => packed, _ => {
-                        packed?.Dispose();
-                        packed = null;
-                    });
-                    cachedTexture = CachedTexture.Value;
-                    InvalidateCachedTextureDown();
-                }
+                ConsecutiveUncachedPaints = 0;
+            }
+            
+            // Finally, draw the cache to screen
+            if (paintToScreen) {
+                DrawCachedTexture(
+                    cachedTexture,
+                    xy,
+                    padding,
+                    textureSize
+                );
             }
 
-            if (paintToScreen)
-                DrawCachedTexture(cachedTexture, xy, padding, whTexture);
+            return;
+
+            void DeleteCache() {
+#if DEBUG
+                if (cacheJustCreated) {
+                    throw new Exception("PERFORMANCE ISSUE: Deleting cache which was just created!");
+                }
+#endif
+                CachedTexture?.Dispose();
+                CachedTexture = null;
+                cachedTexture = null;
+                ConsecutiveCachedPaints = 0;
+            }
+
+            void CacheToPool() {
+                if (CachedTexture?.IsValid ?? false) throw new Exception("Cache leak detected!");
+                if (textureSize.X > UI.MegaCanvas.MaxSize || textureSize.Y > UI.MegaCanvas.MaxSize)
+                    throw new Exception($"Asked for a region that was too big! {textureSize}");
+                CachedTexture = Reloadable.Temporary(default(RenderTarget2DRegionMeta),
+                    () => (CachePool ?? UI.MegaCanvas.DefaultPool).Get(textureSize.X, textureSize.Y),
+                    true);
+                cachedTexture = CachedTexture.Value;
+                cacheJustCreated = true;
+                if (cachedTexture == null) throw new Exception($"Could not obtain cache with size {textureSize}!");
+            }
+
+            void MigrateToAtlas() {
+                // Duplicate check here for speed
+                if (textureSize.X > UI.MegaCanvas.MaxPackedSize || textureSize.Y > UI.MegaCanvas.MaxPackedSize) return;
+                if (cachedTexture == null) { // Oops!
+                    return;
+                }
+                // Migrate the cache to the atlas
+                RenderTarget2DRegion? packed = UI.MegaCanvas.GetPackedAndFree(cachedTexture, 
+                    new Rectangle(0, 0, textureSize.X, textureSize.Y));
+                if (packed is null) { // Atlas failed, keep old cache!
+                    return;
+                }
+                CachedTexture!.Dispose();
+                CachedTexture = Reloadable.Permanent(new RenderTarget2DRegionMeta(), () => packed, rt => {
+                    packed.Dispose();
+                    packed = null;
+                });
+                cachedTexture = CachedTexture.Value;
+                InvalidateCachedTextureDown();
+            }
         }
 
         protected virtual void DrawCachedTexture(RenderTarget2DRegion rt, Vector2 xy, Padding padding, Point size) {

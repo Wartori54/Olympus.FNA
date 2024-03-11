@@ -15,34 +15,92 @@ namespace Olympus {
 
     public class ModAPI {
         #region Interfaces
+        
+        // Represents a ModAPI capable of providing IModInfo and IModFileInfo instances
         public interface IModInfoAPI { }
 
+        /// <summary>
+        /// Represents a mod info as in its mod page, completely detached from actual files
+        /// </summary>
         public interface IModInfo {
-            public string Name { get; }
-            public string Author { get; }
-            public string Description { get; }
-            public DateTime CreationDate { get; }
-            public DateTime LastModified { get; }
-            public string[] Screenshots { get; }
-            public string ModType { get; }
-            public string PageURL { get; }
-            public IEnumerable<IModFileInfo> Files { get; }
+            public string Name { get; } // Display name of the mod
+            public string Author { get; } // Its author
+            public string Description { get; } // Short description
+            public DateTime CreationDate { get; } // ...
+            public DateTime LastModified { get; } // ...
+            public string[] Screenshots { get; } // Screenshot urls for this mod
+            public ModType ModType { get; } // ...
+            public string PageURL { get; } // Its url, the page
+            public IEnumerable<IModFileInfo> Files { get; } // All the files you can download
         }
 
 
+        /// <summary>
+        /// Represents a file from a mod, can be either local or remote
+        /// </summary>
         public interface IModFileInfo {
-            public string? Path { get; }
-            public abstract string Name { get; }
-            public string Hash { get; }
-            public bool IsLocal { get; }
-            public DateTime? LastUpdate { get; }
-            public string[]? DownloadUrl { get; }
-            public bool? IsBlacklisted { get; }
-            public bool? IsUpdaterBlacklisted { get; }
-            public Version? Version { get; }
-            public string[]? DependencyIds { get; }
+            public string? Path { get; } // Path to obtain it (NOT URL)
+            public string Name { get; } // ID, from the .yaml file
+            public string Hash { get; } // ...
+            public bool IsLocal { get; } // Determines where does the file live: on the current machine, or its remote
+            public DateTime? LastUpdate { get; } // ...
+            public string[]? DownloadUrl { get; } // List of urls from where it can be downloaded
+            public bool? IsBlacklisted { get; } // ...
+            public bool? IsUpdaterBlacklisted { get; } // ...
+            public Version? Version { get; } // ...
+            public string[]? DependencyIds { get; } // List of its dependencies as ID
         }
         
+        #endregion
+
+        #region DefinedTypes
+        public class ModType {
+            public static readonly ModType Map = new() { ModClass = ModClassEnum.Map};
+            public static readonly ModType Helper = new() { ModClass = ModClassEnum.Helper};
+            public static readonly ModType Tool = new() { ModClass = ModClassEnum.Tool};
+
+            public static ModType Other(string meta) => new() { ModClass = ModClassEnum.Other, Meta = meta };
+            
+            public ModClassEnum ModClass { get; private set; }
+            public string Meta { get; private set; }
+
+            private ModType() {
+                Meta = "";
+            }
+
+            public enum ModClassEnum {
+                Map,
+                Helper,
+                Tool,
+                Other,
+            }
+
+            public override string ToString() {
+                return ModClass + (ModClass == ModClassEnum.Other ? $" ({Meta})" : "");
+            }
+            
+            public static bool operator ==(ModType type1, ModType type2) {
+                if (ReferenceEquals(type1, type2)) 
+                    return true;
+                if (ReferenceEquals(type1, null)) 
+                    return false;
+                if (ReferenceEquals(type2, null))
+                    return false;
+                return type1.Equals(type2);
+            }
+
+            public static bool operator !=(ModType type1, ModType type2) => !(type1 == type2);
+
+            public override bool Equals(object? obj) {
+                if (obj is not ModType type) return false;
+                if (this.Meta == "" || type.Meta == "") {
+                    return this.ModClass == type.ModClass;
+                }
+
+                return this.ModClass == type.ModClass && this.Meta == type.Meta;
+            }
+        }
+
         #endregion
         
         #region LocalAPI
@@ -142,7 +200,7 @@ namespace Olympus {
                     
                     if (res != null) {
                         ModFileInfoCache.TryAdd(fsEntry, new ManualCache<IModFileInfo?>(path => 
-                            CacheModFileInfo(path as string ?? ""), 
+                            CacheModFileInfo(path as string ?? throw new InvalidCastException("path was not a string!")), 
                             fsEntry));
                     }
                 }
@@ -258,6 +316,15 @@ namespace Olympus {
 
             public abstract RemoteModInfo? GetModInfoFromFileInfo(IModFileInfo file);
 
+            /// <summary>
+            /// Forces the API to ignore any remote information, forcing it into a permanent reproducible state
+            /// </summary>
+            public abstract void Freeze();
+            /// <summary>
+            /// Returns the API into a normal state, pre-freeze
+            /// </summary>
+            public abstract void UnFreeze();
+
             public abstract class RemoteModFileInfo : IModFileInfo {
                 public string? Path => null;
                 public abstract string Name { get; }
@@ -278,10 +345,13 @@ namespace Olympus {
                 public abstract DateTime CreationDate { get; }
                 public abstract DateTime LastModified { get; }
                 public abstract string[] Screenshots { get; }
-                public abstract string ModType { get; }
+                public abstract ModType ModType { get; }
                 public abstract string PageURL { get; }
                 public abstract IEnumerable<IModFileInfo> Files { get; }
             }
+
+
+            
         }
 
         public class MaddieModInfoAPI : RemoteModInfoAPI {
@@ -298,6 +368,7 @@ namespace Olympus {
             private readonly TimedCache<Dictionary<int, MaddieModInfo>> searchDataBase;
 
             public MaddieModInfoAPI() : base(YamlPath) {
+                // Really make sure that all caches are synced and will time out at the same time, it can cause really bad issues otherwise
                 rawUpdateDataBase = new(TimeSpan.FromMinutes(15), 
                     DownloadUpdateDataBase, null);
                 mmdlUpdateDataBase = new(TimeSpan.FromMinutes(15), 
@@ -352,7 +423,7 @@ namespace Olympus {
                 List<RemoteModInfo> ret = new();
                 foreach (MaddieModInfo entry in entries) {
                     // Tools cannot be featured
-                    if (entry.ModType == "Tool") continue;
+                    if (entry.ModType == ModType.Tool) continue;
                     List<MaddieModFileInfo> newFiles = new();
                     foreach (IModFileInfo file in entry.Files) {
                         string mmdl = file.DownloadUrl![0].Split('/')[^1];
@@ -445,6 +516,20 @@ namespace Olympus {
                 return info;
             }
 
+            public override void Freeze() {
+                rawUpdateDataBase.Frozen = true; 
+                mmdlUpdateDataBase.Frozen = true; 
+                featuredEntries.Frozen = true; 
+                searchDataBase.Frozen = true; 
+            }
+
+            public override void UnFreeze() {
+                rawUpdateDataBase.Frozen = false; 
+                mmdlUpdateDataBase.Frozen = false; 
+                featuredEntries.Frozen = false; 
+                searchDataBase.Frozen = false; 
+            }
+
             public RemoteModFileInfo? GetModFileInfoFromFileId(int id) {
                 if (!mmdlUpdateDataBase.Value.TryGetValue(id, out string? stringId))
                     return null;
@@ -524,17 +609,37 @@ namespace Olympus {
                 [JsonProperty("Screenshots")]
                 [YamlMember(Alias = "Screenshots")]
                 public string[] screenshots = Array.Empty<string>();
+                
+                [JsonProperty("MirroredScreenshots")]
+                [YamlMember(Alias = "MirroredScreenshots")]
+                public string[] mirroredScreenshots = Array.Empty<string>();
+                
                 [Newtonsoft.Json.JsonIgnore]
                 [YamlIgnore]
-                public override string[] Screenshots => screenshots;
+                public override string[] Screenshots => screenshots.Any(s => s.EndsWith(".png") || s.EndsWith(".jpg")) ? screenshots : mirroredScreenshots;
                 
+                // modType will adopt most types, but not all, so sometimes we have to rely on gbType
+                [JsonProperty("CategoryName")]
+                [YamlMember(Alias = "CategoryName")]
+                public string modType = "";
+                
+                // gbType is either: Mod, Tool or Wip; we only care about it when this is "Tool"
+                // since most tools arent tagged as "Tool" in modType
                 [JsonProperty("GameBananaType")]
                 [YamlMember(Alias = "GameBananaType")]
-                public string modType = "";
+                public string gbType = "";
+
                 [YamlIgnore]
                 [Newtonsoft.Json.JsonIgnore]
-                public override string ModType => modType;
-                
+                public override ModType ModType =>
+                    gbType == "Tool" ? ModType.Tool : // We can blindly trust gbType when its "Tool"
+                    modType switch {
+                        "Maps" => ModType.Map,
+                        "Helpers" => ModType.Helper,
+                        "Mechanics" => ModType.Tool,
+                        _ => ModType.Other(modType),
+                    };
+
                 [JsonProperty("PageURL")]
                 [YamlMember(Alias = "PageURL")]
                 public string pageURL = "";
@@ -598,16 +703,22 @@ namespace Olympus {
             public RemoteModInfoAPI DefaultAPI() {
                 return Default.ApiInstance;
             }
-            
+
             /// <summary>
             /// Attempts to call a method from RemoteModInfoAPI on all apis, until one succeeds
             /// </summary>
             /// <param name="func">The method to call on the api</param>
+            /// <param name="shouldFreeze">Indicates whether the api should be frozen and later unfrozen for the call</param>
             /// <typeparam name="T">The expected return type</typeparam>
             /// <returns>null if failure, an object otherwise</returns>
-            public T? TryAll<T>(Func<RemoteModInfoAPI, T?> func) where T : class {
+            public T? TryAll<T>(Func<RemoteModInfoAPI, T?> func, bool shouldFreeze = false) where T : class {
                 foreach (APIRegister api in apis) {
+                    if (shouldFreeze) api.ApiInstance.Freeze();
+                    
                     T? res = func(api.ApiInstance);
+                    
+                    if (shouldFreeze) api.ApiInstance.UnFreeze();
+                    
                     if (res != null) return res;
                 }
 

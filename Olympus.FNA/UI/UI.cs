@@ -27,6 +27,10 @@ namespace OlympUI {
         public static bool GlobalDrawDebug = false;
 
         public static Element? Hovering;
+#if DEBUG
+        public static Element? HoveringAny;
+        public static List<Element>? HoveringAll;
+#endif
         public static Element? Dragging;
         public static Element? Focusing;
 
@@ -174,6 +178,10 @@ namespace OlympUI {
                 if (UIInput.MouseDXY != default || ReflowingPrev) {
                     Element? hoveringPrev = Hovering;
                     Element? hoveringNext = Hovering = UIInput.MouseFocus ? Root.GetInteractiveChildAt(UIInput.Mouse.ToPoint()) : null;
+#if DEBUG
+                    HoveringAny = UIInput.MouseFocus ? Root.GetSmallestChildAt(UIInput.Mouse.ToPoint()) : null;
+                    HoveringAll = UIInput.MouseFocus ? Root.GetAllChildrenAt(UIInput.Mouse.ToPoint()) : null;
+#endif
 
                     if (hoveringPrev != hoveringNext) {
                         hoveringPrev?.InvokeUp(new MouseEvent.Leave());

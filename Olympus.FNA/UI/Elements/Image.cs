@@ -1,5 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using System;
 
 namespace OlympUI {
     public abstract partial class ImageBase : Element {

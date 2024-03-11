@@ -20,7 +20,7 @@
     <UseWindowsForms>$(TargetIsWindows)</UseWindowsForms>
     <PublishReadyToRun>true</PublishReadyToRun>
     <Platform>x64</Platform>
-    <OutputType>exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <OutputType Condition="$(TargetIsWindows)">winexe</OutputType>
     <OutputPath>bin\$(Platform)\$(Configuration)\$(TargetFramework)</OutputPath>
     <IntermediateOutputPath>obj\$(Platform)\$(Configuration)\$(TargetFramework)</IntermediateOutputPath>

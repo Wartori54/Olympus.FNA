@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using FontStashSharp;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 using OlympUI;
 using System;
@@ -43,9 +44,12 @@ namespace Olympus {
 #if DEBUG
             UI.Root.Children.Add(Scener.Get<MetaDebugScene>().Root);
             UI.Root.Children.Add(DebugLabel = new Label("") {
+                Cached = false,
                 Style = {
-                    Color.Red,
-                    OlympUI.Assets.FontMonoOutlined,
+                    { Label.StyleKeys.Color, Color.Red },
+                    { Label.StyleKeys.Font, OlympUI.Assets.FontMonoOutlined },
+                    { Label.StyleKeys.FontEffect, FontSystemEffect.Stroked },
+                    { Label.StyleKeys.FontEffectAmount, 1 /* EffectAmount */}
                 },
             });
 #endif
@@ -107,6 +111,7 @@ namespace Olympus {
                 MetaNotificationScene.PushNotification(new() { Message = "Information", Level = Notification.SeverityLevel.Information });
                 MetaNotificationScene.PushNotification(new() { Message = "Warning", Level = Notification.SeverityLevel.Warning });
                 MetaNotificationScene.PushNotification(new() { Message = "Error", Level = Notification.SeverityLevel.Error });
+                MetaNotificationScene.PushNotification(new() { Message = "Long information message thats likely to use multiple lines so the wrap and layout of the notification can get tested and debugged easily", Level = Notification.SeverityLevel.Information });
             }
 
             if (UIInput.Pressed(Keys.F5)) {
@@ -143,6 +148,7 @@ namespace Olympus {
             if (UIInput.Pressed(Keys.F8)) {
                 // Run debug code that prints to stdout here
                 UI.Root.InvalidateForce();
+                UI.GlobalRepaintID++;
             }
             
             if (UIInput.Pressed(Keys.F10)) {
@@ -184,16 +190,54 @@ namespace Olympus {
                 $"App Size: {App.Width} x {App.Height} ({(Native.IsMaximized ? "maximized" : "windowed")})\n" +
                 $"Reloadable Texture2D Used: {TextureTracker.Instance.UsedCount} / {TextureTracker.Instance.TotalCount}\n" +
                 $"Reloadable Texture2D Memory: {GetHumanFriendlyBytes(TextureTracker.Instance.UsedMemory)} / {GetHumanFriendlyBytes(TextureTracker.Instance.TotalMemory)}\n" +
-                $"Pool MAIN Available: {UI.MegaCanvas.Pool.EntriesAlive}\n" +
-                $"Pool MAIN Used: {UI.MegaCanvas.Pool.Used.Count}\n" +
+                $"Pool MAIN Available: {UI.MegaCanvas.Pool.RegionsUsed}\n" +
+                $"Pool MAIN Used: {UI.MegaCanvas.Pool.UsedCount}\n" +
                 $"Pool MAIN Memory: {GetHumanFriendlyBytes(UI.MegaCanvas.Pool.UsedMemory)} / {GetHumanFriendlyBytes(UI.MegaCanvas.Pool.TotalMemory)} \n" +
-                $"Pool MSAA Available: {UI.MegaCanvas.PoolMSAA.EntriesAlive}\n" +
-                $"Pool MSAA Used: {UI.MegaCanvas.PoolMSAA.Used.Count}\n" +
+                $"Pool MSAA Available: {UI.MegaCanvas.PoolMSAA.RegionsUsed}\n" +
+                $"Pool MSAA Used: {UI.MegaCanvas.PoolMSAA.UsedCount}\n" +
                 $"Pool MSAA Memory: {GetHumanFriendlyBytes(UI.MegaCanvas.PoolMSAA.UsedMemory)} / {GetHumanFriendlyBytes(UI.MegaCanvas.PoolMSAA.TotalMemory)} \n" +
                 $"Atlas Pages: {UI.MegaCanvas.Pages.Count} x {GetHumanFriendlyBytes(UI.MegaCanvas.PageSize * UI.MegaCanvas.PageSize * 4)} \n" +
                 $"Element: {UI.Hovering}, WH: {UI.Hovering?.WH}";
-#endif
+            if (DebugLabel.Visible) {
+                DebugLabel.Text =
+                    $"FPS: {App.FPS}\n" +
+                    $"Repaint Mode: {(AlwaysRepaint ? "always (debug)" : "on demand")}\n" +
+                    $"Mouse: {UIInput.Mouse}\n" +
+                    $"Root Size: {UI.Root.WH.X} x {UI.Root.WH.Y}\n" +
+                    $"App Size: {App.Width} x {App.Height} ({(Native.IsMaximized ? "maximized" : "windowed")})\n" +
+                    $"Reloadable Texture2D Used: {TextureTracker.Instance.UsedCount} / {TextureTracker.Instance.TotalCount}\n" +
+                    $"Reloadable Texture2D Memory: {GetHumanFriendlyBytes(TextureTracker.Instance.UsedMemory)} / {GetHumanFriendlyBytes(TextureTracker.Instance.TotalMemory)}\n" +
+                    $"Pool MAIN Available: {UI.MegaCanvas.Pool.RegionsUsed}\n" +
+                    $"Pool MAIN Used: {UI.MegaCanvas.Pool.UsedCount}\n" +
+                    $"Pool MAIN Memory: {GetHumanFriendlyBytes(UI.MegaCanvas.Pool.UsedMemory)} / {GetHumanFriendlyBytes(UI.MegaCanvas.Pool.TotalMemory)} \n" +
+                    $"Pool MSAA Available: {UI.MegaCanvas.PoolMSAA.RegionsUsed}\n" +
+                    $"Pool MSAA Used: {UI.MegaCanvas.PoolMSAA.UsedCount}\n" +
+                    $"Pool MSAA Memory: {GetHumanFriendlyBytes(UI.MegaCanvas.PoolMSAA.UsedMemory)} / {GetHumanFriendlyBytes(UI.MegaCanvas.PoolMSAA.TotalMemory)} \n" +
+                    $"Atlas Pages: {UI.MegaCanvas.Pages.Count} x {GetHumanFriendlyBytes(UI.MegaCanvas.PageSize * UI.MegaCanvas.PageSize * 4)} \n" +
+                    $"Element: {UI.HoveringAny}, XY: {UI.HoveringAny?.OnScreen}, WH: {UI.HoveringAny?.WH}";
+                if (UIInput.Down(Keys.LeftShift) && UI.HoveringAll != null) {
+                    string allElementsStr = "";
+                    foreach (Element el in UI.HoveringAll) {
+                        allElementsStr += "    " + el + $", XY: {el.ScreenXY}, \n" +
+                                          $"    WH: {el.WH},\n" +
+                                          "    Children: {el.Children.Count}\n";
+                    }
+                    DebugLabel.Text += "\n" +
+                                       $"All Elements:\n{allElementsStr}";
+                }
+            }
 
+            if (UIInput.Down(Keys.LeftShift) && UIInput.Down(Keys.LeftControl) && UI.HoveringAll != null) {
+                string allElementsStr = "";
+                foreach (Element el in UI.HoveringAll) {
+                    allElementsStr += "    " + el + $", XY: {el.ScreenXY}, \n" +
+                                      $"    WH: {el.WH},\n" +
+                                      "    Children: {el.Children.Count}\n";
+                }
+                Console.WriteLine($"All Elements:\n{allElementsStr}");
+            }
+#endif
+            
             Scener.Update(dt);
             UI.Update(dt);
         }

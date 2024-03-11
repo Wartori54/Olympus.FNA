@@ -115,6 +115,7 @@ namespace OlympUI {
             $"#{c.R:X2}{c.G:X2}{c.B:X2}" :
             $"#{c.R:X2}{c.G:X2}{c.B:X2}{c.A:X2}";
 
+        // Next Power of Two
         public static int NextPoT(this int v) => (int) NextPoT((uint) v);
         public static uint NextPoT(this uint v) {
             --v;

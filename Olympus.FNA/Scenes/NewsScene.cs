@@ -202,6 +202,8 @@ public class NewsScene : Scene {
 
             await UI.Run(() => {
                 Image image = new Image(tex) {
+                    Cached = false,
+                    DisposeTexture = true,
                     Modifiers = {
                         new FadeInAnimation(0.6f).With(Ease.QuadOut),
                     },
@@ -222,7 +224,12 @@ public class NewsScene : Scene {
                 });
                 // alright let me be clear here
                 // WHYY THE FRICK DOES A HECKING GROUP NEED TO BE HERE IN ORDER FOR THE IMG TO BE CENTERED
-                imagePanel.Add(new Group() {image});
+                imagePanel.Add(new Group() {
+                    Layout = {
+                        Layouts.FillFull()
+                    },
+                    Children = {image}
+                });
 
             });
         });

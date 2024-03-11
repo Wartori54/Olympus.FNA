@@ -10,28 +10,30 @@ namespace OlympUI {
             (gd, _) => new NoiseEffect(gd)
         );
 
-        private EffectParameter MinMaxParam;
-        private bool MinMaxValid;
-        private Vector4 MinMaxValue = new(0f, 0f, 1f, 1f);
+        private MiniEffectParam<Vector4> MinMaxParam;
+        // private EffectParameter MinMaxParam;
+        // private bool MinMaxValid;
+        // private Vector4 MinMaxValue = new(0f, 0f, 1f, 1f);
         public Vector2 Min {
-            get => new(MinMaxValue.X, MinMaxValue.Y);
-            set => _ = (MinMaxValue.X = value.X, MinMaxValue.Y = value.Y, MinMaxValid = false);
+            get => new(MinMaxParam.Value.X, MinMaxParam.Value.Y);
+            set => MinMaxParam.Value = new Vector4(value.X, value.Y, MinMaxParam.Value.Z, MinMaxParam.Value.W);
         }
         public Vector2 Max {
-            get => new(MinMaxValue.Z, MinMaxValue.W);
-            set => _ = (MinMaxValue.Z = value.X, MinMaxValue.W = value.Y, MinMaxValid = false);
+            get => new(MinMaxParam.Value.Z, MinMaxParam.Value.W);
+            set => MinMaxParam.Value = new Vector4(MinMaxParam.Value.X, MinMaxParam.Value.Y, value.X, value.Y);
         }
 
-        private EffectParameter NoiseParam;
-        private bool NoiseValid;
-        private Vector3 NoiseValue;
+        private MiniEffectParam<Vector3> NoiseParam;
+        // private EffectParameter NoiseParam;
+        // private bool NoiseValid;
+        // private Vector3 NoiseValue;
         public Vector2 Spread {
-            get => new(NoiseValue.X, NoiseValue.Y);
-            set => _ = (NoiseValue.X = value.X, NoiseValue.Y = value.Y, NoiseValid = false);
+            get => new(NoiseParam.Value.X, NoiseParam.Value.Y);
+            set => NoiseParam.Value = new Vector3(value.X, value.Y, NoiseParam.Value.Z);
         }
         public float Blend {
-            get => NoiseValue.Z;
-            set => _ = (NoiseValue.Z = value, NoiseValid = false);
+            get => NoiseParam.Value.Z;
+            set => NoiseParam.Value = new Vector3(NoiseParam.Value.X, NoiseParam.Value.Y, value);
         }
 
         public NoiseEffect(GraphicsDevice graphicsDevice)
@@ -52,8 +54,8 @@ namespace OlympUI {
         [MemberNotNull(nameof(MinMaxParam))]
         [MemberNotNull(nameof(NoiseParam))]
         private void SetupParams() {
-            MinMaxParam = Parameters[MiniEffectParamCount + 0];
-            NoiseParam = Parameters[MiniEffectParamCount + 1];
+            MinMaxParam = new MiniEffectParam<Vector4>(Parameters[MiniEffectParamCount + 0], new Vector4(0f, 0f, 1f, 1f));
+            NoiseParam = new MiniEffectParam<Vector3>(Parameters[MiniEffectParamCount + 1], default);
         }
 
         public override Effect Clone()
@@ -62,15 +64,9 @@ namespace OlympUI {
         protected override void OnApply() {
             base.OnApply();
 
-            if (!MinMaxValid) {
-                MinMaxValid = true;
-                MinMaxParam.SetValue(MinMaxValue);
-            }
+            MinMaxParam.Apply();
 
-            if (!NoiseValid) {
-                NoiseValid = true;
-                NoiseParam.SetValue(NoiseValue);
-            }
+            NoiseParam.Apply();
         }
 
     }

@@ -58,7 +58,13 @@ namespace Olympus {
                         }
 
                         return ret;
-                    })())
+                    })()),
+                    Section("Mod screen", new() {
+                        new Button("Open it", _ => {
+                            Scener.PopFront();
+                            Scener.Push<ModManagerScene>();
+                        })
+                    })
                 }
                 
             };

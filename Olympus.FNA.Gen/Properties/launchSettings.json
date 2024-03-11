@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Generators": {
+      "commandName": "DebugRoslynComponent",
+      "targetProject": "Olympus.FNA.Gen.csproj"
+    }
+  } 
+}

@@ -25,7 +25,7 @@ namespace Olympus {
                 { "force-sdl2", "Force using the SDL2 native helpers.", v => forceSDL2 = v is not null },
             };
 #if DEBUG
-            console = true;
+            console = false;
 #else
             if (PlatformHelper.Is(Platform.Windows)) {
                 options.Add("console", "Open a debug console.", v => console = v is not null);
@@ -137,6 +137,8 @@ namespace Olympus {
                 AppLogger.Log.Error(ex, ex.Message);
                 Environment.Exit(-1);
             }
+
+            return 2;
         }
 
 

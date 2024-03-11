@@ -476,6 +476,7 @@ namespace Olympus.Utils {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 FileName = Path.Combine(install.Root, binaryName),
+                // Arguments = "--no-console"
             };
             
             Channel<(string, bool)> processStdData = Channel.CreateUnbounded<(string, bool)>();

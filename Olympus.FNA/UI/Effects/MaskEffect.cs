@@ -10,13 +10,14 @@ namespace OlympUI {
             (gd, _) => new MaskEffect(gd)
         );
 
-        protected EffectParameter MaskXYWHParam;
-        protected bool MaskXYWHValid;
-        protected Vector4 MaskXYWHValue = new(0f, 0f, 1f, 1f);
-        public Vector4 MaskXYWH {
-            get => MaskXYWHValue;
-            set => _ = (MaskXYWHValue = value, MaskXYWHValid = false);
-        }
+        protected MiniEffectParam<Vector4> MaskXYWHParam;
+        // protected EffectParameter MaskXYWHParam;
+        // protected bool MaskXYWHValid;
+        // protected Vector4 MaskXYWHValue = new(0f, 0f, 1f, 1f);
+        // public Vector4 MaskXYWH {
+            // get => MaskXYWHValue;
+            // set => _ = (MaskXYWHValue = value, MaskXYWHValid = false);
+        // }
 
         public MaskEffect(GraphicsDevice graphicsDevice)
             : base(graphicsDevice, Cache.GetData()) {
@@ -35,7 +36,7 @@ namespace OlympUI {
 
         [MemberNotNull(nameof(MaskXYWHParam))]
         private void SetupParams() {
-            MaskXYWHParam = Parameters[MiniEffectParamCount + 0];
+            MaskXYWHParam = new MiniEffectParam<Vector4>(Parameters[MiniEffectParamCount + 0], new Vector4(0f, 0f, 1f, 1f));
         }
 
         public override Effect Clone()
@@ -44,10 +45,7 @@ namespace OlympUI {
         protected override void OnApply() {
             base.OnApply();
 
-            if (!MaskXYWHValid) {
-                MaskXYWHValid = true;
-                MaskXYWHParam.SetValue(MaskXYWHValue);
-            }
+            MaskXYWHParam.Apply();
         }
 
     }

@@ -81,6 +81,7 @@ public partial class MetaNotificationScene : Scene  {
             
             { Panel.StyleKeys.Background, new Color(0x1F, 0x1F, 0x1F, 0xFF) },
             { Panel.StyleKeys.Shadow, Shadow },
+            { Group.StyleKeys.Spacing, 0f }
         };
         
         private readonly Notification Notification;
@@ -90,26 +91,36 @@ public partial class MetaNotificationScene : Scene  {
             Clip = true;
             ClipExtend = Shadow * 8;
             Notification = notification;
-                
-            var close = new NotificationCloseButton("close") {
+            Layout.Add(Layouts.Column());
+            
+            NotificationCloseButton close = new("close") {
                 W = 24, H = 24,
                 Callback = _ => {
                     if (Status == Lifecycle.Show) StartFadeout();
                 },
                 Layout = {
-                    Layouts.Fill(0.0f, 0.0f),
+                    // Layouts.Fill(0.0f, 0.0f),
                     Layouts.Right(0),
                 },
             };
-            Children.Add(new Group {
+            Group labelGroup = new Group {
                 Layout = {
                     Layouts.Fill(1.0f, 0.0f, LayoutConsts.Next),
                 },
                 Children = {
                     new Label(Notification.Message) { Wrap = true, }
                 }
+            };
+            Children.Add(new Group() {
+                Layout = {
+                    Layouts.Fill(1, 0),
+                    Layouts.Row(),
+                },
+                Children = {
+                    labelGroup,
+                    close
+                }
             });
-            Children.Add(close);
             Children.Add(new NotificationProgress(Notification) {
                 H = 5,
                 Layout = {

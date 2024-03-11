@@ -362,8 +362,8 @@ namespace OlympUI {
                 return false;
 
             gd.Textures[0] = Texture.Value;
-            effect.Color = Color.ToVector4();
-            effect.Transform = Transform ?? CreateTransform();
+            effect.ColorParam.Value = Color.ToVector4();
+            effect.TransformParam.Value = Transform ?? CreateTransform();
 
             return true;
         }
