@@ -291,13 +291,15 @@ namespace OlympUI {
         }
 
         private void AddAttributeHandlers() {
-            Type type = GetType();
-            foreach ((LayoutPassAttribute? layoutPassAttribute, MethodInfo member) entry in type.GetMethods()
-                         .Select(member => (member.GetCustomAttribute<LayoutPassAttribute>(), member))) {
-                if (entry.layoutPassAttribute != null)
-                    Add(entry.layoutPassAttribute.Pass ?? LayoutPass.Normal, 
-                        entry.layoutPassAttribute.Subpass ?? LayoutSubpass.AfterChildren, 
-                        entry.member.CreateDelegate<Action<LayoutEvent>>(Owner));
+            for (Type? type = Owner.GetType(); type !=  null; type = type.BaseType) {
+                foreach ((LayoutPassAttribute? layoutPassAttribute, MethodInfo member) entry in type
+                             .GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                             .Select(member => (member.GetCustomAttribute<LayoutPassAttribute>(), member))) {
+                    if (entry.layoutPassAttribute != null)
+                        Add(entry.layoutPassAttribute.Pass ?? LayoutPass.Normal,
+                            entry.layoutPassAttribute.Subpass ?? LayoutSubpass.AfterChildren,
+                            entry.member.CreateDelegate<Action<LayoutEvent>>(Owner));
+                }
             }
         }
         
@@ -403,10 +405,13 @@ namespace OlympUI {
                 return e;
             }
 
+            bool hasRecursedToChildren = false;
+
             // Iterate on the current pass
             foreach (HandlerSublist subhandlers in handlers.Handlers) {
                 if (subhandlers.Pass >= LayoutSubpass.AfterChildren) { // AfterChildren is a special case, we've hit the first one, so invoke on children now
                     RecurseToChildren(e);
+                    hasRecursedToChildren = true;
                 }
 
                 e.Reset();
@@ -430,6 +435,11 @@ namespace OlympUI {
                 }
             }
 
+            // Reminder that the above recurse to children may only get execute if we have a event that goes after children
+            if (!hasRecursedToChildren) {
+                RecurseToChildren(e);
+            }
+
             e.Reset();
             return e;
         }
@@ -438,8 +448,10 @@ namespace OlympUI {
             if (!e.Recursive) return;
             foreach (Element child in e.Element.Children) {
                 child.Invoke(e);
-                if (e.Status == EventStatus.Cancelled)
-                    return;
+                if (e.Status == EventStatus.Cancelled) {
+                    throw new InvalidOperationException();
+                    continue;
+                }
             }
         }
 
