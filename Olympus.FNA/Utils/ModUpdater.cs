@@ -19,7 +19,7 @@ namespace Olympus.Utils {
 
             void FinishCallback(bool success, bool isDone) { }
             
-            foreach (var mod in mods) {
+            foreach (ModAPI.IModFileInfo mod in mods) {
                 // Synchronous updates, for now
                 await UpdateMod(mod, TickCallback, FinishCallback);
             }

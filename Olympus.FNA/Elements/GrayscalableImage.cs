@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using OlympUI;
+using OlympUI.Events;
 using OlympUI.MegaCanvas;
 using Olympus.Effects;
 using System;
@@ -11,7 +12,7 @@ namespace Olympus {
     /// An extension to an Image to support drawing it on grayscale, this is a separate element because of
     /// the need of a shader, otherwise this could be a draw_modifier
     /// </summary>
-    public partial class GrayscalableImage : Image {
+    public partial class GrayscalableImage : Image, IMouseEventReceiver {
         protected Style.Entry StyleIntensity = new(new FloatFader(0f));
         // public float coolerIntensity = (0f);
 
@@ -92,7 +93,7 @@ namespace Olympus {
             ));
         }
 
-        private void OnClick(MouseEvent.Click e) {
+        public void OnClick(MouseEvent.Click e) {
             // Console.WriteLine("Pre click " + StyleIntensity.GetCurrent<float>());
             // if (StyleIntensity.GetCurrent<float>() == 1f) {
             //     Style.Apply(StyleKeys.Normal);

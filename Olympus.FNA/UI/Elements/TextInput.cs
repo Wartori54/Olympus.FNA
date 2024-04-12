@@ -1,6 +1,7 @@
 using FontStashSharp;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
+using OlympUI.Events;
 using SDL2;
 using System;
 using System.Collections.Generic;
@@ -8,7 +9,7 @@ using System.Linq;
 
 namespace OlympUI; 
 
-public partial class TextInput : Panel {
+public partial class TextInput : Panel, IFocusEventReceiver {
     public record struct SelectionArea() {
         public static readonly SelectionArea Inactive = new();
         
@@ -110,7 +111,7 @@ public partial class TextInput : Panel {
     public bool Enabled {
         get => _enabled;
         set {
-            // Unfocus ourselves when disabled
+            // UnFocus ourselves when disabled
             if (value == false && Focused) {
                 UI.SetFocused(null);
             }
@@ -342,7 +343,7 @@ public partial class TextInput : Panel {
         if (shouldRedraw) InvalidatePaint();
     }
 
-    private void OnFocus(FocusEvent.Focus e) {
+    public void OnFocus(FocusEvent.Focus e) {
         if (!Enabled) return;
         TextInputEXT.StartTextInput();
         TextInputEXT.SetInputRectangle(new(X, Y, W, H));
@@ -350,7 +351,7 @@ public partial class TextInput : Panel {
         TextInputEXT.TextEditing += OnTextEditing;
         InvalidatePaint();
     }
-    private void OnUnfocus(FocusEvent.Unfocus e) {
+    public void OnUnFocus(FocusEvent.UnFocus e) {
         if (!Enabled) return;
         TextInputEXT.TextInput -= OnTextInput;
         TextInputEXT.TextEditing -= OnTextEditing;

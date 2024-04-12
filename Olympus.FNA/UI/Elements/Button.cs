@@ -1,8 +1,9 @@
 ﻿using Microsoft.Xna.Framework;
+using OlympUI.Events;
 using System;
 
 namespace OlympUI {
-    public partial class Button : Panel {
+    public partial class Button : Panel, IMouseEventReceiver {
 
         public static readonly new Style DefaultStyle = new() {
             {
@@ -99,7 +100,7 @@ namespace OlympUI {
             base.Update(dt);
         }
 
-        private void OnClick(MouseEvent.Click e) {
+        public void OnClick(MouseEvent.Click e) {
             if (Enabled)
                 Callback?.Invoke(this);
         }

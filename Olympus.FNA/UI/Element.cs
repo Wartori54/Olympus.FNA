@@ -39,13 +39,9 @@ namespace OlympUI {
             set => _Data.Apply(value);
         }
 
-        private EventHandlers _Events;
-        public EventHandlers Events {
-            get => _Events;
-            set {
-                if (value != _Events)
-                    throw new InvalidOperationException();
-            }
+
+        public EventManager Events {
+            get;
         }
 
         private LayoutHandlers _Layout;
@@ -324,12 +320,13 @@ namespace OlympUI {
             _RandID = RandIDGen.Next();
             _IDFallback = $"({GetType().Name}:{_UniqueID})";
 
-            _Style = new(this);
-            _Data = new();
-            _Events = new(this);
-            _Layout = new(this);
+            _Style = new Style(this);
+            _Data = new Data();
 
-            Siblings = new(this);
+            Events = new EventManager(this);
+            _Layout = new LayoutHandlers(this);
+
+            Siblings = new SiblingCollection(this);
 
             Children.CollectionChanged += OnChildrenCollectionChanged;
             Modifiers.CollectionChanged += OnModifiersCollectionChanged;
@@ -931,23 +928,32 @@ namespace OlympUI {
 
         #region Event Listener Logic
 
-        public T Invoke<T>(T e) where T : Event
-            => _Events.Invoke(e);
+        // layout events are an edge case, since they're a global event
+        public void Invoke(LayoutEvent e) {
+            e.Reset();
+            e.Element = this;
+            OnReflow(e); // Just reflow it, layout events cannot be canceled or anything
+        }
 
+        public void Invoke<T>(T e) where T : Event
+            => Events.Invoke(e);
+
+        // Invokes an event downwards, even if the element does not support events
         public T InvokeDown<T>(T e) where T : Event {
             Invoke(e);
             if (e.Status == EventStatus.Cancelled)
                 return e;
-
+        
             foreach (Element child in Children) {
                 child.InvokeDown(e);
                 if (e.Status == EventStatus.Cancelled)
                     return e;
             }
-
+        
             return e;
         }
-
+        
+        // Invokes an event upwards, even if the element does not support events
         public T InvokeUp<T>(T e) where T : Event {
             for (Element? el = this; el is not null; el = el.Parent) {
                 el.Invoke(e);
@@ -1012,7 +1018,7 @@ namespace OlympUI {
             }
         }
 
-        private void OnReflow(LayoutEvent e) {
+        public void OnReflow(LayoutEvent e) {
             if (!(Reflowing || this == UI.Root) && e.ForceReflow == LayoutForce.None)
                 return;
             if (e.Pass == (LayoutPass) int.MaxValue)

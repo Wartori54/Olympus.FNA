@@ -1,8 +1,9 @@
 using Microsoft.Xna.Framework;
+using OlympUI.Events;
 using System;
 
 namespace OlympUI {
-    public partial class SelectablePanel : Panel {
+    public partial class SelectablePanel : Panel, IMouseEventReceiver {
         
         public static readonly new Style DefaultStyle = new() {
             {
@@ -41,7 +42,7 @@ namespace OlympUI {
             this.callback = callback;
         }
 
-        private void OnClick(MouseEvent.Click e) {
+        public void OnClick(MouseEvent.Click e) {
             if (callback.Invoke(e))
                 Selected = !Selected;
         }

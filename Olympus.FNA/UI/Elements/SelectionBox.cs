@@ -1,4 +1,5 @@
 using Microsoft.Xna.Framework;
+using OlympUI.Events;
 using Olympus;
 using System;
 using System.Collections.Generic;
@@ -7,7 +8,7 @@ using System.Collections.Specialized;
 using System.Linq;
 
 namespace OlympUI {
-    public partial class SelectionBox : ScrollBox {
+    public partial class SelectionBox : ScrollBox, IMouseEventReceiver {
 
         public new readonly ObservableCollection<ISelectionBoxEntry> Content = new();
 
@@ -87,7 +88,7 @@ namespace OlympUI {
             return panel;
         }
         
-        private void OnClick(MouseEvent.Click e) {
+        public void OnClick(MouseEvent.Click e) {
             // using indexes with foreach may be dirty, but using .Select from LINQ seemed to cause lag 
             int childIdx = 0;
             foreach (Element element in base.Content.Children) {

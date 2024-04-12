@@ -1,10 +1,10 @@
 ﻿using Microsoft.Xna.Framework;
+using OlympUI.Events;
 using OlympUI.MegaCanvas;
 using System;
-using System.Collections.Specialized;
 
 namespace OlympUI {
-    public partial class ScrollBox : Group {
+    public partial class ScrollBox : Group, IMouseEventReceiver {
         public override bool Clip => true;
 
         public Element Content {
@@ -152,7 +152,7 @@ namespace OlympUI {
             AfterScroll();
         }
 
-        private void OnScroll(MouseEvent.Scroll e) {
+        public void OnScroll(MouseEvent.Scroll e) {
             if (!Contains(e.XY))
                 return;
 
@@ -220,7 +220,7 @@ namespace OlympUI {
         Y,
     }
 
-    public partial class ScrollHandle : Element {
+    public partial class ScrollHandle : Element, IEventReceive {
 
         public static readonly new Style DefaultStyle = new() {
             {

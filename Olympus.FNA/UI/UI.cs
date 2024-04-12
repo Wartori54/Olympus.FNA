@@ -100,7 +100,7 @@ namespace OlympUI {
         
         public static void SetFocused(Element? element) {
             if (element != Focusing) {
-                Focusing?.InvokeUp(new FocusEvent.Unfocus());
+                Focusing?.InvokeUp(new FocusEvent.UnFocus());
                 Focusing = element;
                 Focusing?.InvokeUp(new FocusEvent.Focus());
             }
