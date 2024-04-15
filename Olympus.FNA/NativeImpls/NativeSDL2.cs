@@ -62,6 +62,7 @@ namespace Olympus.NativeImpls {
         }
 
         public override void Dispose() {
+            App.Dispose();
         }
 
         public override void PrepareEarly() {
