@@ -180,12 +180,18 @@ namespace OlympUI {
 
         // Apparently caching this is really expensive and not worth it???? TODO: figure out this
         protected override void PaintContent(bool paintToCache, bool paintToScreen, Padding padding) {
+            if (paintToCache) { // If we have to paint to cache, just take it
+                base.PaintContent(paintToCache, paintToScreen, padding);
+                return;
+            }
+            
             if (CachedTexture?.IsValid ?? false) {
                 CachedTexture.Dispose();
                 CachedTexture = null;
             }
             
-            DrawContent();
+            if (paintToScreen)
+                DrawContent();
             return;
             Element content = Content;
             // Simply fall back if its not reflowed yet
