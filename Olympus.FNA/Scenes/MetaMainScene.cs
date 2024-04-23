@@ -233,10 +233,10 @@ namespace Olympus {
                 everestPlay,
                 vanillaPlay,
                 new SidebarNavButton("everest", "Home", Scener.Get<HomeScene>()),
-                new SidebarNavButton("gamebanana", "Find Mods", Scener.Get<TestScene>()),
+                new SidebarNavButton("gamebanana", "Find Mods", Scener.Get<UnderConstructionScene>()),
                 new SidebarNavButton("loenn", "Lönn", Scener.Get<LoennScene>()),
                 // new SidebarNavButton("ahorn", "Ahorn", new MetaMainScene() { Real = false }),
-                new SidebarNavButton("wiki", "Wiki", Scener.Get<TestScene>()),
+                new SidebarNavButton("wiki", "Wiki", Scener.Get<UnderConstructionScene>()),
             };
 
             return children;
