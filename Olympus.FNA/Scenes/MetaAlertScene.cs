@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using OlympUI;
+using OlympUI.Events;
 using OlympUI.MegaCanvas;
 using Olympus.NativeImpls;
 using System;
@@ -39,20 +40,21 @@ namespace Olympus {
                         }
                     },
                     new CloseButton("close") {
-                        Callback = btn => {
+                        ID = "MetaAlertSceneClose",
+                        Callback = _ => {
                             if (!(Scener.Alert?.Locked ?? false)) {
                                 Scener.PopAlert();
                             }
                         },
                         Layout = {
                             Layouts.Top(-8),
-                            Layouts.Right(-8),
+                            Layouts.Right(8),
                         }
                     },
                 }
             };
 
-        public partial class AlertContainer : Panel {
+        public partial class AlertContainer : Panel, IMouseEventReceiver {
 
             public static readonly new Style DefaultStyle = new() {
                 {
@@ -129,7 +131,7 @@ namespace Olympus {
                 ));
             }
 
-            private void OnClick(MouseEvent.Click e) {
+            public void OnClick(MouseEvent.Click e) {
                 foreach (Element child in Children)
                     if (child.Contains(e.XY))
                         return;

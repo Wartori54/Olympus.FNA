@@ -85,6 +85,10 @@ public sealed class LayoutHandlers : IEnumerable<Action<LayoutEvent>> {
 
     internal readonly List<HandlerList> Handlers = new();
     internal readonly Dictionary<LayoutPass, HandlerList> HandlerMap = new();
+    
+    public readonly Dictionary<LayoutDataType, LayoutData> LayoutInfo = new();
+
+    public readonly HashSet<LayoutPass> PassesApplied = new();
 
     internal class HandlerList {
         public readonly LayoutPass Pass;
@@ -115,6 +119,7 @@ public sealed class LayoutHandlers : IEnumerable<Action<LayoutEvent>> {
     public void Clear() {
         Handlers.Clear();
         HandlerMap.Clear();
+        LayoutInfo.Clear();
     }
 
     public void Reset() {
@@ -192,7 +197,7 @@ public sealed class LayoutHandlers : IEnumerable<Action<LayoutEvent>> {
     public void Add(LayoutPass pass, Action<LayoutEvent> handler)
         => Add(pass, LayoutSubpass.AfterChildren, handler);
 
-    // Handy tuple version
+    // Handy tuple version for IEnumerable initializers
     public void Add((LayoutPass Pass, LayoutSubpass Subpass, Action<LayoutEvent> Handler) args)
         => Add(args.Pass, args.Subpass, args.Handler);
 
@@ -200,6 +205,17 @@ public sealed class LayoutHandlers : IEnumerable<Action<LayoutEvent>> {
         List<Action<LayoutEvent>> list = GetHandlers(pass, subpass);
         list.Add(handler);
     }
+
+    public void Add(LayoutPass pass, LayoutSubpass subpass, Action<LayoutEvent> handler, LayoutData data) {
+        Add(pass, subpass, handler);
+        if (!LayoutInfo.TryAdd(data.DataType, data)) {
+            throw new NotSupportedException("Detected duplicate layouts!");
+        }
+    }
+
+    // Handy tuple version for IEnumerable initializers
+    public void Add((LayoutPass pass, LayoutSubpass subpass, Action<LayoutEvent> handler, LayoutData data) args)
+        => Add(args.pass, args.subpass, args.handler, args.data);
 
     public void AddUnique((LayoutPass Pass, LayoutSubpass Subpass, Action<LayoutEvent> Handler) args) {
         List<Action<LayoutEvent>> list = GetHandlers(args.Pass, args.Subpass);
@@ -240,6 +256,7 @@ public sealed class LayoutHandlers : IEnumerable<Action<LayoutEvent>> {
             }
         }
 
+        PassesApplied.Add(e.Pass);
         // Done!
         e.Reset();
         return e;
@@ -247,6 +264,7 @@ public sealed class LayoutHandlers : IEnumerable<Action<LayoutEvent>> {
 
     public LayoutEvent Invoke(LayoutEvent e) {
         if (!HandlerMap.TryGetValue(e.Pass, out HandlerList? handlers)) {
+            PassesApplied.Add(e.Pass);
             // No passes registered currently, pass the event to the children if required
             RecurseToChildren(e);
             return e;
@@ -256,7 +274,7 @@ public sealed class LayoutHandlers : IEnumerable<Action<LayoutEvent>> {
 
         // Iterate on the current pass
         foreach (HandlerSublist subhandlers in handlers.Handlers) {
-            if (subhandlers.Pass >= LayoutSubpass.AfterChildren) {
+            if (subhandlers.Pass >= LayoutSubpass.AfterChildren && !hasRecursedToChildren) {
                 // AfterChildren is a special case, we've hit the first one, so invoke on children now
                 RecurseToChildren(e);
                 hasRecursedToChildren = true;
@@ -288,6 +306,8 @@ public sealed class LayoutHandlers : IEnumerable<Action<LayoutEvent>> {
             RecurseToChildren(e);
         }
 
+        PassesApplied.Add(e.Pass);
+
         e.Reset();
         return e;
     }
@@ -313,5 +333,10 @@ public sealed class LayoutHandlers : IEnumerable<Action<LayoutEvent>> {
             yield return handler;
     }
 
+    public record LayoutData(LayoutDataType DataType);
 
+    public enum LayoutDataType {
+        Fill,
+        Positioner,
+    }
 }

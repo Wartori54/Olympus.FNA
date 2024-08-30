@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using NativeFileDialogSharp;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
+using OlympUI.Events;
 using System.Linq;
 
 namespace Olympus {
@@ -115,7 +116,6 @@ namespace Olympus {
                                                         { Group.StyleKeys.Spacing, 8 },
                                                     },
                                                     Layout = {
-                                                        Layouts.Column(),
                                                         Layouts.Fill(1, 0),
                                                     },
                                                 },
@@ -229,7 +229,7 @@ namespace Olympus {
                     },
                 });
 
-                var textGroup = panel.Add(new Group() {
+                Group textGroup = panel.Add(new Group() {
                     Clip = true,
                     Layout = {
                         Layouts.Fill(1, 0), 
@@ -270,11 +270,11 @@ namespace Olympus {
                 const int SmallButtonSize = ButtonSize / 2 - Spacing / 2; 
                 const int SmallIconSize = SmallButtonSize / 2;
                 
-                var buttonGroup = panel.Add(new Group {
+                Group buttonGroup = panel.Add(new Group {
                     Layout = {
                         Layouts.Top(0.5f, -0.5f),
                         Layouts.Right(Spacing),
-                        Layouts.Row(Spacing, resize: false),
+                        Layouts.Row(Spacing, OrdererBehavior.None),
                     },
                 });
                 if (RenamingInstalls.Contains(install)) {
@@ -282,7 +282,7 @@ namespace Olympus {
                         WH = new(ButtonSize, ButtonSize),
                         Callback = _ => {
                             panel.PreventNextClick();
-                            var input = panel.FindChild<TextInput>();
+                            TextInput? input = panel.FindChild<TextInput>();
                             if (UI.Focusing == input) UI.Run(() => UI.SetFocused(null));
                             // Make sure to trim it
                             install.NameOverride = input!.Text.Trim();
@@ -296,7 +296,7 @@ namespace Olympus {
                         WH = new(ButtonSize, ButtonSize),
                         Callback = _ => {
                             panel.PreventNextClick();
-                            var input = panel.FindChild<TextInput>();
+                            TextInput? input = panel.FindChild<TextInput>();
                             if (UI.Focusing == input) UI.Run(() => UI.SetFocused(null));
                             RenamingInstalls.Remove(install);
                             GeneratePanelContent(panel);
@@ -363,7 +363,7 @@ namespace Olympus {
                 Clip = false,
                 Layout = {
                     Layouts.Fill(1, 0),
-                    Layouts.Row(resize: false),
+                    Layouts.Row(OrdererBehavior.None),
                 },
                 Style = {
                     { Group.StyleKeys.Spacing, 4 },
@@ -410,7 +410,7 @@ namespace Olympus {
             }
         }
 
-        private class InstallerSelectablePanel : SelectablePanel {
+        private class InstallerSelectablePanel : SelectablePanel, IMouseEventReceiver {
             public new static readonly Style DefaultStyle = new() { // TODO: selected on dark mode looks awful
                 {
                     StyleKeys.Hovered,
@@ -440,7 +440,7 @@ namespace Olympus {
                 base.Update(dt);
             }
 
-            private void OnClick(MouseEvent.Click e) {
+            public void OnClick(MouseEvent.Click e) {
                 if (preventNextClick) {
                     preventNextClick = false;
                     return;

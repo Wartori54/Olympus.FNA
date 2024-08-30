@@ -10,8 +10,8 @@ namespace Olympus {
             set {
                 scene?.Leave();
                 scene = value;
-                UI.Root.InvalidateForce();
-                Children.Clear();
+                Children.Clear(); // DO NOT DisposeChildren, the elements will still be referenced in the scene's roots
+                // Furthermore, they wont be regenerated either
                 Children.Add(scene.Root);
                 scene.Enter(/* no args */);
             }

@@ -234,7 +234,7 @@ public class LoennScene : Scene {
                 H = 60, 
                 Layout = {
                     Layouts.Fill(1.0f, 0.0f), 
-                    Layouts.Column(false),
+                    Layouts.Column(OrdererBehavior.None),
                 },
                 Init = RegisterRefresh<Group>(async el => await UI.Run(() => {
                     el.DisposeChildren();
@@ -296,7 +296,7 @@ public class LoennScene : Scene {
             new Group {
                 Layout = {
                     Layouts.Fill(1.0f, 0.0f), 
-                    Layouts.Column(false),
+                    Layouts.Column(OrdererBehavior.None),
                 },
                 Init = RegisterRefresh<Group>(async el => await UI.Run(() => {
                     el.DisposeChildren();

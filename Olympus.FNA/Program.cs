@@ -129,14 +129,20 @@ namespace Olympus {
                 NativeImpl.Native = new NativeSDL2();
             }
 
+            // Debug builds don't have critical error logging so debuggers are nicer to use
+#if !DEBUG
             try {
+#endif
                 using (NativeImpl.Native)
                     NativeImpl.Native.Run();
-            } catch (Exception ex) { // Native.Run() can be mulithreaded, force the exit to make sure no hanging threads stay alive
-                AppLogger.Log.Error("Exception on init! ");
+#if !DEBUG
+            } catch (Exception ex) {
+                // Native.Run() can be mulithreaded, force the exit to make sure no hanging threads stay alive
+                AppLogger.Log.Error("Critical exception encountered!!");
                 AppLogger.Log.Error(ex, ex.Message);
                 Environment.Exit(-1);
-            }
+            } 
+#endif
 
             return 2;
         }

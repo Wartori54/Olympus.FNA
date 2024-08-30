@@ -119,6 +119,8 @@ namespace OlympUI {
             GlobalUpdateID++;
 
             bool forceReflow = WHPrev != Root.WH || Root.ReflowingForce;
+            if (forceReflow)
+                Console.WriteLine("Forcing reflow!");
             WHPrev = Root.WH;
             Root.Reflowing |= forceReflow;
             Root.ReflowingForce = false;
@@ -332,13 +334,16 @@ namespace OlympUI {
                             reflow.Recursive = true;
                             // No need to InvokeDown as reflows follow their own recursion rules.
                             Root.Invoke(reflow);
+                            // If root was asked for a reflow, cancel the event
                             if (Root.Reflowing) {
+                                Console.WriteLine("Restarting reflow!");
                                 Root.INTERNAL_ReflowLoopCount();
                                 goto FirstPass;
                             }
                         }
                     }
 
+                    // If we reflowed, recollecting may be needed
                     if (!Root.Recollecting && !reflowing)
                         break;
 
@@ -385,6 +390,10 @@ namespace OlympUI {
         public static MaybeAwaitable Run(Action run) {
             MaybeAwaitable awaitable = new(() => true);
             Action runReal = () => {
+                if (run.Target is Element el && el.IsDisposed) { // Dont run actions for disposed elements
+                    awaitable.SetResult();
+                    return;
+                }
                 run();
                 awaitable.SetResult();
             };

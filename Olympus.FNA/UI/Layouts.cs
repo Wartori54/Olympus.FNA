@@ -1,25 +1,26 @@
 ﻿using Microsoft.Xna.Framework;
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace OlympUI {
     public static class Layouts {
 
-        private static (int whole, float fract) Fract(float num, float fallback = 0f) {
+        private static (int whole, float fract) Fract(float num) {
+            const float threshold = 0.005f;
             int whole;
             float fract;
 
             if (num < 0f) {
-                (whole, fract) = Fract(-num, fallback);
+                (whole, fract) = Fract(-num);
                 return (-whole, -0.9999f <= num || num <= 0.9999f ? -fract : fract);
             }
 
             fract = num % 1f;
-            if (fract <= 0.0001 || fract >= 0.9999) {
-                fract = fallback;
-            } else if (fract <= 0.005) {
+            if (fract <= threshold) {
                 fract = 0f;
-            } else if (fract >= 0.995) {
+            } else if (fract >= 1 - threshold) {
                 fract = 1f;
             }
 
@@ -41,8 +42,8 @@ namespace OlympUI {
                         return value;
                     }
 
-                case LayoutConsts.Next:
-                    {
+                case LayoutConsts.Next: {
+                        bool invalidated = false;
                         value = 0;
                         if (!p.Style.TryGetCurrent(Panel.StyleKeys.Spacing, out int spacing))
                             spacing = 0;
@@ -54,13 +55,21 @@ namespace OlympUI {
                             } else if (skip) {
                                 continue;
                             }
+
+                            // We depend on elements that will be relfowed later, as such if those aren't yet, just queue a new update
+                            if (!sibling.HasBeenReflowed && !invalidated) {
+                                invalidated = true;
+                                p.InvalidateFull();
+                            }
+                                
                             value += sibling.W + spacing;
                         }
                         return value;
                     }
 
                 case LayoutConsts.Free:
-                    return p.InnerWH.X - ResolveConstsX(el, p, LayoutConsts.Prev);
+                    int offs = ResolveConstsX(el, p, LayoutConsts.Prev);
+                    return p.InnerWH.X - offs;
 
                 case LayoutConsts.Pos:
                     return (int) MathF.Floor(el.XY.X);
@@ -130,59 +139,136 @@ namespace OlympUI {
             return layout;
         }
 
-        public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) Column(bool resize) =>
-            Column(null, resize);
+        public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>, PositionerData) Column(OrdererBehavior behavior) =>
+            Column(null, behavior);
 
-        public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) Column(int? spacing = null, bool resize = true) => (
+        public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>, PositionerData) Column(int? spacing = null, OrdererBehavior behavior = OrdererBehavior.Resize) => (
             LayoutPass.Normal, LayoutSubpass.Late,
-            (LayoutEvent e) => {
+            e => DoColumn(e.Element, spacing, behavior),
+            new PositionerData(e => { // Fix overflows and overlaps
+                return;
+                // If last element does not overflow return early, elements are correct
+                if (e.Element.Children.Count == 0 || e.Element.Children[^1].RealXYWH.Bottom < e.Element.H) {
+                    return;
+                }
+                
                 Element el = e.Element;
-                int spacingReal;
-                if (spacing is not null) {
-                    spacingReal = spacing.Value;
-                } else if (!el.Style.TryGetCurrent(Group.StyleKeys.Spacing, out spacingReal)) {
-                    spacingReal = 0;
+                List<(int idx, FillData data)> fillTargets = new(el.Children.Count);
+
+                int fakeHeight = el.InnerWH.Y;
+                // Calculate the length that we have to fill
+                // And index all the elements that have to be re-filled for later use
+                for (int i = 0; i < el.Children.Count; i++) {
+                    Element child = el.Children[i];
+                    // If it has a fill continue
+                    if (child.Layout.LayoutInfo.TryGetValue(LayoutHandlers.LayoutDataType.Fill, out LayoutHandlers.LayoutData? fillData)) {
+                        fillTargets.Add((i, (FillData) fillData));
+                        continue;
+                    }
+
+                    fakeHeight -= child.H;
                 }
-                Padding padding = el.Padding;
-                Vector2 offs = padding.LT.ToVector2();
-                int y = 0;
-                foreach (Element child in el.Children) {
-                    child.RealXY = child.XY + offs + new Vector2(0f, y);
-                    y += child.H + spacingReal;
+
+                // Invoke fill on all the others
+                for (int i = 0; i < fillTargets.Count; i++) {
+                    Element child = el.Children[fillTargets[i].idx];
+                    FillData data = fillTargets[i].data;
+                    
+                    DoFill(data.FractX, data.FractY, child, new Point(el.InnerWH.X, fakeHeight), el.Padding.LT,
+                        Point.Zero);
+                    child.WH -= new Point(data.OffsX > 0 ? data.OffsX : 0, data.OffsY > 0 ? data.OffsY : 0);
                 }
-                if (resize)
-                    el.H = y + padding.B;
-            }
+                
+                DoColumn(e.Element, spacing, behavior);
+            }, spacing)
         );
 
-        public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) Row(bool resize) =>
-            Row(null, resize);
-
-        public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) Row(int? spacing = null, bool resize = true) => (
-            LayoutPass.Normal, LayoutSubpass.Late,
-            (LayoutEvent e) => {
-                Element el = e.Element;
-                int spacingReal;
-                if (spacing is not null) {
-                    spacingReal = spacing.Value;
-                } else if (!el.Style.TryGetCurrent(Group.StyleKeys.Spacing, out spacingReal)) {
-                    spacingReal = 0;
-                }
-                Padding padding = el.Padding;
-                Vector2 offs = padding.LT.ToVector2();
-                int x = 0;
-                foreach (Element child in el.Children) {
-                    child.RealXY = child.XY + offs + new Vector2(x, 0f);
-                    x += child.W + spacingReal;
-                }
-                if (resize)
-                    el.W = x + padding.R;
+        private static void DoColumn(Element el, int? spacing, OrdererBehavior behavior) {
+            int spacingReal;
+            if (spacing is not null) {
+                spacingReal = spacing.Value;
+            } else if (!el.Style.TryGetCurrent(Group.StyleKeys.Spacing, out spacingReal)) {
+                spacingReal = 0;
             }
+            Padding padding = el.Padding;
+            Vector2 offs = padding.LT.ToVector2();
+            int y = 0;
+            foreach (Element child in el.Children) {
+                child.RealXY = child.XY + offs + new Vector2(0f, y);
+                y += child.H + spacingReal;
+            }
+            if (behavior == OrdererBehavior.Resize || (behavior == OrdererBehavior.Fit && el.H < y + padding.B))
+                el.H = y + padding.B;
+                
+        }
+
+        public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>, PositionerData) Row(OrdererBehavior behavior) =>
+            Row(null, behavior);
+
+        public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>, PositionerData) Row(int? spacing = null, OrdererBehavior behavior = OrdererBehavior.Resize) => (
+            LayoutPass.Normal, LayoutSubpass.Late,
+            e => DoRow(e.Element, spacing, behavior),
+            new PositionerData(e => { // Fix overflows and overlaps
+                return;
+                // If last element does not overflow return early, elements are correct
+                if (e.Element.Children.Count == 0 || e.Element.Children[^1].RealXYWH.Right < e.Element.W) {
+                    return;
+                }
+                
+                Element el = e.Element;
+                List<(int idx, FillData data)> fillTargets = new(el.Children.Count);
+
+                int fakeWidth = el.InnerWH.X;
+                // Calculate the length that we have to fill
+                // And index all the elements that have to be re-filled for later use
+                for (int i = 0; i < el.Children.Count; i++) {
+                    Element child = el.Children[i];
+                    // If it has a fill continue
+                    if (child.Layout.LayoutInfo.TryGetValue(LayoutHandlers.LayoutDataType.Fill, out LayoutHandlers.LayoutData? fillData)) {
+                        fillTargets.Add((i, (FillData) fillData));
+                        continue;
+                    }
+
+                    fakeWidth -= child.W;
+                }
+
+                bool didChanges = false;
+                // Invoke fill on all the others
+                for (int i = 0; i < fillTargets.Count; i++) {
+                    Element child = el.Children[fillTargets[i].idx];
+                    FillData data = fillTargets[i].data;
+                    
+                    DoFill(data.FractX, data.FractY, child, new Point(fakeWidth, el.InnerWH.Y), el.Padding.LT,
+                        Point.Zero);
+                    didChanges = true;
+                }
+                
+                if (didChanges)
+                    DoRow(e.Element, spacing, behavior);
+            }, spacing)
         );
+
+        private static void DoRow(Element el, int? spacing, OrdererBehavior behavior) {
+            int spacingReal;
+            if (spacing is not null) {
+                spacingReal = spacing.Value;
+            } else if (!el.Style.TryGetCurrent(Group.StyleKeys.Spacing, out spacingReal)) {
+                spacingReal = 0;
+            }
+            Padding padding = el.Padding;
+            Vector2 offs = padding.LT.ToVector2();
+            int x = 0;
+            foreach (Element child in el.Children) {
+                child.RealXY = child.XY + offs + new Vector2(x, 0f);
+                x += child.W + spacingReal;
+            }
+            if (behavior == OrdererBehavior.Resize || (behavior == OrdererBehavior.Fit && el.W < x + padding.R))
+                el.W = x + padding.R;
+        }
 
         public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) Left(int offs = 0) => (
             LayoutPass.Post, LayoutSubpass.AfterChildren,
-            (LayoutEvent e) => {
+            e => {
                 Element el = e.Element;
                 Element? p = el.Parent;
                 if (p is null)
@@ -194,7 +280,7 @@ namespace OlympUI {
 
         public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) Left(float fract, float offs = 0f) => (
             LayoutPass.Post, LayoutSubpass.AfterChildren,
-            (LayoutEvent e) => {
+            e => {
                 Element el = e.Element;
                 Element? p = el.Parent;
                 if (p is null)
@@ -207,7 +293,7 @@ namespace OlympUI {
 
         public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) Top(int offs = 0) => (
             LayoutPass.Post, LayoutSubpass.AfterChildren,
-            (LayoutEvent e) => {
+            e => {
                 Element el = e.Element;
                 Element? p = el.Parent;
                 if (p is null)
@@ -219,7 +305,7 @@ namespace OlympUI {
 
         public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) Top(float fract, float offs = 0f) => (
             LayoutPass.Post, LayoutSubpass.AfterChildren,
-            (LayoutEvent e) => {
+            e => {
                 Element el = e.Element;
                 Element? p = el.Parent;
                 if (p is null)
@@ -232,19 +318,23 @@ namespace OlympUI {
 
         public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) Right(int offs = 0) => (
             LayoutPass.Post, LayoutSubpass.AfterChildren,
-            (LayoutEvent e) => {
+            e => {
                 Element el = e.Element;
                 Element? p = el.Parent;
                 if (p is null)
                     return;
                 el.X = p.InnerWH.X - el.W - offs;
                 el.RealX = p.Padding.L + el.X;
+                if (el.ID == "MetaAlertSceneClose") {
+                    Console.WriteLine(el.X);
+                    Console.WriteLine(el.RealX);
+                }
             }
         );
 
         public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) Bottom(int offs = 0) => (
             LayoutPass.Post, LayoutSubpass.AfterChildren,
-            (LayoutEvent e) => {
+            e => {
                 Element el = e.Element;
                 Element? p = el.Parent;
                 if (p is null)
@@ -256,7 +346,7 @@ namespace OlympUI {
 
         public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) Move(int offsX = 0, int offsY = 0) => (
             LayoutPass.Post, LayoutSubpass.AfterChildren,
-            (LayoutEvent e) => {
+            e => {
                 Element el = e.Element;
                 Element? p = el.Parent;
                 if (p is null)
@@ -265,17 +355,17 @@ namespace OlympUI {
                     el.XY += new Vector2(offsX, offsY);
                     el.RealXY += new Vector2(offsX, offsY);
                 } else if (offsX != 0) {
-                    el.XY.X += offsX;
+                    el.X += offsX;
                     el.RealXY = new(el.RealXY.X + offsX, el.RealXY.Y);
                 } else if (offsY != 0) {
-                    el.XY.Y += offsY;
+                    el.Y += offsY;
                     el.RealXY = new(el.RealXY.X, el.RealXY.Y + offsY);
                 }
             }
         );
         public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) FitChildren(bool horizontally, bool vertically) => (
             LayoutPass.Post, LayoutSubpass.AfterChildren,
-            (LayoutEvent e) => {
+            e => {
                 Element el = e.Element;
                 Point wh = new();
                 if (!horizontally)
@@ -296,69 +386,69 @@ namespace OlympUI {
             }
         );
 
-        public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) Fill(float fractX = 1f, float fractY = 1f, int offsX = 0, int offsY = 0) => (
-            LayoutPass.Normal, LayoutSubpass.Pre + 1,
-            (LayoutEvent e) => {
-                Element el = e.Element;
-                Element? p = el.Parent;
-                if (p is null)
-                    return;
-                bool print = offsX == LayoutConsts.Next;
-                int roffsX = ResolveConstsX(el, p, offsX);
-                offsX = roffsX;
-                if (el.ID == "DescLabelCont" && print) {
-                    Console.WriteLine(roffsX + " " + el + " " + p.Children.Count);
-                    if (p.Children.Count == 2) {
-                        Console.WriteLine(p.Children[1] + " " + p.Children[1].WH);
-                        Console.WriteLine(p.Children[1].Children[0] + " " + p.Children[1].Children[0].WH);
-                    }
-                }
+        public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>, FillData) Fill(float fractX = 1f, float fractY = 1f, int offsX = 0, int offsY = 0) {
+            return (
+                LayoutPass.Normal, LayoutSubpass.Pre + 1,
+                e => {
+                    Element? p = e.Element.Parent;
+                    if (p is null) return;
+                    DoFill(fractX, fractY, e.Element, p.InnerWH, p.Padding.LT, Point.Zero);
+                    int roffsX = ResolveConstsX(e.Element, p, offsX);
+                    // offsX = roffsX;
+                    int roffsY = ResolveConstsY(e.Element, p, offsY);
+                    e.Element.WH -= new Point(roffsX, roffsY);
+                },
+                new FillData(fractX, fractY, offsX, offsY, false)
+            );
+        }
 
-                int roffsY = ResolveConstsY(el, p, offsY);
-                if (fractX > 0f && fractY > 0f) {
-                    el.XY = new(0, 0);
-                    el.RealXY = p.Padding.LT.ToVector2();
-                    el.WH = (p.InnerWH.ToVector2() * new Vector2(fractX, fractY)).ToPoint() - new Point(roffsX, roffsY);
-                } else if (fractX > 0f) {
-                    el.XY.X = 0;
-                    el.RealXY = new(p.Padding.L, el.RealXY.Y);
-                    el.WH.X = (int) (p.InnerWH.X * fractX) - roffsX;
-                } else if (fractY > 0f) {
-                    el.XY.Y = 0;
-                    el.RealXY = new(el.RealXY.X, p.Padding.T);
-                    el.WH.Y = (int) (p.InnerWH.Y * fractY) - roffsY;
-                }
+        private static void DoFill(float fractX, float fractY, Element el, Point parentBounds, Point parentPadding, Point parentOrigin) {
+            // int roffsX = ResolveConstsX(el, p, offsX);
+            // offsX = roffsX;
+            // int roffsY = ResolveConstsY(el, p, offsY);
+            if (fractX > 0f && fractY > 0f) {
+                el.XY = parentOrigin.ToVector2();
+                el.RealXY = parentPadding.ToVector2();
+                el.WH = (parentBounds.ToVector2() * new Vector2(fractX, fractY)).ToPoint();// -
+                        // new Point(roffsX, roffsY);
+            } else if (fractX > 0f) {
+                el.X = parentOrigin.X;
+                el.RealXY = new(parentPadding.X, el.RealXY.Y);
+                el.W = (int) (parentBounds.X * fractX);// - roffsX;
+            } else if (fractY > 0f) {
+                el.Y = parentOrigin.Y;
+                el.RealXY = new(el.RealXY.X, parentPadding.Y);
+                el.H = (int) (parentBounds.Y * fractY);// - roffsY;
             }
-        );
+        }
 
         public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) FillFull(float fractX = 1f, float fractY = 1f, int offsX = 0, int offsY = 0) => (
             LayoutPass.Normal, LayoutSubpass.Pre + 1,
-            (LayoutEvent e) => {
-                Element el = e.Element;
-                Element? p = el.Parent;
-                if (p is null)
-                    return;
-                offsX = ResolveConstsX(el, p, offsX);
-                offsY = ResolveConstsY(el, p, offsY);
-                if (fractX > 0f && fractY > 0f) {
-                    el.XY = -p.Padding.LT.ToVector2();
-                    el.RealXY = new(0, 0);
-                    el.WH = (p.WH.ToVector2() * new Vector2(fractX, fractY)).ToPoint() - new Point(offsX, offsY);
-                } else if (fractX > 0f) {
-                    el.XY.X = -p.Padding.L;
-                    el.RealXY = new(0, el.RealXY.Y);
-                    el.WH.X = (int) (p.WH.X * fractX) - offsX;
-                } else if (fractY > 0f) {
-                    el.XY.Y = -p.Padding.T;
-                    el.RealXY = new(el.RealXY.X, 0);
-                    el.WH.Y = (int) (p.WH.Y * fractY) - offsY;
-                }
+            e => {
+                Element? p = e.Element.Parent;
+                if (p is null) return;
+                DoFill(fractX, fractY, e.Element, p.WH, Point.Zero, p.Padding.LT * new Point(-1, -1));
+                // offsX = ResolveConstsX(el, p, offsX);
+                // offsY = ResolveConstsY(el, p, offsY);
+                // if (fractX > 0f && fractY > 0f) {
+                //     el.XY = -p.Padding.LT.ToVector2();
+                //     el.RealXY = new(0, 0);
+                //     el.WH = (p.WH.ToVector2() * new Vector2(fractX, fractY)).ToPoint() - new Point(offsX, offsY);
+                // } else if (fractX > 0f) {
+                //     el.XY.X = -p.Padding.L;
+                //     el.RealXY = new(0, el.RealXY.Y);
+                //     el.W = (int) (p.WH.X * fractX) - offsX;
+                // } else if (fractY > 0f) {
+                //     el.XY.Y = -p.Padding.T;
+                //     el.RealXY = new(el.RealXY.X, 0);
+                //     el.H = (int) (p.WH.Y * fractY) - offsY;
+                // }
             }
         );
 
         public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) Grow(int offsX = 0, int offsY = 0) => (
             LayoutPass.Normal, LayoutSubpass.Pre + 1,
-            (LayoutEvent e) => {
+            e => {
                 Element el = e.Element;
                 Element? p = el.Parent;
                 if (p is null)
@@ -366,12 +456,36 @@ namespace OlympUI {
                 if (offsX != 0 && offsY != 0) {
                     el.WH += new Point(offsX, offsY);
                 } else if (offsX != 0) {
-                    el.WH.X += offsX;
+                    el.W += offsX;
                 } else if (offsY != 0) {
-                    el.WH.Y += offsY;
+                    el.H += offsY;
                 }
             }
         );
+
+        public static (LayoutPass, LayoutSubpass, Action<LayoutEvent>) LayoutRespect(int tries = 2) => (
+            LayoutPass.Normal,
+            LayoutSubpass.Force,
+            e => {
+                if (tries == 0) return;
+                bool success = true;
+                Rectangle bounds = Point.Zero.WithSize(e.Element.InnerWH);
+                foreach (Element child in e.Element.Children) {
+                    if (!bounds.Contains(child.RealXYWH)) {
+                        child.InvalidateFull();
+                        success = false;
+                    }
+                }
+
+                if (success) {
+                    tries = 2;
+                } else {
+                    tries--;
+                    if (tries == 0) {
+                        Console.WriteLine(e.Element + " failed to respect");
+                    }
+                }
+            });
 
     }
 
@@ -382,5 +496,18 @@ namespace OlympUI {
         public const int Next = ConstOffset + 2;
         public const int Free = ConstOffset + 3;
         public const int Pos = ConstOffset + 4;
+        public const int Largest = Pos;
     }
+
+    public enum OrdererBehavior {
+        None,
+        Fit,
+        Resize,
+    }
+
+    public record FillData(float FractX, float FractY, int OffsX, int OffsY, bool IsFull) 
+        : LayoutHandlers.LayoutData(LayoutHandlers.LayoutDataType.Fill);
+
+    public record PositionerData(Action<LayoutEvent> Fixer, int? Spacing)
+        : LayoutHandlers.LayoutData(LayoutHandlers.LayoutDataType.Positioner);
 }

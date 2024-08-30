@@ -220,21 +220,21 @@ namespace Olympus {
                     foreach (Element el in UI.HoveringAll) {
                         allElementsStr += "    " + el + $", XY: {el.ScreenXY}, \n" +
                                           $"    WH: {el.WH},\n" +
-                                          "    Children: {el.Children.Count}\n";
+                                          $"    Children: {el.Children.Count}\n";
                     }
                     DebugLabel.Text += "\n" +
                                        $"All Elements:\n{allElementsStr}";
-                }
-            }
+                } else if (UIInput.Down(Keys.LeftControl)) {
+                    string hierarchyStr = "";
+                    for (Element? el = UI.HoveringAny; el != null; el = el.Parent) {
+                        hierarchyStr += "    " + el + $", XY: {el.ScreenXY}, \n" +
+                                        $"    WH: {el.WH},\n" +
+                                        $"    Children: {el.Children.Count}\n";
+                    }
 
-            if (UIInput.Down(Keys.LeftShift) && UIInput.Down(Keys.LeftControl) && UI.HoveringAll != null) {
-                string allElementsStr = "";
-                foreach (Element el in UI.HoveringAll) {
-                    allElementsStr += "    " + el + $", XY: {el.ScreenXY}, \n" +
-                                      $"    WH: {el.WH},\n" +
-                                      "    Children: {el.Children.Count}\n";
+                    DebugLabel.Text += "\n" +
+                                       $"Hierarchy:\n{hierarchyStr}";
                 }
-                Console.WriteLine($"All Elements:\n{allElementsStr}");
             }
 #endif
             

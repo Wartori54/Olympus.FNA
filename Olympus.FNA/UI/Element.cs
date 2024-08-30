@@ -25,7 +25,7 @@ namespace OlympUI {
 
         public static readonly NullElement Null = new();
 
-        protected bool IsDisposed;
+        public bool IsDisposed { get; private set; }
 
         private readonly Style _Style;
         public Style Style {
@@ -72,7 +72,7 @@ namespace OlympUI {
 
         protected uint ReflowID;
         protected uint ReflowLoopCycles;
-        protected uint ReflowLoopCyclesMax = 10;
+        protected uint ReflowLoopCyclesMax = 100;
         public bool Reflowing {
             get => ReflowID != UI.GlobalReflowID;
             set {
@@ -125,33 +125,52 @@ namespace OlympUI {
 
         #region Parameters
 
+        private Vector2 _XY;
+
         /// <summary>
         /// User-defined or otherwise expected position.
         /// </summary>
-        public Vector2 XY;
+        public Vector2 XY {
+            get => _XY;
+            set {
+                _XY = value;
+            }
+        }
         public int X {
             get => (int) XY.X;
-            set => XY.X = value;
+            set => XY = new Vector2(value, XY.Y);
         }
         public int Y {
             get => (int) XY.Y;
-            set => XY.Y = value;
+            set => XY = new Vector2(XY.X, value);
         }
 
+        private Point _WH;
         /// <summary>
         /// User-defined or otherwise expected size.
         /// </summary>
-        public Point WH;
+        public Point WH {
+            get {
+                return _WH;
+            }
+            set {
+                _WH = value;
+            }
+        }
+
         public int W {
             get => WH.X;
-            set => WH.X = value;
+            set => WH = new Point(value, WH.Y);
         }
         public int H {
             get => WH.Y;
-            set => WH.Y = value;
+            set => WH = new Point(WH.X, value);
         }
 
         public bool Visible = true;
+
+        // Returns whether this element has had its Normal pass executed
+        public bool HasBeenReflowed { get; private set; } = false;
 
         public virtual InteractiveMode Interactive { get; set; } = InteractiveMode.Pass;
 
@@ -196,7 +215,9 @@ namespace OlympUI {
         public Element? Parent;
         private readonly ObservableCollection<Element> _Children = new();
         public ObservableCollection<Element> Children {
-            get => _Children;
+            get {
+                return _Children;
+            }
             set {
                 _Children.Clear();
                 if (value is null)
@@ -481,12 +502,12 @@ namespace OlympUI {
                 case NotifyCollectionChangedAction.Add:
                     HashSet<Element> nulls = new();
                     foreach (Element item in e.NewItems ?? throw new NullReferenceException("Child add didn't give new items")) {
-                        if (item is NullElement) {
-                            nulls.Add(item);
-                            continue;
-                        }
-                        item.Parent = this;
+                        // if (item is NullElement) {
+                        //     nulls.Add(item);
+                        //     continue;
+                        // }
                         item.InvalidateFull();
+                        item.Parent = this; // Amazing speed optimization here
                         item.InvalidateFullDown();
                     }
                     foreach (Element item in nulls)
@@ -505,27 +526,40 @@ namespace OlympUI {
                     }
                     break;
 
+                case NotifyCollectionChangedAction.Replace:
+                    Console.WriteLine("CHILDREN REPLACED!");
+                    break;
+                case NotifyCollectionChangedAction.Move:
+                    Console.WriteLine("CHILDREN MOVED!");
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
 
-            UI.Root.InvalidateCollect();
-            UI.Root.InvalidateForce();  // TODO: Performance sink, look into only reflowing the modified elements
             InvalidateFull();
+        }
+        
+        public virtual void InvalidateSelf() {
+            Reflowing = true;
+            Repainting = true;
         }
 
         public virtual void InvalidateFull() {
             for (Element? el = this; el is not null; el = el.Parent) {
-                el.Reflowing = true;
-                el.Repainting = true;
+                el.InvalidateSelf();
             }
         }
 
+        
+
         public virtual void InvalidateFullDown() {
             foreach (Element el in Children) {
-                el.Reflowing = true;
-                el.Repainting = true;
+                el.InvalidateSelf();
                 el.InvalidateFullDown();
             }
         }
+        
+        
 
         public virtual void InvalidatePaint() {
             for (Element? el = this; el is not null; el = el.Parent) {
@@ -933,6 +967,8 @@ namespace OlympUI {
             e.Reset();
             e.Element = this;
             OnReflow(e); // Just reflow it, layout events cannot be canceled or anything
+            if (e.Pass == LayoutPass.Normal)
+                HasBeenReflowed = true;
         }
 
         public void Invoke<T>(T e) where T : Event

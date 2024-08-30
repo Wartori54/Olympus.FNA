@@ -71,13 +71,13 @@ namespace Olympus {
                             Layouts.Fill(1f, 0.4f, 0, 32),
                             Layouts.Top(),
                             Layouts.Left(),
-                            Layouts.Column(false),
+                            Layouts.Column(OrdererBehavior.None),
                         },
                         Children = {
                             new Group() {
                                 Layout = {
                                     Layouts.Fill(1, 1, 0, LayoutConsts.Prev),
-                                    Layouts.Row(false),
+                                    Layouts.Row(OrdererBehavior.None),
                                 },
                                 Init = RegisterRefresh<Group>(async el => {
                                     await UI.Run(() => {
@@ -186,6 +186,7 @@ namespace Olympus {
                                             RemoteModInfoAPI.RemoteModInfo mod = mods[randomMap[i]];
 
                                             panels[i] = el.Add(new Panel() {
+                                                ForceWH = new(Group.WHTrue, Group.WHTrue), // We want to clip, so disable resizing
                                                 ID = $"FeaturedMod:{i}",
                                                 Clip = true,
                                                 Layout = {
@@ -222,7 +223,7 @@ namespace Olympus {
                                                         ID = "Content",
                                                         Layout = {
                                                             Layouts.Fill(),
-                                                            Layouts.Column(false),
+                                                            Layouts.Column(OrdererBehavior.None),
                                                         },
                                                         Children = {
                                                             new HeaderSmall(mod.Name) {
@@ -353,7 +354,7 @@ namespace Olympus {
                             Layouts.Fill(2/3f, 0.6f, 32, 0),
                             Layouts.Bottom(),
                             Layouts.Left(),
-                            Layouts.Column(false),
+                            Layouts.Column(OrdererBehavior.None),
                         },
                         Children = {
                             new Group() {
@@ -592,7 +593,7 @@ namespace Olympus {
                             Layouts.Fill(1/3f, 0.6f, 0, 0),
                             Layouts.Bottom(),
                             Layouts.Right(),
-                            Layouts.Column(false),
+                            Layouts.Column(OrdererBehavior.None),
                         },
                         Children = {
                             new HeaderMedium("News"),
@@ -875,8 +876,6 @@ namespace Olympus {
                     Layouts.Right(),
                 },
             };
-            int versionButtonWidth = versionButton.GetChild<Label>().W + versionButton.Padding.W;
-            // TODO: make use of LayoutConsts.Prev instead of this hack
             Panel everestPanel = new Panel() {
                 ID = "everestPanel",
                 Layout = {
@@ -890,13 +889,14 @@ namespace Olympus {
                     },
                     new Group() {
                         Layout = {
-                            Layouts.Fill(1, 0, versionButtonWidth, 0),
+                            Layouts.Fill(1, 0, 0, 0),
                             Layouts.Row(),
+                            Layouts.LayoutRespect()
                         },
                         Children = {
                             new Group() {
                                 Layout = {
-                                    Layouts.Fill(1f, 0, 0, 0),
+                                    Layouts.Fill(1f, 0, LayoutConsts.Next, 0),
                                     Layouts.Column(),
                                 },
                                 Children = {
@@ -1271,7 +1271,7 @@ namespace Olympus {
             public IconButton(string iconPath, string text, Action<Button> cb) : base() {
                 Cached = true;
                 
-                Layout.Add(Layouts.Row(false));
+                Layout.Add(Layouts.Row(OrdererBehavior.Fit));
 
                 Icon = Add(new Icon(OlympUI.Assets.GetTexture(iconPath)) {
                     ID = "icon",
@@ -1288,6 +1288,9 @@ namespace Olympus {
                     ID = "label",
                     Style = {
                         { Label.StyleKeys.Color, Style.GetLink(StyleKeys.Foreground) },
+                    },
+                    Layout = {
+                        Layouts.Top(0.5f, -0.5f),
                     },
                 });
 

@@ -141,6 +141,7 @@ public class NewsScene : Scene {
         int maxImageWidth = 400;
         int maxImageHeight = (int) (maxImageWidth * (9f / 16f)); // default to 16:9 aspect ratio since most imgs are shaped like this
         Panel newsPanel = new Panel() {
+            ForceW = Group.WHTrue,
             Layout = {
                 Layouts.Fill(1f, 0), 
                 Layouts.Column(), 
@@ -208,12 +209,11 @@ public class NewsScene : Scene {
                         new FadeInAnimation(0.6f).With(Ease.QuadOut),
                     },
                     Layout = {
-                        ev => {
+                        (LayoutPass.Normal, LayoutSubpass.Late, ev => {
                             Image img = (Image) ev.Element;
                             img.AutoH = maxImageHeight;
                             img.X = imagePanel.W/2 - img.AutoW/2;
-
-                        },
+                        }),
                     }
                 };
                 imagePanel.DisposeChildren();

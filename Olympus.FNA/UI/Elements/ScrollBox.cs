@@ -51,6 +51,10 @@ namespace OlympUI {
 
         // TODO: Scrolling speed is dependent on dt, the higher it is the slower it is
         public override void Update(float dt) {
+            // Fix if the element got cleared
+            if (Children.Count == 0) {
+                Content = new NullElement();
+            }
             int index;
             if ((index = Children.IndexOf(ScrollHandleX)) != 1) {
                 if (index != -1)
@@ -171,10 +175,10 @@ namespace OlympUI {
                 if (wh.Y != WHFalse) {
                     WH = wh;
                 } else {
-                    WH.X = wh.X;
+                    W = wh.X;
                 }
             } else if (wh.Y != WHFalse) {
-                WH.Y = wh.Y;
+                H = wh.Y;
             }
         }
 

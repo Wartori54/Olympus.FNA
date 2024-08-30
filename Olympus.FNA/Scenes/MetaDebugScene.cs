@@ -16,21 +16,21 @@ namespace Olympus {
                 ID = "MetaDebugScene",
                 Layout = {
                     Layouts.Right(),
-                    Layouts.Column(false)
+                    Layouts.Column(OrdererBehavior.None)
                 },
                 Children = {
-                    new Button("EXIT") {
-                        Callback = _ => App.Instance.Exit()
-                    },
-                    new Button("EXIT") {
-                        Callback = _ => App.Instance.Exit()
-                    },
-                    new Button("EXIT") {
-                        Callback = _ => App.Instance.Exit()
-                    },
-                    new Button("EXIT") {
-                        Callback = _ => App.Instance.Exit()
-                    },
+                    // new Button("EXIT") {
+                    //     Callback = _ => App.Instance.Exit()
+                    // },
+                    // new Button("EXIT") {
+                    //     Callback = _ => App.Instance.Exit()
+                    // },
+                    // new Button("EXIT") {
+                    //     Callback = _ => App.Instance.Exit()
+                    // },
+                    // new Button("EXIT") {
+                    //     Callback = _ => App.Instance.Exit()
+                    // },
                 }
             };
 

@@ -33,7 +33,7 @@ public abstract class SetupLoennShortcutSceneBase : Scene {
                         Layouts.Fill(0.5f, 0.4f),
                         Layouts.Left(0.5f, -0.5f),
                         Layouts.Top(0.5f, -0.5f),
-                        Layouts.Column(16, false),
+                        Layouts.Column(16, OrdererBehavior.None),
                     },
                     Style = {
                         { Panel.StyleKeys.Padding, 16 }

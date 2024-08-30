@@ -25,7 +25,7 @@ namespace OlympUI {
                     return;
                 _Text = value;
                 InvalidateFull();
-                LayoutNormal(LayoutEvent.Instance); // Recalculate size early
+                // LayoutNormal(LayoutEvent.Instance); // Recalculate size early
             }
         }
 
@@ -55,6 +55,7 @@ namespace OlympUI {
         [LayoutPass(LayoutPass.Normal)]
         private void LayoutNormal(LayoutEvent e) {
             // FIXME: FontStashSharp can't even do basic font maximum size precomputations...
+            Point wh = WH;
 
             DynamicSpriteFont font = StyleFont.GetCurrent<DynamicSpriteFont>();
             FontSystemEffect effect = StyleFontEffect.GetCurrent<FontSystemEffect>();
@@ -112,7 +113,12 @@ namespace OlympUI {
                 fontExtra.Set("MaxHeight", maxHeight);
             }
 
-            WH.Y = Math.Max(WH.Y, maxHeight ?? 0);
+            H = Math.Max(WH.Y, maxHeight ?? 0);
+
+            // if (wh != WH && Parent != null && Parent is Group group) {
+            //     group.AutoW = Group.WHInit;
+            //     group.AutoH = Group.WHInit;
+            // }
         }
 
         public Bounds GetTextBounds(string text = "The quick brown fox jumps over the lazy dog.", 

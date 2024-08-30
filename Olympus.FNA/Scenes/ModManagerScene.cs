@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using OlympUI;
 using OlympUI.Animations;
+using OlympUI.Events;
 using OlympUI.Modifiers;
 using Olympus.ColorThief;
 using Olympus.Utils;
@@ -42,16 +43,23 @@ namespace Olympus {
         public override Element Generate()
             => new Group() {
                 Style = { { Group.StyleKeys.Padding, 8 }, { Group.StyleKeys.Spacing, 8 }, },
-                Layout = { Layouts.Column(), Layouts.Fill(1F, 1F), },
+                Layout = {
+                    Layouts.Column(), 
+                    Layouts.Fill(1F, 1F),
+                },
                 Children = {
                     new Group() {
-                        Layout = { Layouts.Fill(1F, 0F), Layouts.Row(), },
+                        Layout = { 
+                            Layouts.Fill(1F, 0F), 
+                            Layouts.Row(OrdererBehavior.None), 
+                        },
                         Children = {
                             new Group() {
                                 Layout = { Layouts.Fill(1 / 4F, 0), },
                                 Children = {
                                     new SectionButton(this, Scener.Get<ModManagerMapsScene>(), "Your Maps")
                                     {
+                                        ID = "ModMgrB1",
                                         Layout = { Layouts.Left(0.5f, -0.5f), }
                                     },
                                 }
@@ -247,7 +255,7 @@ namespace Olympus {
                 // Dispose the scene on Leave instead on the Refresh, so this way we make sure we don't get a draw with
                 // the contents we're about to dispose (as that draw call *will* be really expensive)
                 isVisible = false;
-                UI.Run(Root.GetChild<Group>("ScrollBoxClipper").GetChild<ScrollBox>("ScrollBox").Content.DisposeChildren);
+                Root.GetChild<Group>("ScrollBoxClipper").GetChild<ScrollBox>("ScrollBox").Content.DisposeChildren();
                 base.Leave();
             }
 
@@ -300,7 +308,7 @@ namespace Olympus {
                         // This is fine since scenes do not get re-instantiated
                         List<(ModAPI.IModInfo, EntryModInfo)> allOfType = Scener.Get<ModManagerScene>().GetAllOfType(ModAPI.ModType.Tool);
                         await UI.Run(() => {
-                            el.Children.Clear();
+                            el.DisposeChildren();
                             foreach ((ModAPI.IModInfo modInfo, EntryModInfo modFileInfos) in 
                                      allOfType) {
                                 string text = modInfo.Name + $" ({modInfo.ModType})" + " -> ";
@@ -370,12 +378,12 @@ namespace Olympus {
                 },
             };
 
-            public SectionButton(ModManagerScene parentScene, Scene scene, string text) 
+            public SectionButton(ModManagerScene? parentScene, Scene scene, string text) 
                 : base(b => {
-                    if (parentScene.sceneContainer != null) 
+                    if (parentScene?.sceneContainer != null) 
                         parentScene.sceneContainer.Scene = scene;
                 }) {
-                Layout.Add(Layouts.Row(false));
+                Layout.Add(Layouts.Row(OrdererBehavior.None));
                 
                 Children.Add(new HeaderMedium(text) {
                     ID = "label",
@@ -384,12 +392,13 @@ namespace Olympus {
                     }
                 });
                 
-                Children.Add(new MetaMainScene.SidebarNavButtonIndicator(() => scene == parentScene.sceneContainer?.Scene) {
+                Children.Add(new MetaMainScene.SidebarNavButtonIndicator(() => scene == parentScene?.sceneContainer?.Scene) {
                     Y = 24+8,
                     H = 4,
+                    ID = "NavBtn" + text,
                     IsHorizontal = true,
                     Layout = {
-                        Layouts.Fill(1, 0, 0, 0),
+                        Layouts.Fill(1f, 0, 0, 0),
                         Layouts.Left(0.5f, -0.5f),
                     },
                     Style = {
@@ -416,7 +425,7 @@ namespace Olympus {
         }
         
         // The panels used everywhere in this scene
-        public sealed partial class ModManagerSceneEntry : Panel {
+        public sealed partial class ModManagerSceneEntry : Panel, IMouseEventReceiver {
             private readonly ModAPI.IModFileInfo modFileInfo;
             private readonly ModAPI.IModInfo modInfo;
 
@@ -461,6 +470,7 @@ namespace Olympus {
                 this.modFileInfo = modFileInfo;
                 this.modInfo = modInfo;
                 Disabled = this.modFileInfo.IsBlacklisted ?? false;
+                ForceW = WHTrue;
                 Layout.Add(Layouts.Fill(1, 0));
                 Layout.Add(Layouts.Column());
                 Children = new ObservableCollection<Element> {
@@ -506,6 +516,7 @@ namespace Olympus {
                         Layout = {
                             Layouts.Row(),
                             Layouts.Fill(1f, 0),
+                            // Layouts.LayoutRespect(),
                         },
                         Style = {
                             { Group.StyleKeys.Spacing, 8 } // TODO: this makes all the buttons move for a frame, whyy
@@ -684,6 +695,7 @@ namespace Olympus {
                     hasUpdatesText = HasUpdate(modFileInfo) ? "Update available!" : "Up to date!";
                 }
                 await UI.Run(() => {
+                    // TODO: Race condition: the children could be disposed before this runs
                     Button button = GetChild<Group>("BottomGroup").GetChild<Button>("UpdateStatus");
                     button.Text = hasUpdatesText;
                     button.Enabled = hasUpdatesText != "Up to date!";
@@ -715,7 +727,7 @@ namespace Olympus {
                 base.Update(dt);
             }
             
-            private void OnClick(MouseEvent.Click e) {
+            public void OnClick(MouseEvent.Click e) {
                 Disabled = !Disabled;
                 if (overlaidLabel != null) 
                     overlaidLabel.Text = Disabled ? "Press to enable!" : "Press to disable!";

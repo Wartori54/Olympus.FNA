@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 namespace OlympUI {
     public sealed partial class Root : Element {
@@ -89,6 +90,10 @@ namespace OlympUI {
 
         public void InvalidateForce() {
             ReflowingForce = true;
+#if DEBUG
+            StackTrace st = new(true);
+            Console.Write("Forcing reflow: " + st.GetFrame(1));
+#endif
         }
 
         public void InvalidateCollect() {

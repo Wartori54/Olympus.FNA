@@ -14,7 +14,7 @@ namespace OlympUI {
         public override Padding Padding => StylePadding.GetCurrent<Padding>();
         public override Point InnerWH {
             get {
-                Padding padding = StylePadding.GetCurrent<Padding>();
+                Padding padding = Padding;
                 Point wh = WH;
                 return new(wh.X - padding.W, wh.Y - padding.H);
             }
@@ -70,6 +70,57 @@ namespace OlympUI {
         }
 
         public virtual void Resize(Point wh) {
+            wh = WH;
+            Point innerWH = InnerWH;
+
+            Padding padding = Padding;
+            Point biggestWh = Point.Zero;
+            // Only if this has not init-ed resize to biggest children (if necessary)
+            if (ForceW != WHTrue && ForceH != WHTrue)
+                foreach (Element child in Children) {
+                    Point childMax = child.XY.ToPoint() /*- padding.LT*/ + child.WH;
+                    if (ForceW != WHTrue)
+                        biggestWh.X = Math.Max(biggestWh.X, childMax.X);
+                    if (ForceH != WHTrue)
+                        biggestWh.Y = Math.Max(biggestWh.Y, childMax.Y);
+                }
+
+            if (biggestWh.X > innerWH.X)
+                wh.X = biggestWh.X + padding.W;
+            if (biggestWh.Y > innerWH.Y)
+                wh.Y = biggestWh.Y + padding.H;
+            
+            Point minWH = MinWH;
+            minWH = new(
+                Math.Max(Math.Max(minWH.X, padding.W), 8),
+                Math.Max(Math.Max(minWH.Y, padding.H), 8)
+            );
+            Point maxWH = MaxWH;
+            if (minWH.X >= 0 && wh.X < minWH.X)
+                wh.X = minWH.X;
+            if (maxWH.X >= 0 && maxWH.X < wh.X)
+                wh.X = maxWH.X;
+            if (minWH.Y >= 0 && wh.Y < minWH.Y)
+                wh.Y = minWH.Y;
+            if (maxWH.Y >= 0 && maxWH.Y < wh.Y)
+                wh.Y = maxWH.Y;
+
+            // if (wh != WH && Parent != null && Parent is Group group) {
+            //     group.AutoW = WHInit;
+            //     group.AutoH = WHInit;
+            // }
+            
+            AutoWH = WH = wh;
+            
+            // bool invalidate = false;
+            // foreach (Element child in Children) {
+            //     if (child.Layout.PassesApplied.Contains(LayoutPass.Normal)) continue;
+            //     child.InvalidateSelf();
+            //     invalidate = true;
+            // }
+            // if (invalidate)
+            //     InvalidateFull();
+            return;
             Point manualWH = WH;
             Point autoWH = AutoWH;
 
@@ -79,7 +130,6 @@ namespace OlympUI {
                 autoWH.Y = manualWH.Y == default ? WHTrue : WHFalse;
 
             // The following is mostly ported from the Lua version of Olympus with slight modifications.
-
             Point forceWH = new();
             if (autoWH.X == WHTrue) {
                 forceWH.X = WHFalse;
@@ -101,7 +151,7 @@ namespace OlympUI {
             if (forceWH.Y >= 0)
                 wh.Y = forceWH.Y;
 
-            Padding padding = Padding;
+            // Padding padding = Padding;
 
             if (wh.X < 0 && wh.Y < 0) {
                 foreach (Element child in Children) {
@@ -109,55 +159,69 @@ namespace OlympUI {
                     wh.X = Math.Max(wh.X, childMax.X);
                     wh.Y = Math.Max(wh.Y, childMax.Y);
                 }
-
             } else if (wh.X < 0) {
                 foreach (Element child in Children) {
                     wh.X = Math.Max(wh.X, (int) child.RealX - padding.L + child.W);
                 }
-
             } else if (wh.Y < 0) {
                 foreach (Element child in Children) {
                     wh.Y = Math.Max(wh.Y, (int) child.RealY - padding.T + child.H);
                 }
             }
 
-            Point minWH = MinWH;
-            minWH = new(
-                Math.Max(minWH.X, padding.W),
-                Math.Max(minWH.Y, padding.H)
-            );
-            Point maxWH = MaxWH;
-            if (minWH.X >= 0 && wh.X < minWH.X)
-                wh.X = minWH.X;
-            if (maxWH.X >= 0 && maxWH.X < wh.X)
-                wh.X = maxWH.X;
-            if (minWH.Y >= 0 && wh.Y < minWH.Y)
-                wh.Y = minWH.Y;
-            if (maxWH.Y >= 0 && maxWH.Y < wh.Y)
-                wh.Y = maxWH.Y;
+            // Point minWH = MinWH;
+            // minWH = new(
+            //     Math.Max(minWH.X, padding.W),
+            //     Math.Max(minWH.Y, padding.H)
+            // );
+            // Point maxWH = MaxWH;
+            // if (minWH.X >= 0 && wh.X < minWH.X)
+            //     wh.X = minWH.X;
+            // if (maxWH.X >= 0 && maxWH.X < wh.X)
+            //     wh.X = maxWH.X;
+            // if (minWH.Y >= 0 && wh.Y < minWH.Y)
+            //     wh.Y = minWH.Y;
+            // if (maxWH.Y >= 0 && maxWH.Y < wh.Y)
+            //     wh.Y = maxWH.Y;
 
             wh.X += padding.W;
             wh.Y += padding.H;
 
             AutoWH = WH = wh;
+
+            // bool invalidate = false;
+            // foreach (Element child in Children) {
+            //     if (child.Layout.PassesApplied.Contains(LayoutPass.Normal)) continue;
+            //     child.InvalidateSelf();
+            //     invalidate = true;
+            // }
+            // if (invalidate)
+            //     InvalidateFull();
         }
 
-        public virtual void RepositionChildren() {
+        public virtual void RepositionChildren(LayoutEvent e) {
             Vector2 padding = Padding.LT.ToVector2();
             foreach (Element child in Children) {
                 child.RealXY = child.XY + padding;
             }
         }
 
+        [LayoutPass(LayoutPass.Normal, LayoutSubpass.Late - 1)]
+        private void TriggerPositionerFixers(LayoutEvent e) {
+            if (Layout.LayoutInfo.TryGetValue(LayoutHandlers.LayoutDataType.Positioner,
+                    out LayoutHandlers.LayoutData? data)) {
+                ((PositionerData) data).Fixer(e);
+            }
+        }
+        
         [LayoutPass(LayoutPass.Normal, LayoutSubpass.Late)]
         private void LayoutRepositionChildren(LayoutEvent e) {
-            RepositionChildren();
+            RepositionChildren(e);
         }
 
-        [LayoutPass(LayoutPass.Normal, LayoutSubpass.Pre)]
+        [LayoutPass(LayoutPass.Normal, LayoutSubpass.AfterChildren)]
         private void LayoutResize(LayoutEvent e) {
             Resize(new(WHFalse, WHFalse));
         }
-
     }
 }

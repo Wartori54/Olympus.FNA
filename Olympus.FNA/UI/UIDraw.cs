@@ -25,7 +25,7 @@ namespace OlympUI {
             Stack.Push(Current);
 
             if (!Recorders.TryGetValue(rt.UniqueID, out RecorderEntry? entry))
-                Recorders[rt.UniqueID] = entry = new(Current, rt);
+                Recorders[rt.UniqueID] = entry = new RecorderEntry(Current, rt);
 
             if (entry.IsDirty)
                 throw new Exception("Pushing a new draw target that is still dirty");

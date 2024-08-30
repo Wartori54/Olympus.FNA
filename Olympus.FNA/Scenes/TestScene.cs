@@ -49,6 +49,7 @@ namespace Olympus {
                     new Panel() {
                         X = 300,
                         Y = 100,
+                        MinWH = new Point(32, 32),
                         Style = {
                             { Panel.StyleKeys.Background, new Color(0xf0, 0xf0, 0xf0, 0xff) },
                             { Panel.StyleKeys.Shadow, 2f }
@@ -57,6 +58,7 @@ namespace Olympus {
                     new Panel() {
                         X = 500,
                         Y = 100,
+                        MinWH = new Point(32, 32),
                         Style = {
                             { Panel.StyleKeys.Background, Color.Black },
                             { Panel.StyleKeys.Shadow, 1f }
@@ -75,6 +77,7 @@ namespace Olympus {
                     new Panel() {
                         X = 700,
                         Y = 100,
+                        MinWH = new Point(32, 32),
                         Style = {
                             { Panel.StyleKeys.Background, Color.Black },
                             { Panel.StyleKeys.Shadow, 1f }
@@ -164,6 +167,69 @@ namespace Olympus {
                                         },
                                         new TestElement() {
                                         },
+                                        new Panel() {
+                                            Layout = {
+                                                Layouts.Fill(1, 0),
+                                                Layouts.Row(OrdererBehavior.None),
+                                                Layouts.LayoutRespect(),
+                                            },
+                                            ID = "DEBUGPANEL1",
+                                            Children = {
+                                                new Group() {
+                                                    Layout = {
+                                                        Layouts.Fill(1, 0, LayoutConsts.Next),
+                                                    },
+                                                    Children = {
+                                                        new Label("this is just text bla bla that will wrap kjasdfñlkjsadñflkjasdñflkjsadñflkjsadñflkjsadflñkjsadfñlkjdsafñlkjsadfñlkjajfaljfw") {
+                                                            Wrap = true,
+                                                        },
+                                                    }
+                                                },
+                                                new Button("Do stuff (actually nothing)", b => {
+                                                    b.Parent!.Parent!.Add(new Panel() {
+                                                        Layout = {
+                                                            Layouts.Column(),
+                                                            Layouts.Fill(1, 0),
+                                                        },
+                                                        Children = {
+                                                            new Group() {
+                                                                ID = "InterestingGID",
+                                                                Children = {
+                                                                    new Label("this is text")
+                                                                },
+                                                            },
+                                                            new Label("This is more text"),
+                                                        }
+                                                    });
+                                                }) {
+                                                    ID = "DEBUGBUTTON1"
+                                                },
+                                            }
+                                        },
+                                        new Group() {
+                                            Layout = {
+                                                Layouts.Fill(0.5f, 0, 0, 0),
+                                                Layouts.Row(OrdererBehavior.None),
+                                                // Layouts.LayoutRespect(),
+                                            },
+                                            Children = {
+                                                new Group() {
+                                                    ID = "DEBUGGROUP1",
+                                                    Layout = {
+                                                        Layouts.Fill(1, 1),
+                                                        // Layouts.LayoutRespect(),
+                                                    },
+                                                    Children = {
+                                                        new ModManagerScene.SectionButton(null, null, "ABC") {
+                                                            ID = "DEBUGBUTTON2",
+                                                            Layout = {
+                                                                Layouts.Left(0.5f, -0.5f),
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     },
                                 }
                             }
